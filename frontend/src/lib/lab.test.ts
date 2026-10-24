@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, cfbCandidates, grade, nbaCandidates, publish, rankBoard, type LabPick } from "./lab";
+import { advance, cfbCandidates, chooseDaily, grade, nbaCandidates, publish, rankBoard, type LabPick } from "./lab";
 import type { AltLine, CfbGame } from "./cfb";
 import type { NbaConfidence, NbaRow, Slate } from "./nba";
 
@@ -134,5 +134,31 @@ describe("cfbCandidates", () => {
     expect(grade(c[0], { cfb: { "7": [24, 20] } })?.result).toBe("won");
     // no alternate lines loaded: the favorite stands
     expect(cfbCandidates({ generated_at: "", games: [game()], picks: [], odds: { books_games: 1, espn_games: 0, no_line: 0 } }, {})[0].tier).toBe("Favorite");
+  });
+});
+
+describe("picks of the day", () => {
+  const now = new Date("2026-10-24T17:00:00Z");   // Saturday noon in Chicago
+  const at = (i: number, o: Partial<LabPick> = {}) => pick({ id: `p${i}`, game_id: String(i), player_id: String(i), kickoff: "2026-10-25T00:00:00Z", chance: 0.9 - i / 100, ...o });
+  it("locks each sport's 3 likeliest picks per Central-time day, priced -1000 or longer, and never swaps them", () => {
+    const cands = [at(1, { price: -1500 }), at(2), at(3), at(4), at(5),
+      at(6, { kickoff: "2026-10-24T16:00:00Z" }),                    // already started
+      at(7, { kickoff: "2026-10-26T00:00:00Z", chance: 0.99 }),      // Sunday evening in Chicago: tomorrow's list
+      at(8, { kickoff: "2026-10-28T00:00:00Z", chance: 0.99 })];     // later in the week: not yet
+    const d = chooseDaily([], cands, now);
+    expect(d.filter((x) => x.date === "2026-10-24").map((x) => [x.id, x.slot])).toEqual([["p2", 1], ["p3", 2], ["p4", 3]]);
+    expect(d.filter((x) => x.date === "2026-10-25").map((x) => x.id)).toEqual(["p7"]);
+    // a later refresh with a likelier pick keeps today's three as chosen
+    expect(chooseDaily(d, [...cands, at(9, { chance: 0.98 })], now).filter((x) => x.date === "2026-10-24").map((x) => x.id)).toEqual(["p2", "p3", "p4"]);
+  });
+  it("grades picks of the day and keeps their own record", () => {
+    const s = advance({ updated_at: null, board: [], frozen: [] }, [at(2, { game_id: "9", player_id: "5", side: "over", line: 20.5 })], {}, now);
+    expect(s.daily?.length).toBe(1);
+    const later = new Date("2026-10-25T15:00:00Z");
+    const s2 = advance(s, [], { nba: { rows: [{ date: "2026-10-24", game_id: 9, player_id: "5", market: "points", actual: 25 }], through: "2026-10-24" } }, later);
+    const b = publish(s2, sports);
+    expect(b.daily.record.by_sport.nba.won).toBe(1);
+    expect(b.daily.recent[0].result).toBe("won");
+    expect(b.daily.today).toBe("2026-10-25");
   });
 });

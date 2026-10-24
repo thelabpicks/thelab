@@ -286,7 +286,9 @@ export function grade(p: LabPick, res: Results): { result: LabResult; actual: st
 
 /* ------------------------------------------------------------------ the weekly state */
 
-export type LabState = { updated_at: string | null; board: LabPick[]; frozen: LabPick[] };
+/** A pick of the day: locked once chosen, graded after the final, never swapped. */
+export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string };
+export type LabState = { updated_at: string | null; board: LabPick[]; frozen: LabPick[]; daily?: DailyPick[] };
 export type LabRecord = { n: number; won: number; lost: number; push: number; void: number; rate: number | null };
 export type LabBoard = {
   /** Every sport's top 10 together; rank is within the pick's sport. notes: why a sport's list is short. */
@@ -294,7 +296,40 @@ export type LabBoard = {
   sports: Record<Sport, { loaded: boolean; candidates: number }>;
   record: LabRecord & { by_sport: Record<Sport, LabRecord>; since: string | null };
   recent: LabPick[];
+  /** Each sport's top 3 picks of the day (Central time): today's and tomorrow's once chosen, the recent ones, and their own record. */
+  daily: { today: string; picks: DailyPick[]; recent: DailyPick[]; record: LabRecord & { by_sport: Record<Sport, LabRecord> } };
 };
+
+/** Picks of the day per sport. In testing the model's top 3 per NFL day hit about 85% (props at lines near the
+ *  projection, 2021-2026) and its top 3 college favorites per Saturday hit about 88% when priced -1000 or longer
+ *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing. */
+export const DAILY_SIZE = 3;
+export const DAILY_MIN_PRICE = -1000;
+const DAILY_KEEP_DAYS = 90;
+/** The Central-time date a game is played on: picks of the day follow the US sports day, not UTC. */
+export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+
+/** Fills today's and tomorrow's open pick-of-the-day slots for each sport with its likeliest picks on that date (same
+ *  ranking and one-per-game/player rule as the top 10; games not yet started; priced DAILY_MIN_PRICE or longer when a
+ *  price is known). Slots already filled stay exactly as chosen. */
+export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): DailyPick[] {
+  const today = playDate(now), tomorrow = playDate(new Date(now.getTime() + 864e5));
+  const out = [...prev];
+  for (const sp of SPORTS) {
+    for (const date of [today, tomorrow]) {
+      const have = out.filter((d) => d.sport === sp && d.date === date);
+      if (have.length >= DAILY_SIZE) continue;
+      const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
+      const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now
+        && (p.price == null || p.price >= DAILY_MIN_PRICE) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
+      rankBoard(pool, DAILY_SIZE - have.length).forEach((p, i) => {
+        const { frozen_at: _f, ...rest } = p;
+        out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: now.toISOString() });
+      });
+    }
+  }
+  return out;
+}
 
 /** Picks from the last board whose games have started are frozen as they were shown; the rest are rebuilt. */
 export function advance(prev: LabState, cands: LabPick[], res: Results, now: Date): LabState {
@@ -304,7 +339,11 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
   const frozen = [...prev.frozen, ...prev.board.filter((p) => started(p) && !known.has(p.id)).map((p) => ({ ...p, frozen_at: at }))]
     .map((p) => { if (p.result) return p; const g = grade(p, res); return g ? { ...p, ...g } : p; });
   const open = cands.filter((c) => !started(c));
-  return { updated_at: now.toISOString(), board: SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp))), frozen };
+  const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp)));
+  const cutoff = playDate(new Date(now.getTime() - DAILY_KEEP_DAYS * 864e5));
+  const daily = chooseDaily((prev.daily ?? []).filter((d) => d.date >= cutoff), open, now)
+    .map((d) => { if (d.result) return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
+  return { updated_at: now.toISOString(), board, frozen, daily };
 }
 
 export function tally(ps: LabPick[]): LabRecord {
@@ -328,5 +367,18 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 30): 
     notes: Object.fromEntries(SPORTS.map((sp) => [sp, note(sp)])) as Record<Sport, string | null>,
     record: { ...tally(settled), by_sport: by, since: s.frozen.length ? s.frozen.map((p) => p.kickoff).sort()[0] : null },
     recent: SPORTS.flatMap((sp) => s.frozen.filter((p) => p.sport === sp).sort((a, b) => b.kickoff.localeCompare(a.kickoff)).slice(0, recentN)),
+    daily: dailyBoard(s),
+  };
+}
+
+function dailyBoard(s: LabState) {
+  const today = playDate(s.updated_at ?? new Date());
+  const all = s.daily ?? [];
+  const settled = all.filter((d) => d.result);
+  const order = (a: DailyPick, b: DailyPick) => SPORTS.indexOf(a.sport) - SPORTS.indexOf(b.sport) || a.slot - b.slot;
+  return {
+    today, picks: all.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date) || order(a, b)),
+    recent: all.filter((d) => d.date < today).sort((a, b) => b.date.localeCompare(a.date) || order(a, b)).slice(0, 45),
+    record: { ...tally(settled), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp))])) as Record<Sport, LabRecord> },
   };
 }

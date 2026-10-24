@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { SPORTS, SURE, SPORT_LABEL, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { SPORTS, SURE, SPORT_LABEL, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -37,6 +37,11 @@ export default function LabPicks() {
         Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the surest. Picks at 70%+
         are marked sure plays. Tap a pick for the full write-up.
       </p>
+      <Notice tone="info" title="Live lines coming soon">
+        Live sportsbook lines aren't pulling in for now, so some picks use a player's usual line. Check your book's line before betting. Live lines are coming soon.
+      </Notice>
+      {b?.daily && <DailyCard b={b} />}
+
       <Segmented label="Sport" value={sport} onChange={(v) => setSp({ sport: v }, { replace: true })}
         options={SPORTS.map((s) => ({ value: s, label: `${SPORT_LABEL[s]}${b ? ` · ${b.board.filter((p) => p.sport === s).length}` : ""}` }))} />
       {q.isLoading && <Card><LoadingBlock rows={6} className="p-5" /></Card>}
@@ -109,6 +114,58 @@ function ResultBadge({ p }: { p: LabPick }) {
   const tone = p.result === "won" ? "ok" : p.result === "lost" ? "danger" : "neutral";
   const label = { won: "Won", lost: "Lost", push: "Push", void: "Void" }[p.result!];
   return <Badge tone={tone} title={p.actual}>{label}</Badge>;
+}
+
+const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** The text of one sport's picks of the day, ready to post. */
+function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
+  const lines = ps.map((p) => `${p.slot}. ${p.bet} (${p.matchup}): ${pct(p.chance, 0)} to hit`);
+  return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines, r.n ? `Picks of the day: ${recText(r)} (${pct(r.rate ?? 0, 0)})` : ""].filter(Boolean).join("\n");
+}
+
+/** Each sport's 3 likeliest picks for today (and tomorrow, once chosen), locked when chosen and tracked separately. */
+function DailyCard({ b }: { b: LabBoard }) {
+  const [copied, setCopied] = React.useState<string | null>(null);
+  const groups = new Map<string, DailyPick[]>();
+  for (const p of b.daily.picks) groups.set(`${p.date}|${p.sport}`, [...(groups.get(`${p.date}|${p.sport}`) ?? []), p]);
+  const rec = b.daily.record;
+  const copy = (key: string, text: string) => {
+    navigator.clipboard?.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(null), 2000); }, () => {});
+  };
+  return (
+    <Card>
+      <CardHeader title="Picks of the day" icon={<Trophy className="h-4 w-4 text-accent" />}
+        subtitle={`Each sport's 3 likeliest picks for the day, locked when chosen and graded after the final. Record: ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}`} />
+      {!groups.size && <CardBody><p className="text-sm text-muted">Today's picks post once the sport's games have lines; they stay put once chosen.</p></CardBody>}
+      {[...groups.entries()].map(([key, ps]) => {
+        const sport = ps[0].sport, date = ps[0].date;
+        return (
+          <div key={key} className="border-t border-line/60">
+            <div className="flex items-center justify-between gap-3 px-4 pt-3 sm:px-5">
+              <div className="flex items-center gap-2 text-sm font-semibold"><SportBadge sport={sport} />{date === b.daily.today ? "Today" : day(date)}
+                <span className="text-xs font-normal text-muted">{recText(rec.by_sport[sport])}</span></div>
+              <button type="button" className="text-xs text-accent hover:underline" onClick={() => copy(key, postText(sport, date, ps, rec.by_sport[sport]))}>
+                {copied === key ? "Copied" : "Copy for posting"}</button>
+            </div>
+            <ol className="divide-y divide-line/40">
+              {ps.map((p) => (
+                <li key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
+                  <span className="w-5 shrink-0 text-center font-display font-bold text-accent">{p.slot}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium leading-snug">{p.bet}</div>
+                    <div className="text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
+                  </div>
+                  <span className="text-sm font-semibold">{pct(p.chance, 0)}</span>
+                  {p.result && <ResultBadge p={p} />}
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+    </Card>
+  );
 }
 
 const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "–");
