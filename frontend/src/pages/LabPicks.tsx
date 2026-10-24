@@ -37,6 +37,9 @@ export default function LabPicks() {
         Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the surest. Picks at 70%+
         are marked sure plays. Tap a pick for the full write-up.
       </p>
+      <Notice tone="info" title="Live lines coming soon">
+        Live sportsbook lines aren't pulling in for now, so some picks use a player's usual line. Check your book's line before betting. Live lines are coming soon.
+      </Notice>
       <Segmented label="Sport" value={sport} onChange={(v) => setSp({ sport: v }, { replace: true })}
         options={SPORTS.map((s) => ({ value: s, label: `${SPORT_LABEL[s]}${b ? ` · ${b.board.filter((p) => p.sport === s).length}` : ""}` }))} />
       {q.isLoading && <Card><LoadingBlock rows={6} className="p-5" /></Card>}
