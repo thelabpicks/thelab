@@ -306,10 +306,15 @@ def fetch_odds(day: str, key: str, week_games: list[dict], featured: list[int], 
     games = []
     for e in events:  # type: ignore[union-attr]
         h, a = match_team(e.get("home_team", ""), teams), match_team(e.get("away_team", ""), teams)
-        gid = by_pair.get((h, a)) or by_pair.get((a, h))
+        gid = by_pair.get((h, a))
+        flipped = not gid and bool(by_pair.get((a, h)))
+        gid = gid or by_pair.get((a, h))
         if gid:
+            # "home" and "away" always mean the schedule's sides: when the feed lists them the other way round
+            # (neutral sites), its names are swapped so every price lands on the right team
+            home, away = (e["away_team"], e["home_team"]) if flipped else (e["home_team"], e["away_team"])
             games.append({"event_id": e["id"], "game_id": gid, "commence_time": e["commence_time"],
-                          "home": e["home_team"], "away": e["away_team"]})
+                          "home": home, "away": away, "flipped": flipped})
     remaining, used = _credits(hdr)
     feat_events = [g for f in featured for g in games if g["game_id"] == f]
     budget = plan_budget(remaining, used, len(games), len(feat_events), datetime.fromisoformat(day).weekday(), mode,

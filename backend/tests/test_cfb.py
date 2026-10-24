@@ -139,9 +139,16 @@ def test_frozen_picks_are_graded_at_their_line(tmp_path, monkeypatch):
 
 def test_qb_change_flags_a_new_passer_in_the_last_game():
     rows = [(g, "Starter", 30) for g in (1, 2, 3)] + [(4, "Backup", 28), (4, "Starter", 3)]
-    pg = pd.DataFrame([{"season": 2026, "team_id": 9, "game_id": g, "athlete_name": n, "pass_att": a} for g, n, a in rows])
+    pg = pd.DataFrame([{"season": 2026, "team_id": 9, "game_id": g, "athlete_name": n, "pass_att": a, "rush_att": 3} for g, n, a in rows])
     assert pipeline.qb_changes(pg, 2026) == {9: {"season_leader": "Starter", "last_game": "Backup"}}
     assert pipeline.qb_changes(pg[pg.game_id < 4], 2026) == {}
+
+
+def test_qb_change_catches_an_option_quarterback_who_barely_throws():
+    # Air Force 2026: Szarka hurt, Medders started and threw 3 times
+    rows = [(1, "Szarka", 11, 25), (1, "Medders", 1, 5), (2, "Szarka", 5, 13), (3, "Szarka", 10, 21), (4, "Medders", 3, 18)]
+    pg = pd.DataFrame([{"season": 2026, "team_id": 2005, "game_id": g, "athlete_name": n, "pass_att": a, "rush_att": r} for g, n, a, r in rows])
+    assert pipeline.qb_changes(pg, 2026) == {2005: {"season_leader": "Szarka", "last_game": "Medders"}}
 
 
 def test_postgame_resim_scores_more_for_the_offense_that_played_better():
@@ -243,6 +250,42 @@ def test_upset_drivers_counts_how_often_the_dog_was_ahead():
                       "home_to": [0] * 60 + [1] * 60, "away_to": [2] * 60 + [1] * 60})
     d = report.upset_drivers(g)
     assert d["upsets"] == 60 and d["rows"][0]["upsets"] == 1.0 and d["rows"][0]["others"] == 0.0
+
+
+def test_this_week_keeps_only_the_current_week():
+    now = pd.Timestamp("2026-10-24 15:00")
+    g = pd.DataFrame({"game_id": [1, 2, 3, 4], "season": 2026, "season_type": "regular", "week": [8, 8, 9, 7],
+                      "final": [False, False, False, True],
+                      "date": pd.to_datetime(["2026-10-24 19:30", "2026-10-27 23:00", "2026-10-31 04:00", "2026-10-18 19:00"]),
+                      "home_team": ["Minnesota", "WKU", "Iowa", "Iowa"], "away_team": ["Iowa", "Delaware", "Wisconsin", "X"]})
+    assert g[pipeline.this_week(g, now)].game_id.tolist() == [1, 2]     # next Saturday's Wisconsin at Iowa waits a week
+
+
+def test_cross_checks_flag_a_team_twice_and_a_wrong_matchup():
+    g = pd.DataFrame({"season": [2026], "final": [True], "fbs_game": [True], "spread": [-3.0]})
+    rows = [{"game_id": 1, "home": "Minnesota", "away": "Iowa", "home_id": 135, "away_id": 2294, "line": {"has_line": True}},
+            {"game_id": 2, "home": "Iowa", "away": "Wisconsin", "home_id": 2294, "away_id": 275, "line": {"has_line": True}}]
+    lines = {1: {"espn_home_id": 135, "espn_away_id": 2294}, 2: {"espn_home_id": 275, "espn_away_id": 2294}}
+    c = {x["check"]: x for x in pipeline.cross_checks(g, lines, rows, pd.Series(dtype=bool))}
+    assert c["Teams listed in more than one game this week"]["value"] == "Iowa"
+    m = c["Matchups (home and away team) that match ESPN's schedule"]
+    assert m["value"] == "1 of 2" and m["games"] == [2] and not m["ok"]
+
+
+def test_odds_feed_listed_the_other_way_round_still_prices_the_right_team(monkeypatch):
+    from datetime import datetime, timezone
+    week = [{"game_id": 7, "home_team": "Iowa", "home_id": 2294, "away_team": "Wisconsin", "away_id": 275}]
+
+    def fake(url, params=None):
+        if url.endswith("/events"):
+            return [{"id": "e", "home_team": "Wisconsin Badgers", "away_team": "Iowa Hawkeyes", "commence_time": "x"}], {"x-requests-remaining": "400", "x-requests-used": "100"}
+        return [{"id": "e", "bookmakers": [{"key": "dk", "markets": [{"key": "spreads", "outcomes": [
+            {"name": "Iowa Hawkeyes", "point": -4.5, "price": -110}, {"name": "Wisconsin Badgers", "point": 4.5, "price": -110}]}]}]}], {}
+    monkeypatch.setattr(collect, "_get_json", fake)
+    out = collect.fetch_odds("2026-10-27", "k", week, [], log=lambda *_: None, mode="never",
+                             now=datetime(2026, 10, 27, 12, tzinfo=timezone.utc))
+    home = [l for l in out["game_lines"] if l["side"] == "home"]
+    assert out["games"][0]["flipped"] and home[0]["point"] == -4.5      # Iowa is the home team on the schedule
 
 
 def test_alternate_lines_are_priced_by_the_sims_at_the_best_price():

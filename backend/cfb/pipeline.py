@@ -24,7 +24,7 @@ from engine.util import utcnow
 from . import collect, history, model, props, rating, report, sources
 
 FREEZE_HOURS = 36      # a game's picks are frozen on the run before kickoff, within this many hours of it
-WEEK_DAYS = 8
+WEEK_DAYS = 8          # look this far ahead, then keep only the current week (see this_week)
 
 
 def _clean(o):
@@ -75,6 +75,17 @@ def book_table(offers: list[dict]) -> list[dict]:
         if key and o.get("price") is not None:
             b.setdefault(key, {})[o["side"]] = [o.get("point"), int(o["price"])]
     return sorted(out.values(), key=lambda b: b["book"])
+
+
+def this_week(g: pd.DataFrame, now: pd.Timestamp) -> pd.Series:
+    """Games of the current college football week that are still to be played. An eight-day look-ahead alone would
+    show next Saturday's games on a Saturday, putting a team on the page twice (Iowa at Minnesota and Wisconsin at
+    Iowa), so only the earliest week left in that window is kept."""
+    ahead = (~g.final) & (g.date >= now - pd.Timedelta(hours=4)) & (g.date < now + pd.Timedelta(days=WEEK_DAYS))
+    if not ahead.any():
+        return ahead
+    first = g[ahead].sort_values("date").iloc[0]
+    return ahead & (g.season == first.season) & (g.season_type == first.season_type) & (g.week == first.week)
 
 
 def live_lines(today: str) -> dict:
@@ -140,7 +151,7 @@ def live_lines(today: str) -> dict:
             "books_at": fetched.get(gid),
             "offers": ls, "team_totals": tts.get(gid, []), "props": prs.get(gid, []), "alts": alts.get(gid, []),
             "home_rank": e.get("home_rank"), "away_rank": e.get("away_rank"), "tv": e.get("tv"),
-            "espn_spread": e.get("home_spread"),
+            "espn_spread": e.get("home_spread"), "espn_home_id": e.get("home_id"), "espn_away_id": e.get("away_id"),
         }
         out[gid] = row
     return out
@@ -560,6 +571,18 @@ def cross_checks(g: pd.DataFrame, lines: dict, rows: list[dict], upcoming: pd.Se
                 gap.append(gid)
     out.append({"check": "Games where ESPN's spread and the sportsbooks' differ by 2.5+ points", "value": str(len(gap)), "ok": len(gap) <= 3,
                 "games": gap[:10]})
+    # every matchup checked against ESPN's schedule, and no team listed twice
+    seen: dict = {}
+    for r in rows:
+        for t in (r["home"], r["away"]):
+            seen[t] = seen.get(t, 0) + 1
+    twice = sorted(t for t, n in seen.items() if n > 1)
+    out.append({"check": "Teams listed in more than one game this week", "value": ", ".join(twice) or "none", "ok": not twice})
+    wrong = [r["game_id"] for r in rows if (L := lines.get(r["game_id"], {})).get("espn_home_id") is not None
+             and (L["espn_home_id"], L["espn_away_id"]) != (r["home_id"], r["away_id"])]
+    on_sb = sum(1 for r in rows if lines.get(r["game_id"], {}).get("espn_home_id") is not None)
+    out.append({"check": "Matchups (home and away team) that match ESPN's schedule", "value": f"{on_sb - len(wrong)} of {on_sb}",
+                "ok": not wrong, "games": wrong[:10]})
     no_line = sum(1 for r in rows if not r["line"]["has_line"])
     out.append({"check": "This week's games without a posted line yet", "value": f"{no_line} of {len(rows)}", "ok": True})
     return out
@@ -570,12 +593,13 @@ def qb_changes(pg: pd.DataFrame, season: int) -> dict:
     quarterback change (injury or benching) that older ratings have not caught up with."""
     if pg.empty:
         return {}
-    p = pg[(pg.season == season) & (pg.pass_att >= 5)]
+    # any attempt counts: option offenses (Air Force, Army, Navy) often start a quarterback who throws 3 or 4 times
+    p = pg[(pg.season == season) & (pg.pass_att >= 1) & (pg.athlete_name != "Team")]
     out = {}
     for tid, x in p.groupby("team_id"):
         lead = x.groupby("athlete_name").pass_att.sum().idxmax()
         last_gid = x.game_id.max()
-        last = x[x.game_id == last_gid].sort_values("pass_att", ascending=False).athlete_name.iloc[0]
+        last = x[x.game_id == last_gid].sort_values(["pass_att", "rush_att"], ascending=False).athlete_name.iloc[0]
         if last != lead and x.game_id.nunique() >= 3:
             out[int(tid)] = {"season_leader": lead, "last_game": last}
     return out
@@ -722,7 +746,7 @@ def run(out: Path, log=print, today: str | None = None, now: datetime | None = N
     lines = live_lines(today)
     # this week's games take the live line (closing lines arrive upstream after the games)
     nowts = pd.Timestamp(now.replace(tzinfo=None))
-    upcoming = (~g.final) & (g.date >= nowts - pd.Timedelta(hours=4)) & (g.date < nowts + pd.Timedelta(days=WEEK_DAYS))
+    upcoming = this_week(g, nowts)
     for c, k in (("spread", "spread"), ("total", "total"), ("ml_home", "ml_home"), ("ml_away", "ml_away")):
         vals = g.loc[upcoming, "game_id"].map(lambda gid: lines.get(gid, {}).get(k))
         g.loc[upcoming, c] = pd.to_numeric(vals, errors="coerce")

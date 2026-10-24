@@ -68,7 +68,10 @@ priced together from 1,000 of that game's simulated scores (`sims.json`), other 
 ## Checking itself
 
 * **Data checks** every run (Research page): finished games missing a box score, play-by-play or closing line;
-  box-score yards vs play-by-play EPA; ESPN's spread vs the sportsbooks'; games without a line yet.
+  box-score yards vs play-by-play EPA; ESPN's spread vs the sportsbooks'; games without a line yet; every matchup's
+  home and away team against ESPN's schedule; no team listed in two games. The site shows only the current week
+  (`this_week`): an eight-day look-ahead alone put next Saturday's games next to today's. Sportsbook feeds that list a
+  neutral-site game the other way round are turned to the schedule's home and away before prices are saved.
 * **Before the game**: quarterback-change warnings when a team's last passer is not its season leader.
 * **After the game**: every frozen projection is compared with the final and with the book's line (props too), and the
   game is simulated 5,000 times again from what each offense actually did (a box-score-to-points model fit on the last
