@@ -102,9 +102,11 @@ describe("nbaCandidates", () => {
       by_side: { over: [], under: [] }, note: "", by_market: [] } } as NbaConfidence;
     const slate: Slate = { date: "2026-10-24", generated_at: "", odds: { fetched_at: null, plan: "free", props_priced: false },
       games: [{ game_id: 1, date: "2026-10-24", home: "NY", away: "BOS", time: "2026-10-24T23:30:00Z" }],
-      rows: [nbaRow("1", 1, 28, 21.5), nbaRow("2", 1, 20, 19.5), nbaRow("3", 1, 28, 21.5, { out: true }), nbaRow("4", 1, 28, 21.5, { evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } })] };
+      rows: [nbaRow("1", 1, 25.5, 21.5), nbaRow("2", 1, 20, 19.5), nbaRow("3", 1, 28, 21.5, { out: true }), nbaRow("4", 1, 28, 21.5, { evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
+        // usual line far above this game's projection: no book would post it
+        nbaRow("5", 1, 9, 21.5)] };
     const c = nbaCandidates(slate, { conf });
-    // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor
+    // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor; row 5's line is not one a book would post
     expect(c.map((p) => p.player_id)).toEqual(["1"]);
     expect(c[0].chance).toBeGreaterThanOrEqual(0.7);
     expect(c[0].tier).toBe("Strong");

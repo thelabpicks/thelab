@@ -91,6 +91,9 @@ export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const out: LabPick[] = [];
   for (const r of slate.rows) {
     if (r.out || r.evidence.minutes_long < 20 || r.line < MIN_LINE || !games.has(r.game_id)) continue;
+    // Without a book line the line is the player's usual one. When this game's projection sits far from it (a role or
+    // minutes change), no book will post that line, so a near-certain under against it is not a real pick.
+    if (r.line_source !== "book" && Math.abs(r.mean - r.line) > Math.max(1.5, 0.2 * Math.max(r.line, r.mean))) continue;
     const lean = leanOf(r);
     if (!lean) continue;
     const t = nbaTier(ctx.conf, lean.p);
