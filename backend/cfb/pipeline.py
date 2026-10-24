@@ -533,12 +533,13 @@ def qb_changes(pg: pd.DataFrame, season: int) -> dict:
     quarterback change (injury or benching) that older ratings have not caught up with."""
     if pg.empty:
         return {}
-    p = pg[(pg.season == season) & (pg.pass_att >= 5)]
+    # any attempt counts: option offenses (Air Force, Army, Navy) often start a quarterback who throws 3 or 4 times
+    p = pg[(pg.season == season) & (pg.pass_att >= 1) & (pg.athlete_name != "Team")]
     out = {}
     for tid, x in p.groupby("team_id"):
         lead = x.groupby("athlete_name").pass_att.sum().idxmax()
         last_gid = x.game_id.max()
-        last = x[x.game_id == last_gid].sort_values("pass_att", ascending=False).athlete_name.iloc[0]
+        last = x[x.game_id == last_gid].sort_values(["pass_att", "rush_att"], ascending=False).athlete_name.iloc[0]
         if last != lead and x.game_id.nunique() >= 3:
             out[int(tid)] = {"season_leader": lead, "last_game": last}
     return out

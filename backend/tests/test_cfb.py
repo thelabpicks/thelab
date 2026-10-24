@@ -131,9 +131,16 @@ def test_frozen_picks_are_graded_at_their_line(tmp_path, monkeypatch):
 
 def test_qb_change_flags_a_new_passer_in_the_last_game():
     rows = [(g, "Starter", 30) for g in (1, 2, 3)] + [(4, "Backup", 28), (4, "Starter", 3)]
-    pg = pd.DataFrame([{"season": 2026, "team_id": 9, "game_id": g, "athlete_name": n, "pass_att": a} for g, n, a in rows])
+    pg = pd.DataFrame([{"season": 2026, "team_id": 9, "game_id": g, "athlete_name": n, "pass_att": a, "rush_att": 3} for g, n, a in rows])
     assert pipeline.qb_changes(pg, 2026) == {9: {"season_leader": "Starter", "last_game": "Backup"}}
     assert pipeline.qb_changes(pg[pg.game_id < 4], 2026) == {}
+
+
+def test_qb_change_catches_an_option_quarterback_who_barely_throws():
+    # Air Force 2026: Szarka hurt, Medders started and threw 3 times
+    rows = [(1, "Szarka", 11, 25), (1, "Medders", 1, 5), (2, "Szarka", 5, 13), (3, "Szarka", 10, 21), (4, "Medders", 3, 18)]
+    pg = pd.DataFrame([{"season": 2026, "team_id": 2005, "game_id": g, "athlete_name": n, "pass_att": a, "rush_att": r} for g, n, a, r in rows])
+    assert pipeline.qb_changes(pg, 2026) == {2005: {"season_leader": "Szarka", "last_game": "Medders"}}
 
 
 def test_postgame_resim_scores_more_for_the_offense_that_played_better():
