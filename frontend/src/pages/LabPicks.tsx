@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { SPORTS, SURE, SPORT_LABEL, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -112,7 +112,7 @@ function SportBadge({ sport }: { sport: Sport }) {
 
 function ResultBadge({ p }: { p: LabPick }) {
   const tone = p.result === "won" ? "ok" : p.result === "lost" ? "danger" : "neutral";
-  const label = { won: "Won", lost: "Lost", push: "Push", void: "Void" }[p.result!];
+  const label = { won: "Hit", lost: "Miss", push: "Push", void: "Void" }[p.result!];
   return <Badge tone={tone} title={p.actual}>{label}</Badge>;
 }
 
@@ -170,42 +170,70 @@ function DailyCard({ b }: { b: LabBoard }) {
 
 const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "–");
 
-/** Every pick that was on the list at kickoff, graded after the final. */
+/** Every pick that was on the list at kickoff (and every pick of the day), graded after the final: hit or miss, by day. */
 function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
   const r = b.record.by_sport[sport];
+  const dr = b.daily?.record.by_sport[sport];
   const recent = b.recent.filter((p) => p.sport === sport);
-  const pending = recent.filter((p) => !p.result).length;
+  const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => d.sport === sport).map((d) => [`${d.game_id}|${d.bet}`, d]));
+  // picks of the day that never made the top 10 still belong in the results
+  const rows: (LabPick & { day?: number })[] = [...recent];
+  const seen = new Set(recent.map((p) => `${p.game_id}|${p.bet}`));
+  potd.forEach((d, k) => { if (!seen.has(k) && new Date(d.kickoff) <= new Date(b.generated_at)) rows.push(d); });
+  const byDay = new Map<string, LabPick[]>();
+  for (const p of rows.sort((x, y) => y.kickoff.localeCompare(x.kickoff))) {
+    const d = playDate(p.kickoff); byDay.set(d, [...(byDay.get(d) ?? []), p]);
+  }
+  const pending = rows.filter((p) => !p.result).length;
   return (
     <Card>
-      <CardHeader title={`How the ${SPORT_LABEL[sport]} list has done`} icon={<Trophy className="h-4 w-4 text-accent" />}
-        subtitle={b.record.since ? `Every pick that was on the list when its game started, since ${new Date(b.record.since).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "Picks are frozen at kickoff and graded after the final."} />
+      <CardHeader title={`${SPORT_LABEL[sport]} results`} icon={<Trophy className="h-4 w-4 text-accent" />}
+        subtitle="Every pick that was on the list when its game started, graded after the final. Picks are never changed after kickoff." />
       <CardBody className="space-y-3">
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <div><div className="label">Record</div><div className="font-display text-xl font-bold">{recText(r)}</div></div>
-          <div><div className="label">Hit rate</div><div className="font-display text-xl font-bold">{r.rate == null ? "–" : pct(r.rate, 0)}</div></div>
+          <div><div className="label">Top 10</div><div className="font-display text-xl font-bold">{recText(r)}{r.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(r.rate, 0)}</span>}</div></div>
+          {dr && <div><div className="label">Picks of the day</div><div className="font-display text-xl font-bold">{recText(dr)}{dr.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(dr.rate, 0)}</span>}</div></div>}
           {SPORTS.filter((s) => s !== sport).map((s) => (
-            <div key={s}><div className="label">{SPORT_LABEL[s]}</div><div className="font-semibold">{recText(b.record.by_sport[s])}</div></div>
+            <div key={s}><div className="label">{SPORT_LABEL[s]} top 10</div><div className="font-semibold">{recText(b.record.by_sport[s])}</div></div>
           ))}
-          <div><div className="label">All sports</div><div className="font-semibold">{recText(b.record)}</div></div>
         </div>
-        {!recent.length && <p className="text-sm text-muted">The record starts with the first games played after the list goes live.</p>}
-        {pending > 0 && <p className="text-xs text-muted">{pending} frozen {pending === 1 ? "pick is" : "picks are"} waiting on a final.</p>}
+        {!rows.length && <p className="text-sm text-muted">Results show here once the first games on the list are played.</p>}
+        {pending > 0 && <p className="text-xs text-muted">{pending} {pending === 1 ? "pick is" : "picks are"} waiting on a final score.</p>}
       </CardBody>
-      {!!recent.length && (
-        <ul className="divide-y divide-line/60 border-t border-line">
-          {recent.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
-              <span className="w-6 shrink-0 text-center text-xs font-bold text-muted">#{p.rank}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{p.bet}</div>
-                <div className="truncate text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.actual ? ` · ${p.actual}` : ""}</div>
-              </div>
-              <span className="text-xs text-muted">{pct(p.chance, 0)}</span>
-              {p.result ? <ResultBadge p={p} /> : <Badge>Pending</Badge>}
-            </li>
-          ))}
-        </ul>
-      )}
+      {[...byDay.entries()].map(([d, ps]) => {
+        const t = tally(ps);
+        return (
+          <div key={d} className="border-t border-line">
+            <div className="flex items-center justify-between bg-raised/40 px-4 py-1.5 text-xs font-semibold sm:px-5">
+              <span>{day(d)}</span><span className="text-muted">{t.n ? `${recText(t)} that day` : "Pending"}</span>
+            </div>
+            <ul className="divide-y divide-line/60">
+              {ps.map((p) => {
+                const daily = potd.get(`${p.game_id}|${p.bet}`);
+                return (
+                  <li key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
+                    <ResultMark p={daily?.result ? daily : p} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent">Pick of the day</span>}</div>
+                      <div className="truncate text-xs text-muted">{p.matchup} · {when(p.kickoff)}{(daily?.actual ?? p.actual) ? ` · ${daily?.actual ?? p.actual}` : ""}</div>
+                    </div>
+                    <span className="text-xs text-muted">{pct(p.chance, 0)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
     </Card>
   );
+}
+
+/** A big hit / miss mark for the results list. */
+function ResultMark({ p }: { p: LabPick }) {
+  const r = p.result;
+  const [txt, cls] = r === "won" ? ["✓", "bg-ok/15 text-ok"] : r === "lost" ? ["✗", "bg-danger/15 text-danger"]
+    : r === "push" ? ["P", "bg-raised text-muted"] : r === "void" ? ["–", "bg-raised text-muted"] : ["…", "bg-raised text-muted"];
+  const label = r ? { won: "Hit", lost: "Miss", push: "Push", void: "Void (did not play)" }[r] : "Pending";
+  return <span title={label} aria-label={label} className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold", cls)}>{txt}</span>;
 }

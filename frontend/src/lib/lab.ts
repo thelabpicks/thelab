@@ -352,7 +352,7 @@ export function tally(ps: LabPick[]): LabRecord {
   return { n: won + lost, won, lost, push: c("push"), void: c("void"), rate: won + lost ? won / (won + lost) : null };
 }
 
-export function publish(s: LabState, sports: LabBoard["sports"], recentN = 30): LabBoard {
+export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): LabBoard {
   const settled = s.frozen.filter((p) => p.result);
   const by = Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((p) => p.sport === sp))])) as Record<Sport, LabRecord>;
   const note = (sp: Sport) => {
