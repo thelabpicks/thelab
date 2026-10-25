@@ -15,7 +15,7 @@ export default function CfbResearch() {
   const b = bt.data;
   return (
     <div className="space-y-5">
-      <PageTitle kicker="College football" title="Research and track record" />
+      <PageTitle kicker="College football" title="Track record" />
       {!b && <Card><LoadingBlock rows={6} className="p-5" /></Card>}
       {b && (
         <Notice title="The short version">

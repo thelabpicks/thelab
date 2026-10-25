@@ -1,8 +1,8 @@
 # College football
 
-The site's third side: use the **NFL / CFB / NBA** switch in the header. Pages: This week (picks and every FBS game),
-game pages, Ask, Teams (power ratings, ATS and over/under records), Player props (featured games) and Research &
-record. College football research, not betting advice. No pick is guaranteed.
+The site's third side: use the **NFL / CFB / NBA** switch in the header. It has the same menu as the NFL and NBA sides
+(Picks: This week, Ask, Parlay builder; Research: Player props, All games, Teams; Proof: How it works, Track record),
+plus game pages. Player props cover featured games; Teams has power ratings, ATS and over/under records. College football research, not betting advice. No pick is guaranteed.
 
 ## Every day, automatically
 
