@@ -1,10 +1,10 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MessageCircleQuestion } from "lucide-react";
+import { Dices, MessageCircleQuestion } from "lucide-react";
 import { num, pct } from "@/lib/format";
 import { MIN_LINE, edgeOf, leanOf, marketLabel, nbaTier, score10, useNba, type NbaConfidence, type NbaStatus, type Slate } from "@/lib/nba";
 import { PageTitle } from "@/components/Layout";
-import { Card, CardBody, CardHeader, Input, LoadingBlock, Notice, TeamBadge } from "@/components/ui";
+import { Button, Card, CardBody, CardHeader, Input, LoadingBlock, Notice, TeamBadge } from "@/components/ui";
 import { TierBadge } from "@/components/shared";
 import { Headshot, NbaSignals, NotPublished } from "./shared";
 
@@ -25,7 +25,9 @@ export default function NbaHome() {
   const strong = conf.data?.props?.tiers.find((t) => t.tier === "Strong");
   return (
     <div className="space-y-5">
-      <PageTitle kicker={status.data ? `NBA ${status.data.season_label}` : "NBA"} title={d?.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "Today"} />
+      <PageTitle kicker={status.data ? `NBA ${status.data.season_label}` : "NBA"} title={d?.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "Today"}>
+        <Link to="/nba/builder"><Button variant="primary"><Dices className="h-4 w-4" />Build a parlay</Button></Link>
+      </PageTitle>
       <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/nba/ask?q=${encodeURIComponent(q.trim())}`); }} className="relative">
         <MessageCircleQuestion className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" aria-hidden />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask: best unders tonight, will Brunson score 25, 3-leg parlay…" className="pl-9" aria-label="Ask a question" />

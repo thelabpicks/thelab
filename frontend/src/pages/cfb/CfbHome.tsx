@@ -1,10 +1,10 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MessageCircleQuestion } from "lucide-react";
+import { Dices, MessageCircleQuestion } from "lucide-react";
 import { pct } from "@/lib/format";
 import { dayOf, fmtPrice, kick, useCfb, type Backtest, type CfbGame, type CfbStatus, type Week } from "@/lib/cfb";
 import { PageTitle } from "@/components/Layout";
-import { Badge, Card, CardBody, CardHeader, Input, LoadingBlock } from "@/components/ui";
+import { Badge, Button, Card, CardBody, CardHeader, Input, LoadingBlock } from "@/components/ui";
 import { LeanRow, Matchup, MatchupRow, NotPublished, RatingKey, roiText } from "./shared";
 
 export default function CfbHome() {
@@ -23,7 +23,9 @@ export default function CfbHome() {
   for (const g of games) byDay.set(dayOf(g.date), [...(byDay.get(dayOf(g.date)) ?? []), g]);
   return (
     <div className="space-y-5">
-      <PageTitle kicker={w?.games[0] ? `College football ${status.data?.season ?? ""} · Week ${w.games[0].week}` : "College football"} title="This week" />
+      <PageTitle kicker={w?.games[0] ? `College football ${status.data?.season ?? ""} · Week ${w.games[0].week}` : "College football"} title="This week">
+        <Link to="/cfb/parlay"><Button variant="primary"><Dices className="h-4 w-4" />Build a parlay</Button></Link>
+      </PageTitle>
       <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/cfb/ask?q=${encodeURIComponent(q.trim())}`); }} className="relative">
         <MessageCircleQuestion className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" aria-hidden />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask: best totals this week, Alabama spread, top 10 teams…" className="pl-9" aria-label="Ask a question" />
@@ -65,7 +67,7 @@ export default function CfbHome() {
         <Card><CardBody className="text-xs text-muted">
           Built from {status.data.history.games.toLocaleString()} games since {status.data.history.first_season} ({status.data.history.lined_games.toLocaleString()} with closing lines).
           Ratings are refit before every week and the last two seasons count most. Latest final {status.data.history.last_game_date}.
-          {" "}<Link to="/cfb/research" className="text-accent hover:underline">How it works</Link>
+          {" "}<Link to="/cfb/how" className="text-accent hover:underline">How it works</Link>
         </CardBody></Card>
       )}
     </div>

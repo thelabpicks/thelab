@@ -127,7 +127,7 @@ export default function CfbParlay() {
               </>
             )}
           </Card>
-          <Card><CardBody className="text-xs text-muted">Ratings and the backtest behind them: <Link to="/cfb/research" className="text-accent hover:underline">Research & record</Link>. Football research, not betting advice.</CardBody></Card>
+          <Card><CardBody className="text-xs text-muted">Ratings and the backtest behind them: <Link to="/cfb/record" className="text-accent hover:underline">Track record</Link>. Football research, not betting advice.</CardBody></Card>
         </div>
       </div>
     </div>
