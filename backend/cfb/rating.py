@@ -71,8 +71,14 @@ def fit(L: pd.DataFrame) -> dict:
 
 
 def calibrated(r: dict, market: str, p: float, q: float = 0.5) -> float:
+    """The calibrated chance never claims more edge over the market than the simulation does, and an edge smaller
+    than any the fit has seen keeps the market's chance. The isotonic ends rest on a handful of leans: without the
+    bound a 31% underdog the market gave 30% came out at 1.5% (rating 0.0), and the largest edges were stretched
+    (walk-forward 7+ return +1.6% -> +2.0% with the bound)."""
     xs, ys = r["cal"].get(market, r["cal"].get(market.split("_")[0], [[-1, 1], [-1, 1]]))
-    return float(np.clip(q + np.interp(p - q, xs, ys), 0, 1))
+    x = p - q
+    edge = min(x, 0.0) if x < xs[0] else float(np.interp(x, xs, ys))
+    return float(np.clip(q + min(edge, max(x, 0.0)), 0, 1))
 
 
 def rate(r: dict, market: str, p: float, dec: float | None, q: float = 0.5) -> dict:
