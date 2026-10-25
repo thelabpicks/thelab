@@ -308,3 +308,11 @@ def test_alternate_lines_are_priced_by_the_sims_at_the_best_price():
     assert not any(r["price"] == -5000 for r in rows)                  # priced past -1000: dropped
     assert any(r["market"] == "total" and r["side"] == "over" and r["tested_rate"] is None for r in rows)
     assert [r["chance"] for r in rows] == sorted((r["chance"] for r in rows), reverse=True)
+
+
+def test_calibration_never_claims_more_edge_than_the_simulation():
+    from cfb import rating
+    r = {"cal": {"moneyline_dog": [[0.02, 0.05, 0.2], [-0.29, 0.02, 0.65]]}, "ref": [0.0]}
+    assert rating.calibrated(r, "moneyline_dog", 0.31, 0.30) == 0.30          # edge below the fitted range: market's chance
+    assert rating.calibrated(r, "moneyline_dog", 0.25, 0.30) == 0.25          # negative edge kept as the sim has it
+    assert rating.calibrated(r, "moneyline_dog", 0.50, 0.30) <= 0.50          # never above the sim
