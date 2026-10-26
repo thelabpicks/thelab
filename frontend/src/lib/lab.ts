@@ -90,6 +90,16 @@ function nflPick(d: AskData, p: Pick, kickoff: string): LabPick {
 export const NBA_MIN_START_RATE = 0.6;
 export const NBA_MIN_MINUTES = 24;
 
+/** Starts most games with starter's minutes, judged on this season once he has played in it (last season's role can be
+ *  stale: a starter traded to the bench, or a player yet to appear this season). */
+export function regularStarter(r: NbaRow): boolean {
+  const e = r.evidence;
+  if (e.start_rate < NBA_MIN_START_RATE || e.minutes < NBA_MIN_MINUTES) return false;
+  if (e.season_games == null) return true;
+  if (e.season_games === 0) return false;
+  return (e.season_starts ?? 0) / e.season_games >= NBA_MIN_START_RATE && (e.season_min ?? 0) >= NBA_MIN_MINUTES;
+}
+
 export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const games = new Map(slate.games.map((g) => [g.game_id, g]));
   const out: LabPick[] = [];
@@ -101,7 +111,7 @@ export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
     // Only players sure to play: anyone on the injury report (bar probable) is out of the list. Without a book line, only
     // regular starters with starter's minutes, the players books post props for.
     if (r.injury && !/probable/i.test(r.injury)) continue;
-    if (r.line_source !== "book" && (r.evidence.start_rate < NBA_MIN_START_RATE || r.evidence.minutes < NBA_MIN_MINUTES)) continue;
+    if (r.line_source !== "book" && !regularStarter(r)) continue;
     const lean = leanOf(r);
     if (!lean) continue;
     const t = nbaTier(ctx.conf, lean.p);

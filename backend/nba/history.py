@@ -87,6 +87,7 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     p["games_prior"] = gp.cumcount()
     p["season_games"] = p.groupby(["player_id", "season"]).cumcount()
     p["season_min"] = p.groupby(["player_id", "season"]).minutes.transform(lambda s: s.shift(1).expanding().mean())
+    p["season_starts"] = p.groupby(["player_id", "season"]).starter.transform(lambda s: s.shift(1).fillna(0).cumsum())
     p["rest"] = gp.game_date.diff().dt.days.clip(upper=7).fillna(7)
     # Same-day guard: a player has at most one game per date, so shift(1) above never sees the same day.
 
