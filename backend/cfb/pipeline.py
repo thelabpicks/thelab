@@ -373,8 +373,9 @@ def reasons(row: dict, m: dict) -> list[str]:
 
 # --------------------------------------------------------------------------- frozen picks and the live record
 def freeze(rows: list[dict], now: datetime, props_rows: list[dict] | None = None) -> dict:
-    """Save each game's leans, projected score and player-prop projections once, on the last run before kickoff
-    (within FREEZE_HOURS). Never overwritten, so the report card compares what we said before the game."""
+    """Save each game's leans, projected score and player-prop projections on every run within FREEZE_HOURS of
+    kickoff, so the file ends up holding the last run before kickoff: the picks the site showed when the game
+    started. Once the game has started nothing touches it, so the report card compares what we said beforehand."""
     by_game: dict = {}
     for p in props_rows or []:
         by_game.setdefault(p["game_id"], []).append({k: p[k] for k in ("player", "player_id", "team", "market", "mean", "line",
@@ -387,8 +388,6 @@ def freeze(rows: list[dict], now: datetime, props_rows: list[dict] | None = None
         if not (now < ko <= now + timedelta(hours=FREEZE_HOURS)) or not r["line"]["has_line"]:
             continue
         f = d / f"{r['game_id']}.json"
-        if f.exists():
-            continue
         f.write_text(json.dumps(_clean({"game_id": r["game_id"], "date": r["date"], "home": r["home"], "away": r["away"],
                                         "frozen_at": utcnow(), "line": r["line"], "featured": r["featured"],
                                         "model": r["model"], "ratings": r.get("ratings"), "notes": r.get("notes", []), "markets": r["markets"],

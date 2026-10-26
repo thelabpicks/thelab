@@ -73,6 +73,12 @@ priced together from 1,000 of that game's simulated scores (`sims.json`), other 
   (`this_week`): an eight-day look-ahead alone put next Saturday's games next to today's. Sportsbook feeds that list a
   neutral-site game the other way round are turned to the schedule's home and away before prices are saved.
 * **Before the game**: quarterback-change warnings when a team's last passer is not its season leader.
+* **Frozen picks**: each run within 36 hours of kickoff re-saves the game's picks, so the graded record holds the
+  last run before kickoff (Saturday's line pull included), the same picks the site showed when the game started.
+  Until 2026-10-26 the first run froze them, so Saturday games were graded on Friday's picks.
+* **Tested and rejected (week of Oct 22 review)**: a defense's last-3-game form vs its season (points, yards per play,
+  EPA allowed), pace x explosive-play matchups for shootouts, and quarterback disruption known before kickoff (last
+  starter left early or changed). None moved totals or spreads against the line walk-forward; the books already price them.
 * **After the game**: every frozen projection is compared with the final and with the book's line (props too), and the
   game is simulated 5,000 times again from what each offense actually did (a box-score-to-points model fit on the last
   three seasons). Pregame vs post-game sim = how far the inputs were off; post-game sim vs final = what no input
