@@ -1,5 +1,5 @@
 import * as React from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy, History,
@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
 import { useLinkSuffix, useSeasonWeek, useTheme, type WeeksResponse } from "@/lib/state";
 import { Select } from "./ui";
+import { useCfb, type CfbPrevious, type CfbStatus, type Week as CfbWeek } from "@/lib/cfb";
+import { useNba, type NbaPrevious, type NbaStatus, type Slate } from "@/lib/nba";
 
 type NavItem = { to: string; label: string; short?: string; icon: typeof LayoutDashboard; end?: boolean };
 type NavSection = { title: string; items: NavItem[] };
@@ -91,7 +93,7 @@ function SeasonWeekPicker() {
   return (
     <div className="flex items-center gap-1.5">
       <label className="sr-only" htmlFor="season-select">Season</label>
-      <Select id="season-select" value={season} onChange={(e) => set(Number(e.target.value), Number(e.target.value) === weeks.data?.current_season ? weeks.data.current_week : 1)} className="h-8 w-[4.5rem] text-xs sm:w-auto">
+      <Select id="season-select" value={season} onChange={(e) => set(Number(e.target.value), Number(e.target.value) === weeks.data?.current_season ? weeks.data.current_week : 1)} className="hidden h-8 w-auto text-xs sm:block">
         {seasons.map((s) => <option key={s} value={s}>{s}</option>)}
       </Select>
       <label className="sr-only" htmlFor="week-select">Week</label>
@@ -103,6 +105,77 @@ function SeasonWeekPicker() {
         ))}
       </Select>
     </div>
+  );
+}
+
+/** The NFL header's season and week pickers, for college football (weeks) and the NBA (days). The current week or
+ *  slate opens the sport's home page; a past one opens Previous weeks on it. */
+function SportPeriodPicker({ sport }: { sport: "cfb" | "nba" }) {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const [params] = useSearchParams();
+  const cfb = sport === "cfb";
+  const cPrev = useCfb<CfbPrevious>("previous.json", cfb);
+  const cWeek = useCfb<CfbWeek>("week.json", cfb);
+  const cStat = useCfb<CfbStatus>("status.json", cfb);
+  const nPrev = useNba<NbaPrevious>("previous.json", !cfb);
+  const nSlate = useNba<Slate>("slate.json", !cfb);
+  const nStat = useNba<NbaStatus>("status.json", !cfb);
+  const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  let season: string;
+  let now: string | null;
+  let past: { key: string; label: string }[];
+  if (cfb) {
+    season = String(cStat.data?.season ?? cPrev.data?.season ?? "");
+    const w = cWeek.data?.games[0]?.week;
+    now = w != null ? `Week ${w} · upcoming` : null;
+    const seen = new Set<string>();
+    past = [...(cPrev.data?.games ?? [])].reverse().flatMap((g) => {
+      const key = `${g.season_type}-${g.week}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [{ key, label: g.season_type === "regular" ? `Week ${g.week}` : `Postseason ${g.week}` }];
+    });
+  } else {
+    season = nStat.data?.season_label ?? "";
+    now = nSlate.data?.date ? `${day(nSlate.data.date)} · next games` : null;
+    past = (nPrev.data?.days ?? []).map((d) => ({ key: d.date, label: day(d.date) }));
+  }
+  const base = cfb ? "/cfb" : "/nba";
+  const onPrev = loc.pathname === `${base}/previous`;
+  const value = onPrev ? params.get("p") ?? past[0]?.key ?? "" : "now";
+  if (!season && !now && !past.length) return null;
+  return (
+    <div className="flex items-center gap-1.5">
+      {season && (<>
+        <label className="sr-only" htmlFor="season-select">Season</label>
+        <Select id="season-select" value={season} onChange={() => undefined} className="hidden h-8 w-auto text-xs sm:block">
+          <option value={season}>{season}</option>
+        </Select>
+      </>)}
+      <label className="sr-only" htmlFor="week-select">{cfb ? "Week" : "Day"}</label>
+      <Select id="week-select" value={value} className="h-8 w-[5.5rem] text-xs sm:w-auto"
+        onChange={(e) => nav(e.target.value === "now" ? base : `${base}/previous?p=${encodeURIComponent(e.target.value)}`)}>
+        {now && <option value="now">{now}</option>}
+        {past.map((p) => <option key={p.key} value={p.key}>{p.label} · results</option>)}
+        {onPrev && value === "__all" && <option value="__all">Every {cfb ? "week" : "day"}</option>}
+      </Select>
+    </div>
+  );
+}
+
+/** College football and NBA: the same chip as the NFL's, green when the sport has markets proven in testing. */
+function SportStatusChip({ sport }: { sport: "cfb" | "nba" }) {
+  const cfb = sport === "cfb";
+  const c = useCfb<CfbStatus>("status.json", cfb);
+  const n = useNba<NbaStatus>("status.json", !cfb);
+  const ok = cfb ? (c.data ? Object.values(c.data.proven).some((t) => t.length) : null) : (n.data ? n.data.validated_markets.length > 0 : null);
+  const label = ok == null ? "Checking" : ok ? "Model validated" : "Research ranks only";
+  return (
+    <NavLink to={cfb ? "/cfb/record" : "/nba/record"} className="hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted hover:text-fg sm:flex">
+      <span className={cn("h-2 w-2 rounded-full", ok == null ? "bg-muted" : ok ? "bg-accent" : "bg-info")} aria-hidden />
+      {label}
+    </NavLink>
   );
 }
 
@@ -195,6 +268,8 @@ export function Layout() {
           <div className="flex-1" />
           {!other && <SeasonWeekPicker />}
           {!other && <div className="hidden sm:block"><StatusChip /></div>}
+          {!top && sport !== "nfl" && <SportPeriodPicker sport={sport} />}
+          {!top && sport !== "nfl" && <div className="hidden sm:block"><SportStatusChip sport={sport} /></div>}
           <ThemeToggle />
         </header>
         <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-5 sm:px-6 lg:pb-10">
