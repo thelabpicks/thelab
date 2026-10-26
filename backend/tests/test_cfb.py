@@ -137,6 +137,24 @@ def test_frozen_picks_are_graded_at_their_line(tmp_path, monkeypatch):
     assert won["spread"] == 0.0 and won["total"] == 1 and won["team_total"] == 0.0 and won["moneyline"] == 0.0
 
 
+def test_frozen_picks_keep_the_last_run_before_kickoff(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setenv("CFB_ARCHIVE_DIR", str(tmp_path))
+
+    def row(total):
+        return {"game_id": 9, "date": "2026-10-24T19:30:00Z", "home": "Alabama", "away": "Auburn", "featured": False,
+                "line": {"has_line": True, "total": total}, "model": {}, "markets": []}
+
+    def saved():
+        return json.loads((tmp_path / "picks" / "9.json").read_text())["line"]["total"]
+
+    pipeline.freeze([row(50.5)], datetime(2026, 10, 23, 15, tzinfo=timezone.utc))   # Friday's run
+    pipeline.freeze([row(52.5)], datetime(2026, 10, 24, 15, tzinfo=timezone.utc))   # Saturday's run, new lines
+    assert saved() == 52.5
+    pipeline.freeze([row(55.5)], datetime(2026, 10, 24, 20, tzinfo=timezone.utc))   # after kickoff: untouched
+    assert saved() == 52.5
+
+
 def test_qb_change_flags_a_new_passer_in_the_last_game():
     rows = [(g, "Starter", 30) for g in (1, 2, 3)] + [(4, "Backup", 28), (4, "Starter", 3)]
     pg = pd.DataFrame([{"season": 2026, "team_id": 9, "game_id": g, "athlete_name": n, "pass_att": a, "rush_att": 3} for g, n, a in rows])
