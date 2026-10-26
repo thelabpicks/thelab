@@ -64,8 +64,9 @@ def _norm(s: str) -> str:
 def book_odds(day: str) -> dict:
     """Today's saved prices: game lines by team and player props by (normalized name, market)."""
     f = sources.archive_dir() / "odds" / f"{day}.json"
+    espn = collect.load_espn_lines(day)
     if not f.exists():
-        return {"games": {}, "props": {}, "fetched_at": None, "plan": None}
+        return {"games": espn, "props": {}, "fetched_at": None, "plan": None}
     s = json.loads(f.read_text())
     ev = {g["event_id"]: g for g in s.get("games", [])}
     games = {}
@@ -81,6 +82,7 @@ def book_odds(day: str) -> dict:
             e["spreads"].setdefault("home", []).append(l["point"])
     games = {k: {"total": float(np.median(v["totals"])) if v["totals"] else None,
                  "home_spread": float(np.median(v["spreads"]["home"])) if v["spreads"].get("home") else None} for k, v in games.items()}
+    games = espn | games   # bought lines when there are any, else ESPN's (DraftKings) for free
     pr: dict = {}
     for p in s.get("props", []):
         pr.setdefault((_norm(p["player"]), p["market"]), []).append(
@@ -136,6 +138,13 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     # Due is shown only in markets where, in testing, such players beat their projection at least as often as others.
     due_markets = {m for m, v in due["markets"].items() if v["beat_projection"] >= v["others_beat_projection"]}
     rows = slate_json(proj, f, oos, reports, odds, due_markets) if len(proj) else []
+    # Free plan: buy real prop lines for the likeliest picks' games and markets, then rebuild the rows at those lines.
+    if rows and not odds["props"] and len(slate) and str(slate.game_date.min().date()) == today:
+        teams = {g.game_id: (g.home_abbreviation, g.away_abbreviation) for g in slate.itertuples()}
+        got = collect.fetch_props(today, prop_targets(rows, teams), log=log)
+        if got.get("prices"):
+            odds = book_odds(today)
+            rows = slate_json(proj, f, oos, reports, odds, due_markets)
     games = [{"game_id": g.game_id, "date": str(g.game_date.date()), "time": g.game_date_time, "home": g.home_abbreviation,
               "away": g.away_abbreviation, **odds["games"].get((g.home_abbreviation, g.away_abbreviation), {})}
              for g in slate.itertuples()]
@@ -170,6 +179,35 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     _write(out, "status.json", status)
     log(f"nba: wrote site data for {slate_date} ({len(rows)} rows, {len(players)} player pages) in {status['seconds']:.0f}s")
     return status
+
+
+MIN_START_RATE, MIN_MINUTES = 0.6, 24   # books post props for regular starters
+
+
+def regular_starter(e: dict) -> bool:
+    """Starts most games with starter's minutes, judged on this season once he has played in it."""
+    if (e.get("start_rate") or 0) < MIN_START_RATE or (e.get("minutes") or 0) < MIN_MINUTES:
+        return False
+    g = e.get("season_games")
+    if g is None:
+        return True
+    return g > 0 and (e.get("season_starts") or 0) / g >= MIN_START_RATE and (e.get("season_min") or 0) >= MIN_MINUTES
+
+
+def prop_targets(rows: list[dict], teams: dict) -> list[tuple[str, str, str]]:
+    """(home, away, market) of each likely pick at a usual line, likeliest first: the props worth buying. Eligible: not
+    out or listed worse than probable (as The Lab's NBA list, frontend lab.ts), a regular starter, and a usual line close
+    to his projection (a book line far from it would change the pick)."""
+    picks = []
+    for r in rows:
+        if r["line_source"] == "book" or r["p_over"] is None or r["out"] or r["game_id"] not in teams or r["line"] < 1.5:
+            continue
+        if r["injury"] and "probable" not in r["injury"].lower():
+            continue
+        if not regular_starter(r["evidence"]) or abs(r["mean"] - r["line"]) > max(1.5, 0.2 * max(r["line"], r["mean"])):
+            continue
+        picks.append((max(r["p_over"], 1 - r["p_over"]), (*teams[r["game_id"]], r["market"])))
+    return [w for _, w in sorted(picks, key=lambda x: -x[0])]
 
 
 def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, odds: dict, due_markets: set[str]) -> list[dict]:

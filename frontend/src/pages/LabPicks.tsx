@@ -60,7 +60,7 @@ export default function LabPicks() {
       {b && <RecordCard b={b} sport={sport} />}
 
       <Card><CardBody className="space-y-1.5 text-xs text-muted">
-        <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws only on the picks that sport already features: NFL and NBA props from confidence tiers that hit 50%+ on unseen games,
+        <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws only on the picks that sport already features: NFL and NBA props from confidence tiers that hit 50%+ on unseen games (NBA only at prop lines a book really posts),
           and in college, each game's favorite to win outright plus bets rated 7+. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
           picks really did), highest first, and 70%+ picks are marked sure plays. Ties go to a real sportsbook line, then to the tier's tested record. One pick per game and per player.
           When the books' feed carries alternate lines (a paid odds plan), they count too: only lines a book posts, priced -500 or longer, that the sims give a better chance than the price implies.
