@@ -430,7 +430,7 @@ def record(g: pd.DataFrame, summary: dict) -> dict:
                          "label": f"{s['away']} at {s['home']}", "side": m.get("team") or m["side"], "line": m.get("line"),
                          "posted": m.get("line_posted", True)})
     if not rows:
-        return {"games": 0, "picks": 0, "empty_reason": "The live record starts with this week's games: every game's leans "
+        return {"games": 0, "picks": 0, "finals": recent_finals(fin), "empty_reason": "The live record starts with this week's games: every game's leans "
                                                          "are frozen on game day before kickoff and graded once the final is in."}
     r = pd.DataFrame(rows)
     by = []
@@ -442,9 +442,16 @@ def record(g: pd.DataFrame, summary: dict) -> dict:
             "by_market_tier": by,
             "suggested": {"n": int(len(pk)), "hits": int(pk.won.sum()), "rate": float(pk.won.mean()) if len(pk) else None},
             "recent": r[r.proven].sort_values("date", ascending=False).head(40).to_dict("records"),
-            # Final scores of the last three weeks' graded games, so other pages (The Lab's picks) grade at their own line.
-            "finals": {str(gid): [float(fin.loc[gid].home_points), float(fin.loc[gid].away_points)]
-                       for gid in r[r.date >= (pd.Timestamp(r.date.max()) - pd.Timedelta(days=21)).strftime("%Y-%m-%d")].game_id.unique()}}
+            "finals": recent_finals(fin)}
+
+
+def recent_finals(fin: pd.DataFrame, days: int = 21) -> dict:
+    """Final scores of every game in the last three weeks, so other pages (The Lab's picks) grade at their own line,
+    including games the site's own record never froze a pick on."""
+    if fin.empty:
+        return {}
+    last = fin[fin.date >= fin.date.max() - pd.Timedelta(days=days)]
+    return {str(gid): [float(x.home_points), float(x.away_points)] for gid, x in last.iterrows()}
 
 
 INPUT_LABELS = {"plays": ("plays", "Pace (plays)"), "ypp": ("ypp", "Yards per play"), "turnovers": ("to", "Turnovers"),
