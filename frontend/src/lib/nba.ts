@@ -138,3 +138,9 @@ export function nbaReasons(r: NbaRow, lean: Lean): string[] {
   out.push(`Projects ${r.mean.toFixed(1)} on average; the line is ${r.line} (${over ? "below" : "above"} that).`);
   return out;
 }
+
+/** previous.json: every graded lean of the last three weeks, by day and game. A lean is
+ *  [player_id, name, team, market, side, line, chance, projection, actual, won]. */
+export type NbaPrevLean = [string, string, string, string, "over" | "under", number, number, number | null, number, 0 | 1];
+export type NbaPrevious = { generated_at: string; note?: string;
+  days: { date: string; line_source: "book" | "usual"; games: { game_id: number; home: string; away: string; score: [number | null, number | null]; picks: NbaPrevLean[] }[] }[] };

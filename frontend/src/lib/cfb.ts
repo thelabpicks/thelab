@@ -148,3 +148,12 @@ export function tierOf(r: MarketReport | undefined, name: string | null | undefi
 
 /** "Thu 10:00 AM" style age of a line pull. */
 export const pulled = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" }) : "");
+
+/** previous.json: every finished game of the season with the model's side in every market, graded. source "live" =
+ *  frozen before kickoff; "backtest" = the model as it stood that week, at the closing line. */
+export type PrevLean = Pick<Lean, "market" | "side" | "team" | "team_side" | "line" | "line_posted" | "price" | "p" | "score" | "tier" | "proven" | "ev"> & {
+  result: "won" | "lost" | "push" };
+export type PrevCfbGame = { game_id: number; week: number; season_type: string; date: string; home: string; away: string; score: [number, number];
+  source: "live" | "backtest"; line: { spread: number | null; total: number | null; ml_home: number | null; ml_away: number | null };
+  model: { home: number; away: number; home_win: number } | null; markets: PrevLean[] };
+export type CfbPrevious = { generated_at: string; season: number; games: PrevCfbGame[]; note: string };

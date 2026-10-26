@@ -37,6 +37,9 @@ import CfbParlay from "./pages/cfb/CfbParlay";
 import CfbGames from "./pages/cfb/CfbGames";
 import HitRates from "./pages/HitRates";
 import LabPicks from "./pages/LabPicks";
+import Previous from "./pages/Previous";
+import NbaPrevious from "./pages/nba/NbaPrevious";
+import CfbPrevious from "./pages/cfb/CfbPrevious";
 import { EmptyState } from "./components/ui";
 import { STATIC } from "./lib/api";
 
@@ -70,6 +73,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="data" element={<DataSync />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="top10" element={<LabPicks />} />
+              <Route path="previous" element={<Previous />} />
               <Route path="nba" element={<NbaHome />} />
               <Route path="nba/props" element={<NbaProps />} />
               <Route path="nba/builder" element={<NbaBuilder />} />
@@ -77,6 +81,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="nba/players/:id" element={<NbaPlayer />} />
               <Route path="nba/record" element={<NbaRecord />} />
               <Route path="nba/how" element={<NbaHow />} />
+              <Route path="nba/previous" element={<NbaPrevious />} />
               <Route path="cfb" element={<CfbHome />} />
               <Route path="cfb/game/:id" element={<CfbGame />} />
               <Route path="cfb/ask" element={<CfbAsk />} />
@@ -87,6 +92,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="cfb/how" element={<CfbHow />} />
               <Route path="cfb/parlay" element={<CfbParlay />} />
               <Route path="cfb/games" element={<CfbGames />} />
+              <Route path="cfb/previous" element={<CfbPrevious />} />
               <Route path="*" element={<EmptyState title="Page not found">That route does not exist.</EmptyState>} />
             </Route>
           </Routes>

@@ -37,3 +37,20 @@ def test_scored_game_without_box_score_stays_pending(monkeypatch):
     # once the box score is in, a player with no row sat out
     c.execute("INSERT INTO player_game VALUES ('2', 'g', 2026, 7, 1, 0)")
     assert picklog.grade(c, [pick], 2026, 7)[0]["status"] == "void"
+
+
+def test_previous_weeks_groups_picks_by_week_and_game():
+    import sqlite3
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    c.execute("CREATE TABLE games (game_id, season, week, home_team, away_team, home_score, away_score, gameday)")
+    c.execute("INSERT INTO games VALUES ('2026_07_NE_CHI', 2026, 7, 'CHI', 'NE', 24, 17, '2026-10-22')")
+    rows = [{"season": 2026, "week": 7, "game_id": "2026_07_NE_CHI", "player_id": str(i), "player_name": f"P{i}", "team": "CHI",
+             "market": "rush_yds", "side": "over", "line": 50.5, "p": p, "median": 55.0, "actual": 61.0, "result": 1,
+             "featured": False, "kickoff": "2026-10-23T00:15:00+00:00"} for i, p in ((1, 0.55), (2, 0.7))]
+    out = picklog._previous(c, rows)
+    assert [(w["season"], w["week"]) for w in out] == [(2026, 7)]
+    g = out[0]["games"][0]
+    assert (g["home"], g["away"], g["score"]) == ("CHI", "NE", [24, 17])
+    assert [p[0] for p in g["picks"]] == ["2", "1"]   # likeliest first
+    assert g["picks"][0][9] == 1

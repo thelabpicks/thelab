@@ -158,3 +158,19 @@ def test_post_game_review_splits_a_miss_into_minutes_and_production():
     assert out["lost"] == 1 and out["lost_minutes_explain"] == 1
     assert out["biggest_misses"][0]["cause"] == "minutes"
     assert out["minutes"]["bias"] == -6.0 and out["team_rotation"]["bias"] == -10.0
+
+
+def test_previous_days_groups_leans_by_day_and_game():
+    import pandas as pd
+    from nba import pipeline
+    r = pd.DataFrame([
+        {"date": "2026-10-24", "game_id": 7, "player_id": "1", "player_name": "A", "team": "LAL", "opp": "UTAH", "home": 0, "team_score": 132,
+         "opp_score": 123, "market": "points", "side": "over", "line": 20.5, "lean": 0.58, "mean": 22.1, "actual": 25.0, "won": 1, "line_source": "usual"},
+        {"date": "2026-10-24", "game_id": 7, "player_id": "2", "player_name": "B", "team": "UTAH", "opp": "LAL", "home": 1, "team_score": 123,
+         "opp_score": 132, "market": "assists", "side": "under", "line": 4.5, "lean": 0.66, "mean": 3.2, "actual": 6.0, "won": 0, "line_source": "usual"},
+    ])
+    out = pipeline.previous_days(r)
+    g = out["days"][0]["games"][0]
+    assert (g["home"], g["away"], g["score"]) == ("UTAH", "LAL", [123.0, 132.0])
+    assert [p[1] for p in g["picks"]] == ["B", "A"]   # likeliest first
+    assert g["picks"][0][-1] == 0

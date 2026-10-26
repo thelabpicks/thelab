@@ -152,6 +152,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     _write(out, "confidence.json", conf)
     _write(out, "due.json", due)
     _write(out, "correlation.json", cor or {"use_correlation": False, "buckets": {}})
+    _write(out, "previous.json", rec.pop("previous", None) or {"generated_at": utcnow(), "days": [], "note": rec.get("empty_reason")})
     _write(out, "record.json", rec)
     players = player_pages(d, rows)
     for pid, page in players.items():
@@ -265,7 +266,10 @@ def record(d: pd.DataFrame) -> dict:
             won = int((val > p["line"]) == (side == "over"))
             prices = [o["price"] for o in p.get("offers", []) if o["side"] == side]
             best = max(prices, key=_decimal) if prices else None
+            b = box.loc[key]
             rows.append({"date": s["date"], "market": p["market"], "side": side, "lean": lean, "won": won,
+                         "player_name": p.get("player_name"), "opp": b["opp"], "home": int(b["home"]),
+                         "team_score": b.get("team_score"), "opp_score": b.get("opponent_team_score"), "line_source": p.get("line_source"),
                          "best": best, "edge": lean - 1 / _decimal(best) if best else None,
                          "mean": p.get("mean"), "actual": val, "player_id": p["player_id"], "team": p["team"], "game_id": key[0],
                          "line": p["line"], "proj_minutes": p.get("proj_minutes"), "minutes": float(box.loc[key, "minutes"]),
@@ -285,10 +289,43 @@ def record(d: pd.DataFrame) -> dict:
                           for m, g in r.groupby("market")],
             "vs_books": {"picks": int(len(priced)), "wins": int(priced.won.sum()), "units": units,
                          "roi": units / len(priced) if len(priced) else None},
-            "projection_check": projection_check(r), "post_game": post_game_review(r, d), "graded": graded_rows(r)}
+            "projection_check": projection_check(r), "post_game": post_game_review(r, d), "graded": graded_rows(r),
+            "previous": previous_days(r)}
 
 
 GRADED_DAYS = 14
+PREVIOUS_DAYS = 21
+
+
+def _num(v):
+    return None if v is None or v != v else float(v)
+
+
+def previous_days(r: pd.DataFrame) -> dict:
+    """Every graded lean of the last three weeks, by day and game, for the Previous days page: what the model said
+    (side, line, chance, projection) next to the final stat. Kept compact: one short list per lean.
+    Lean = [player_id, name, team, market, side, line, chance, projection, actual, won]."""
+    days = sorted(r.date.unique())[-PREVIOUS_DAYS:]
+    out = []
+    for day in days:
+        x = r[r.date == day]
+        games = []
+        for gid, gx in x.groupby("game_id"):
+            h = gx[gx.home == 1]
+            a = gx[gx.home == 0]
+            home = h.team.iloc[0] if len(h) else a.opp.iloc[0]
+            away = a.team.iloc[0] if len(a) else h.opp.iloc[0]
+            ref = h.iloc[0] if len(h) else None
+            score = [_num(ref.team_score), _num(ref.opp_score)] if ref is not None else \
+                [_num(a.iloc[0].opp_score), _num(a.iloc[0].team_score)]
+            games.append({"game_id": int(gid), "home": home, "away": away, "score": score,
+                          "picks": [[str(int(float(p.player_id))), p.player_name, p.team, p.market, p.side, float(p.line), round(float(p.lean), 3),
+                                     None if p.mean is None or p.mean != p.mean else round(float(p.mean), 1), float(p.actual), int(p.won)]
+                                    for p in gx.sort_values("lean", ascending=False).itertuples()]})
+        out.append({"date": day, "line_source": "book" if (x.line_source == "book").any() else "usual", "games": games})
+    return {"generated_at": utcnow(), "days": out[::-1],
+            "note": "Each day's leans are frozen before tip-off and graded from the box score the next morning. Book prop lines "
+                    "need a paid odds plan, so most lines are the player's usual line (his recent median), not one a book posted."}
 
 
 def graded_rows(r: pd.DataFrame) -> list[dict]:
