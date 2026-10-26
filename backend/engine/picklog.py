@@ -167,12 +167,15 @@ def grade(c, rows: list[dict], season: int, week: int) -> list[dict]:
     done = {r["game_id"] for r in c.execute("SELECT game_id FROM games WHERE season=? AND week=? AND home_score IS NOT NULL", (season, week))}
     pg = {(r["player_id"], r["game_id"]): r for r in c.execute(
         "SELECT player_id, game_id, participated, scored_anytime FROM player_game WHERE season=? AND week=?", (season, week))}
+    # a final score arrives hours before the box score: until a game has player rows, its picks stay pending rather
+    # than being voided as "did not play"
+    stats_in = {gid for (_, gid) in pg}
     h = props.load_history(c)
     h = h[(h.season == season) & (h.week == week)].set_index("player_id")
     out = []
     for r in rows:
         g = dict(r, result=None, actual=None, status="pending")
-        if r["game_id"] in done:
+        if r["game_id"] in done and r["game_id"] in stats_in:
             row = pg.get((r["player_id"], r["game_id"]))
             if row is None or not row["participated"]:
                 g["status"] = "void"

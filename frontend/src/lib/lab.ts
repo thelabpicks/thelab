@@ -337,12 +337,12 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
   const started = (p: LabPick) => new Date(p.kickoff) <= now;
   const known = new Set(prev.frozen.map((p) => p.id));
   const frozen = [...prev.frozen, ...prev.board.filter((p) => started(p) && !known.has(p.id)).map((p) => ({ ...p, frozen_at: at }))]
-    .map((p) => { if (p.result) return p; const g = grade(p, res); return g ? { ...p, ...g } : p; });
+    .map((p) => { if (p.result && p.result !== "void") return p; const g = grade(p, res); return g ? { ...p, ...g } : p; });
   const open = cands.filter((c) => !started(c));
   const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp)));
   const cutoff = playDate(new Date(now.getTime() - DAILY_KEEP_DAYS * 864e5));
   const daily = chooseDaily((prev.daily ?? []).filter((d) => d.date >= cutoff), open, now)
-    .map((d) => { if (d.result) return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
+    .map((d) => { if (d.result && d.result !== "void") return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
   return { updated_at: now.toISOString(), board, frozen, daily };
 }
 

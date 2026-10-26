@@ -130,7 +130,7 @@ def test_frozen_picks_are_graded_at_their_line(tmp_path, monkeypatch):
                          "tier": "Lean", "proven": False, "line_posted": False},
                         {"market": "moneyline", "side": "away", "team": "Auburn", "p": 0.4, "price": 150, "tier": "Value", "proven": False}]}
     (tmp_path / "picks" / "9.json").write_text(json.dumps(pick))
-    g = pd.DataFrame([{"game_id": 9, "final": True, "home_points": 24, "away_points": 21}])
+    g = pd.DataFrame([{"game_id": 9, "final": True, "date": pd.Timestamp("2026-10-24T19:30:00Z"), "home_points": 24, "away_points": 21}])
     rec = pipeline.record(g, {})
     won = {r["market"]: r["won"] for r in rec["recent"]} | {r["market"]: r["rate"] for r in rec["by_market_tier"]}
     assert rec["picks"] == 4 and rec["suggested"] == {"n": 1, "hits": 1, "rate": 1.0}
@@ -316,3 +316,10 @@ def test_calibration_never_claims_more_edge_than_the_simulation():
     assert rating.calibrated(r, "moneyline_dog", 0.31, 0.30) == 0.30          # edge below the fitted range: market's chance
     assert rating.calibrated(r, "moneyline_dog", 0.25, 0.30) == 0.25          # negative edge kept as the sim has it
     assert rating.calibrated(r, "moneyline_dog", 0.50, 0.30) <= 0.50          # never above the sim
+
+
+def test_recent_finals_cover_games_without_site_picks():
+    d = pd.to_datetime(["2026-09-01", "2026-10-17", "2026-10-24"], utc=True)
+    fin = pd.DataFrame({"game_id": [1, 2, 3], "date": d, "home_points": [10, 21, 35], "away_points": [7, 24, 14]}).set_index("game_id")
+    assert pipeline.recent_finals(fin) == {"2": [21.0, 24.0], "3": [35.0, 14.0]}
+    assert pipeline.recent_finals(fin.iloc[:0]) == {}
