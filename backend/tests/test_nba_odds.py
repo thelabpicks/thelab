@@ -63,3 +63,32 @@ def test_fetch_props_buys_once_and_saves_lines(tmp_path, monkeypatch):
     snap = json.loads(f.read_text())
     assert snap["props"][0]["player"] == "P.J. Washington" and snap["credits_remaining"] == 317
     assert collect.fetch_props("2026-10-26", [("MIA", "DAL", "threes")])["skipped"] == "props already bought today"
+
+
+def test_official_injury_report_rows():
+    text = ("Injury Report: 10/26/26 01:30 PM\n"
+            "10/26/2026 08:00 (ET) MEM@UTA Memphis Grizzlies Small, Javon Out Injury/Illness - Left Ankle; Sprain\n"
+            "Jackson Jr., Jaren Questionable Injury/Illness - Right Knee; Soreness\n"
+            "Utah Jazz Williams, Cody Available\n"
+            "09:00 (ET) GSW@DEN Golden State Warriors Curry, Stephen Probable Rest\n")
+    rows = collect.parse_injury_report(text)
+    assert [(r["name"], r["team"], r["status"]) for r in rows] == [
+        ("Javon Small", "MEM", "Out"), ("Jaren Jackson Jr.", "MEM", "Questionable"),
+        ("Cody Williams", "UTAH", "Available"),
+        ("Stephen Curry", "GS", "Probable")]
+    assert rows[0]["reason"].startswith("Injury/Illness - Left Ankle")
+
+
+def test_official_report_overrides_espn(tmp_path, monkeypatch):
+    from nba import predict
+    monkeypatch.setenv("NBA_ARCHIVE_DIR", str(tmp_path))
+    (tmp_path / "injuries").mkdir()
+    (tmp_path / "official_injuries").mkdir()
+    espn = {"data": {"injuries": [{"displayName": "Utah Jazz", "injuries": [
+        {"athlete": {"displayName": "Cody Williams"}, "status": "Day-To-Day", "shortComment": "ankle"}]}]}}
+    (tmp_path / "injuries" / "2026-10-26.json").write_text(json.dumps(espn))
+    (tmp_path / "official_injuries" / "2026-10-26.json").write_text(json.dumps({"players": [
+        {"name": "Cody Williams", "team": "UTAH", "status": "Available", "reason": ""},
+        {"name": "Javon Small", "team": "MEM", "status": "Out", "reason": "Left Ankle"}]}))
+    inj = predict.injuries()
+    assert "cody williams" not in inj and inj["javon small"]["status"] == "Out"

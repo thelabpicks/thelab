@@ -46,6 +46,15 @@ def injuries() -> dict[str, dict]:
             if name:
                 out[_norm(name)] = {"status": i.get("status", ""), "detail": i.get("shortComment", ""),
                                     "team": team.get("displayName", ""), "as_of": files[-1].stem}
+    # The league's own report for the same day wins: it is what the teams file, and ESPN's list can lag it.
+    # "Available" clears a player ESPN still lists.
+    off = sources.archive_dir() / "official_injuries" / f"{files[-1].stem}.json"
+    for p in (json.loads(off.read_text()).get("players", []) if off.exists() else []):
+        k = _norm(p["name"])
+        if p["status"] == "Available":
+            out.pop(k, None)
+        else:
+            out[k] = {"status": p["status"], "detail": p.get("reason", ""), "team": p.get("team") or "", "as_of": files[-1].stem}
     return out
 
 
