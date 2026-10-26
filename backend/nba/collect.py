@@ -160,6 +160,73 @@ def load_espn_lines(day: str) -> dict:
     return espn_lines(json.loads(f.read_text())) if f.exists() else {}
 
 
+# --------------------------------------------------------------------------- the league's official injury report
+OFFICIAL_INDEX = "https://official.nba.com/nba-injury-report-{y0}-{y1}-season/"
+STATUSES = ("Out", "Doubtful", "Questionable", "Probable", "Available")
+
+
+def parse_injury_report(text: str, teams: dict[str, str] | None = None) -> list[dict]:
+    """Players and statuses from the text of the league's injury report PDF. Rows read like
+    '10/26/2026 08:00 (ET) MEM@UTA Memphis Grizzlies Small, Javon Out Injury/Illness - Left Ankle; Sprain'; team names
+    are swapped for their abbreviation first so they can't run into the player's last name."""
+    import re  # noqa: PLC0415
+    teams = teams or sources.TEAMS
+    for full in sorted(teams, key=len, reverse=True):
+        text = text.replace(full, f" @{teams[full]}@ ")
+    word = r"[A-Z][A-Za-z'\-]+\.?"
+    pat = re.compile(rf"(?:@([A-Z]{{2,4}})@\s+)?((?:{word} ){{0,2}}{word}(?: (?:Jr\.|Sr\.|II|III|IV))?), "
+                     rf"({word}(?: {word})?) ({'|'.join(STATUSES)})\b(?: ([^\n]*))?")
+    out, team = [], None
+    for line in text.splitlines():
+        for m in pat.finditer(line):
+            team = m.group(1) or team
+            out.append({"name": f"{m.group(3)} {m.group(2)}", "team": team, "status": m.group(4),
+                        "reason": (m.group(5) or "").strip()})
+    return out
+
+
+def _latest_report_url(day: str, season: int = sources.CURRENT_SEASON) -> str | None:
+    """The newest report PDF for `day` listed on the league's injury report page."""
+    import re  # noqa: PLC0415
+    req = urllib.request.Request(OFFICIAL_INDEX.format(y0=season - 1, y1=season), headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as r:
+        html = r.read().decode("utf-8", "replace")
+    links = sorted(set(re.findall(rf"https://[^\"']+Injury-Report_{day}_[^\"']+\.pdf", html)))
+    # names end in the report time (…_01_30PM.pdf): order by that time, not the text
+    def when(u: str) -> tuple[int, int]:
+        m = re.search(r"_(\d{2})(?:_(\d{2}))?(AM|PM)\.pdf$", u)
+        if not m:
+            return (0, 0)
+        h = int(m.group(1)) % 12 + (12 if m.group(3) == "PM" else 0)
+        return (h, int(m.group(2) or 0))
+    return max(links, key=when) if links else None
+
+
+def save_official_injuries(day: str, log=print) -> dict:
+    """The league's official injury report (several a day on game days), saved as parsed rows. It is the source the
+    teams file; ESPN's list can lag it."""
+    try:
+        url = _latest_report_url(day)
+        if not url:
+            log("nba: no official injury report posted yet today")
+            return {"skipped": "not posted"}
+        from io import BytesIO  # noqa: PLC0415
+
+        from pypdf import PdfReader  # noqa: PLC0415
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as r:
+            pdf = PdfReader(BytesIO(r.read()))
+        rows = parse_injury_report("\n".join(page.extract_text() or "" for page in pdf.pages))
+    except Exception as ex:  # noqa: BLE001 - ESPN's report still stands
+        log(f"nba: official injury report not saved ({ex})")
+        return {"error": str(ex)}
+    dest = sources.archive_dir() / "official_injuries" / f"{day}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps({"fetched_at": utcnow(), "source": url, "players": rows}))
+    log(f"nba: saved the official injury report ({len(rows)} players, {url.rsplit('/', 1)[-1]})")
+    return {"saved": dest.name, "players": len(rows), "report": url.rsplit("/", 1)[-1]}
+
+
 def save_rosters(day: str, log=print) -> dict:
     """Every team's current roster (ESPN athlete ids, the same ids as the box scores). A player traded or signed in
     the offseason stays on his old team in the box scores until he plays for the new one; the roster corrects that."""
@@ -357,7 +424,7 @@ def run(log=print, force_odds: bool = False, force_files: bool = False) -> dict:
     day = today_et()
     files = download_files(log=log, force=force_files)
     status = {"date": day, "ran_at": utcnow(), "files": files, "box_scores": summarize_box(),
-              "espn": save_espn(day, log), "rosters": save_rosters(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
+              "espn": save_espn(day, log), "official_injuries": save_official_injuries(day, log), "rosters": save_rosters(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
     arch = sources.archive_dir()
     arch.mkdir(parents=True, exist_ok=True)
     (arch / "status.json").write_text(json.dumps(status, indent=2))
