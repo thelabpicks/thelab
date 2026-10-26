@@ -105,7 +105,7 @@ def model_rows(p: pd.DataFrame, market: str) -> pd.DataFrame:
     r["y"] = r[market]
     r["base_mu"] = (r[f"{market}_pm_l"] * r["min_l"]).clip(lower=0.05)   # player average baseline (per-minute x minutes)
     return r.dropna(subset=["min_l"])[["game_id", "game_date", "season", "player_id", "player_name", "team", "opp", "pos",
-                                       "played", "y", "line", "base_mu"] + cols]
+                                       "played", "y", "line", "base_mu", "season_starts"] + cols]
 
 
 def _fit(train: pd.DataFrame, cols: list[str], test_season: int) -> HistGradientBoostingRegressor:
