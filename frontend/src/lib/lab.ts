@@ -86,6 +86,10 @@ function nflPick(d: AskData, p: Pick, kickoff: string): LabPick {
 /* ------------------------------------------------------------------ NBA */
 
 /** The NBA's strongest leans (the home page list): 20+ minute players not listed Out, proven tier, 6.0+. */
+/** Without a book line, an NBA pick needs a player who starts most games and plays starter's minutes. */
+export const NBA_MIN_START_RATE = 0.6;
+export const NBA_MIN_MINUTES = 24;
+
 export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const games = new Map(slate.games.map((g) => [g.game_id, g]));
   const out: LabPick[] = [];
@@ -94,6 +98,10 @@ export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
     // Without a book line the line is the player's usual one. When this game's projection sits far from it (a role or
     // minutes change), no book will post that line, so a near-certain under against it is not a real pick.
     if (r.line_source !== "book" && Math.abs(r.mean - r.line) > Math.max(1.5, 0.2 * Math.max(r.line, r.mean))) continue;
+    // Only players sure to play: anyone on the injury report (bar probable) is out of the list. Without a book line, only
+    // regular starters with starter's minutes, the players books post props for.
+    if (r.injury && !/probable/i.test(r.injury)) continue;
+    if (r.line_source !== "book" && (r.evidence.start_rate < NBA_MIN_START_RATE || r.evidence.minutes < NBA_MIN_MINUTES)) continue;
     const lean = leanOf(r);
     if (!lean) continue;
     const t = nbaTier(ctx.conf, lean.p);
