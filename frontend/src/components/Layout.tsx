@@ -2,7 +2,7 @@ import * as React from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
+  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy, History,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
@@ -14,7 +14,7 @@ type NavSection = { title: string; items: NavItem[] };
 
 /** Every sport gets the NFL tab's menu: the same sections, the same items in the same order, and the same mobile bar
  *  (Home, Props, Ask, Parlay, More). Only the sport's own research pages differ. */
-function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavSection[] {
+function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string; previous: string }): NavSection[] {
   return [
     { title: "Picks", items: [
       { to: base || "/", label: home, short: "Home", icon: LayoutDashboard, end: true },
@@ -25,6 +25,7 @@ function sportNav(base: string, home: string, research: NavItem[], links: { parl
     { title: "Proof", items: [
       { to: links.how, label: "How it works", icon: BookOpen },
       { to: links.record, label: "Track record", icon: BarChart3 },
+      { to: links.previous, label: "Previous weeks", icon: History },
     ] },
     { title: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
   ];
@@ -34,12 +35,12 @@ const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
     { to: "/rankings", label: "Anytime TD", short: "TDs", icon: ListOrdered },
     { to: "/hitrates", label: "Hit rates", icon: Percent },
     { to: "/defenses", label: "Defenses", icon: Shield },
-  ], { parlay: "/builder", how: "/how", record: "/backtest" }),
+  ], { parlay: "/builder", how: "/how", record: "/backtest", previous: "/previous" }),
   cfb: sportNav("/cfb", "This week", [
     { to: "/cfb/games", label: "All games", short: "Games", icon: ListOrdered },
     { to: "/cfb/teams", label: "Teams", icon: Trophy },
-  ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
-  nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
+  ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record", previous: "/cfb/previous" }),
+  nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record", previous: "/nba/previous" }),
 };
 // Mobile bar: Home, Player props, Ask, Parlay builder (then More), whatever the sport.
 const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];

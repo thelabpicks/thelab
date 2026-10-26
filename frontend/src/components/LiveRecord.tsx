@@ -15,6 +15,9 @@ export type LiveRecord = {
   scores?: { games: number; total_typical_miss: number; total_bias: number; overs: number; margin_typical_miss: number } | null;
   sim_review?: SimReview | null;
   sim_report?: SimReport | null;
+  /** Every settled pick of the last weeks by game. Pick = [player_id, name, team, market, side, line, chance, projection, actual, result, featured]. */
+  previous_weeks?: { season: number; week: number; games: { game_id: string; home: string | null; away: string | null; score: [number | null, number | null];
+    date: string | null; kickoff: string | null; picks: [string, string, string, string, string, number | null, number, number | null, number | null, 0 | 1 | null, boolean][] }[] }[];
   last_week?: { season: number; week: number; featured_misses: { player_name: string; team: string; market: string; side: string; line: number | null; p: number; actual: number | null; tier: string }[] };
 };
 

@@ -65,6 +65,14 @@ more credits. Game pages show every book's spread, total and moneyline from the 
 The **Parlay builder** (`/cfb/parlay`) offers those legs plus props at book-posted lines; legs from the same game are
 priced together from 1,000 of that game's simulated scores (`sims.json`), other legs multiply.
 
+## Previous weeks
+
+`/cfb/previous` (Proof menu, every sport has the same page) lists every finished game of the season, week by week, with
+the model's side on the spread, the over/under, the moneyline and any book-posted team total, each with a green check
+or red X, the simulated number next to the final, and the Lab rating. Records per bet type sit on top for the week and
+the whole season, and can be cut to bets rated 7+. Games frozen before kickoff show exactly what the site said then;
+earlier weeks show the walk-forward model as it stood that week at the closing line (`previous.json`).
+
 ## Checking itself
 
 * **Data checks** every run (Research page): finished games missing a box score, play-by-play or closing line;

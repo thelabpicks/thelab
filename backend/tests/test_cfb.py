@@ -323,3 +323,14 @@ def test_recent_finals_cover_games_without_site_picks():
     fin = pd.DataFrame({"game_id": [1, 2, 3], "date": d, "home_points": [10, 21, 35], "away_points": [7, 24, 14]}).set_index("game_id")
     assert pipeline.recent_finals(fin) == {"2": [21.0, 24.0], "3": [35.0, 14.0]}
     assert pipeline.recent_finals(fin.iloc[:0]) == {}
+
+
+def test_previous_weeks_grades_every_market_at_its_line():
+    from cfb import pipeline
+    hp, ap = 31.0, 24.0   # home by 7, 55 points
+    g = pipeline._grade
+    assert g({"market": "spread", "side": "home", "line": -6.5}, hp, ap)["result"] == "won"
+    assert g({"market": "spread", "side": "away", "line": 7.0}, hp, ap)["result"] == "push"
+    assert g({"market": "total", "side": "under", "line": 52.5}, hp, ap)["result"] == "lost"
+    assert g({"market": "team_total", "side": "over", "team_side": "away", "line": 23.5}, hp, ap)["result"] == "won"
+    assert g({"market": "moneyline", "side": "away"}, hp, ap)["result"] == "lost"

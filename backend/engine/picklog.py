@@ -245,6 +245,31 @@ def _recent_rows(rows: list[dict]) -> list[dict]:
             for r in rows if (r["season"], r["week"]) in weeks]
 
 
+PREVIOUS_WEEKS = 8
+
+
+def _previous(c, rows: list[dict]) -> list[dict]:
+    """Every settled pick of the last few weeks, by week and game, for the Previous weeks page: what the model said
+    (side, line, chance, projection) next to what happened. Kept compact: one short list per pick.
+    Pick = [player_id, name, team, market, side, line, chance, projection, actual, result (1, 0 or None for void), featured]."""
+    weeks = sorted({(r["season"], r["week"]) for r in rows})[-PREVIOUS_WEEKS:]
+    out = []
+    for season, week in reversed(weeks):
+        score = {r["game_id"]: [r["home_team"], r["away_team"], r["home_score"], r["away_score"], r["gameday"]] for r in c.execute(
+            "SELECT game_id, home_team, away_team, home_score, away_score, gameday FROM games WHERE season=? AND week=?", (season, week))}
+        games: dict = {}
+        for r in sorted((r for r in rows if (r["season"], r["week"]) == (season, week)), key=lambda r: -r["p"]):
+            games.setdefault(r["game_id"], []).append([r["player_id"], r.get("player_name"), r.get("team"), r["market"], r["side"], r.get("line"),
+                                                       r["p"], r.get("median"), r.get("actual"), r.get("result"), bool(r.get("featured"))])
+        gl = []
+        for gid, picks in games.items():
+            h, a, hs, as_, day = score.get(gid, [None, None, None, None, None])
+            gl.append({"game_id": gid, "home": h, "away": a, "score": [hs, as_], "date": day,
+                       "kickoff": next((r.get("kickoff") for r in rows if r["game_id"] == gid and r.get("kickoff")), None), "picks": picks})
+        out.append({"season": season, "week": week, "games": sorted(gl, key=lambda g: (g["kickoff"] or g["date"] or "", g["game_id"]))})
+    return out
+
+
 def report(c) -> dict:
     files = sorted(picks_dir().glob("*.json")) if picks_dir().exists() else []
     weeks, graded, settled = [], [], []
@@ -261,9 +286,10 @@ def report(c) -> dict:
     sim_review = gamesim.latest_review()
     sim_report = simreview.latest()
     recent = _recent_rows(settled)
+    previous = _previous(c, settled)
     if not graded:
         return {"available": False, "created_at": utcnow(), "weeks": weeks, "sim_review": sim_review, "sim_report": sim_report, "recent_rows": recent,
-                "empty_reason": "Picks are saved before every kickoff starting with 2026 Week 7. The first results appear after those games are final."}
+                "previous_weeks": previous, "empty_reason": "Picks are saved before every kickoff starting with 2026 Week 7. The first results appear after those games are final."}
     by = lambda key: sorted({key(r) for r in graded})  # noqa: E731
     tiers = {kind: [{"tier": t, **_summary([r for r in graded if r["kind"] == kind and r["tier"] == t])}
                     for t, _ in (TD_TIERS if kind == "td" else PROP_TIERS)] for kind in ("td", "props")}
@@ -282,7 +308,7 @@ def report(c) -> dict:
                           **_summary([r for r in graded if r["market"] == m])} for m in by(lambda r: r["market"])],
            "by_side": [{"side": s, **_summary([r for r in graded if r["side"] == s])} for s in by(lambda r: r["side"])],
            "calibration": bins, "weeks": weeks, "drift": drift, "drift_min_n": DRIFT_MIN_N,
-           "sim_review": sim_review, "sim_report": sim_report, "recent_rows": recent, "projections": _projection_check(graded), "scores": _score_check(c, sorted({(r["season"], r["week"]) for r in graded})),
+           "sim_review": sim_review, "sim_report": sim_report, "recent_rows": recent, "previous_weeks": previous, "projections": _projection_check(graded), "scores": _score_check(c, sorted({(r["season"], r["week"]) for r in graded})),
            "last_week": {"season": last[0], "week": last[1], "featured_misses": [
                {k: r[k] for k in ("player_name", "team", "market", "side", "line", "p", "actual", "tier")} for r in misses]},
            "method": ["Picks are saved by every site update and frozen at each game's kickoff, so results are never graded with hindsight.",

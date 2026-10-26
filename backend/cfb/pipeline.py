@@ -454,6 +454,101 @@ def recent_finals(fin: pd.DataFrame, days: int = 21) -> dict:
     return {str(gid): [float(x.home_points), float(x.away_points)] for gid, x in last.iterrows()}
 
 
+# --------------------------------------------------------------------------- previous weeks, game by game
+def _result(diff: float) -> str:
+    return "push" if diff == 0 else "won" if diff > 0 else "lost"
+
+
+def _prev_lean(market: str, side: str, line, p: float, rater: dict | None, mk: dict, dec=None, q: float = 0.5, **extra) -> dict:
+    m = {"market": market, "side": side, "line": line, "p": round(float(p), 4), **extra}
+    if market == "moneyline":
+        t = tier_of(mk["moneyline"]["tiers"], extra["ev"]) if extra["ev"] > 0 else None
+        proven = bool(t and t["proven"] and 100 <= extra["price"] <= report.ML_PRICE_RANGE[1])
+    else:
+        t = tier_of(mk[market]["tiers"], p)
+        proven = bool(t and t["proven"] and extra.get("line_posted", True))
+    m.update(tier=t["tier"] if t else None, proven=proven)
+    if rater is not None:
+        r = rating.rate(rater, market, p, dec, q)
+        m["score"] = r["rating"] if proven else min(r["rating"], UNPROVEN_CAP)
+    else:
+        m["score"] = round(p * 10, 1)
+    return m
+
+
+def _grade(m: dict, hp: float, ap: float) -> dict:
+    if m["market"] == "spread":
+        diff = (hp - ap) + m["line"] if m["side"] == "home" else (ap - hp) + m["line"]
+    elif m["market"] == "total":
+        diff = (hp + ap - m["line"]) * (1 if m["side"] == "over" else -1)
+    elif m["market"] == "team_total":
+        diff = ((hp if m["team_side"] == "home" else ap) - m["line"]) * (1 if m["side"] == "over" else -1)
+    else:
+        diff = (hp - ap) * (1 if m["side"] == "home" else -1)
+    return {**m, "result": _result(diff)}
+
+
+def previous_weeks(g: pd.DataFrame, bt: pd.DataFrame, summary: dict, rater: dict | None, season: int) -> dict:
+    """Every finished game of the season with the model's side in every market and whether it hit, so the site can be
+    checked game by game, not only on its top picks. Games frozen before kickoff use exactly what the site showed then;
+    earlier games use the walk-forward backtest (the model as it stood that week, at the closing line, median across
+    books). Team totals are graded only where a book posted the line: implied team totals are never counted."""
+    mk = summary["markets"]
+    fin = g[g.final & (g.season == season)].set_index("game_id")
+    b = bt[bt.season == season] if len(bt) else bt
+    sim = {int(x.game_id): {"home": float(x.pred_home), "away": float(x.pred_away), "home_win": float(x.p_home_win)} for x in b.itertuples()}
+    games: dict[int, dict] = {}
+    d = sources.archive_dir() / "picks"
+    for fp in sorted(d.glob("*.json")) if d.exists() else []:
+        s = json.loads(fp.read_text())
+        gid = int(s["game_id"])
+        if gid not in fin.index:
+            continue
+        x = fin.loc[gid]
+        hp, ap = float(x.home_points), float(x.away_points)
+        ms = [_grade({k: m.get(k) for k in ("market", "side", "team", "team_side", "line", "line_posted", "price", "p", "score", "tier", "proven")
+                      if m.get(k) is not None}, hp, ap)
+              for m in s["markets"] if m["market"] != "team_total" or m.get("line_posted")]
+        L, md = s["line"], s.get("model")   # the first frozen games did not save the projected score
+        games[gid] = {"game_id": gid, "week": int(x.week), "season_type": x.season_type, "date": s["date"], "home": s["home"], "away": s["away"],
+                      "score": [hp, ap], "source": "live", "line": {k: L.get(k) for k in ("spread", "total", "ml_home", "ml_away")},
+                      "model": {"home": md["home"], "away": md["away"], "home_win": md["home_win"]} if md else sim.get(gid), "markets": ms}
+    for x in b.itertuples():
+        gid = int(x.game_id)
+        if gid in games or gid not in fin.index:
+            continue
+        hp, ap = float(x.home_points), float(x.away_points)
+        ms = []
+        if x.spread == x.spread:
+            pc = float(x.p_home_cover)
+            home = pc >= 0.5
+            ms.append(_prev_lean("spread", "home" if home else "away", float(x.spread if home else -x.spread), max(pc, 1 - pc), rater, mk,
+                                 team=x.home_team if home else x.away_team))
+        if x.total == x.total:
+            po = float(x.p_over)
+            ms.append(_prev_lean("total", "over" if po >= 0.5 else "under", float(x.total), max(po, 1 - po), rater, mk))
+        if x.ml_home == x.ml_home and x.ml_away == x.ml_away:
+            ph = float(x.p_home_win)
+            dh, da = history.decimal(np.array([x.ml_home, x.ml_away], float))
+            evh, eva = ph * dh - 1, (1 - ph) * da - 1
+            home = evh >= eva
+            ih, ia = history.implied(np.array([x.ml_home, x.ml_away], float))
+            ms.append(_prev_lean("moneyline", "home" if home else "away", None, ph if home else 1 - ph, rater, mk,
+                                 dec=float(dh if home else da), q=float((ih if home else ia) / (ih + ia)),
+                                 team=x.home_team if home else x.away_team, price=int(x.ml_home if home else x.ml_away),
+                                 ev=round(float(max(evh, eva)), 4)))
+        if not ms:
+            continue
+        games[gid] = {"game_id": gid, "week": int(x.week), "season_type": x.season_type, "date": x.date.isoformat() + "Z",
+                      "home": x.home_team, "away": x.away_team, "score": [hp, ap], "source": "backtest",
+                      "line": {"spread": x.spread, "total": x.total, "ml_home": x.ml_home, "ml_away": x.ml_away},
+                      "model": sim[gid], "markets": [_grade(m, hp, ap) for m in ms]}
+    rows = sorted(games.values(), key=lambda r: (r["date"], r["game_id"]))
+    return {"generated_at": utcnow(), "season": season, "games": rows,
+            "note": "Games frozen before kickoff show exactly what the site said then. Earlier games show the model as it stood "
+                    "that week (refit on earlier games only), graded at the closing line. Team totals count only where a book posted the line."}
+
+
 INPUT_LABELS = {"plays": ("plays", "Pace (plays)"), "ypp": ("ypp", "Yards per play"), "turnovers": ("to", "Turnovers"),
                 "epa": ("epa", "EPA per play"), "success": ("sr", "Success rate"), "explosive": ("expl", "Explosive-play rate")}
 
@@ -835,6 +930,8 @@ def run(out: Path, log=print, today: str | None = None, now: datetime | None = N
     _write(out, "findings.json", {"rules": finds, "break_even": report.BREAK_EVEN})
     _write(out, "record.json", {**rec, "report_card": card})
     _write(out, "teams.json", {"season": sources.CURRENT_SEASON, "teams": teams})
+    prev_rater = rating.fit(legs[legs.season < sources.CURRENT_SEASON]) if (legs.season < sources.CURRENT_SEASON).any() else rater
+    _write(out, "previous.json", previous_weeks(g, bt, summary, prev_rater, sources.CURRENT_SEASON))
     fin = g[g.final]
     status = {"generated_at": utcnow(), "seconds": (datetime.now(timezone.utc) - t0).total_seconds(),
               "season": sources.CURRENT_SEASON, "games_this_week": len(rows), "picks": len(picks),
