@@ -198,7 +198,9 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),
             "evidence": {"minutes": r.min_s, "minutes_long": r.min_l, "per_min": getattr(r, f"{m}_pm_l"),
                          "opp_mult": getattr(r, f"opp_{m}"), "pace": r.pace, "opp_pace": r.opp_pace, "rest": r.rest,
-                         "start_rate": r.start_rate},
+                         "start_rate": r.start_rate, "season_games": int(r.season_games),
+                         "season_starts": int(r.season_starts),
+                         "season_min": None if r.season_min != r.season_min else float(r.season_min)},
             "due": bool(m in due_markets and len(recent) >= 4 and all(v < r.mu for v in recent[:4]) and (r.min_l or 0) >= 20),
         })
     return rows

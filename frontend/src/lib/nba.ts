@@ -25,7 +25,9 @@ export type NbaRow = {
   injury: string | null; injury_note: string | null; out: boolean; market: string; mean: number; q10: number; q90: number;
   line: number; line_source: "book" | "usual"; usual_line: number | null; dist: PropDist | null; p_over: number | null; offers: Offer[];
   recent: number[]; recent_minutes: number[]; due: boolean;
-  evidence: { minutes: number; minutes_long: number; per_min: number; opp_mult: number | null; pace: number | null; opp_pace: number | null; rest: number; start_rate: number };
+  evidence: { minutes: number; minutes_long: number; per_min: number; opp_mult: number | null; pace: number | null; opp_pace: number | null; rest: number; start_rate: number;
+    /** this season so far (absent in data published before they were added) */
+    season_games?: number; season_starts?: number; season_min?: number | null };
 };
 export type NbaGame = { game_id: number; date: string; time: string; home: string; away: string; total?: number | null; home_spread?: number | null };
 export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
