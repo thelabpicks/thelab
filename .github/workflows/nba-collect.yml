@@ -70,9 +70,11 @@ jobs:
           NBA_ARCHIVE_DIR: ${{ github.workspace }}/nba-archive
         run: python -m nba.collect
 
+      # On the free odds plan the pipeline buys real prop lines for the likeliest picks' games (NBA_PROP_CREDITS a day).
       - name: Build NBA models and numbers
         working-directory: backend
         env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           NBA_ARCHIVE_DIR: ${{ github.workspace }}/nba-archive
         run: python -m nba.pipeline
 

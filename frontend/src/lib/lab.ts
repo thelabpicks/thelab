@@ -86,20 +86,6 @@ function nflPick(d: AskData, p: Pick, kickoff: string): LabPick {
 /* ------------------------------------------------------------------ NBA */
 
 /** The NBA's strongest leans (the home page list): 20+ minute players not listed Out, proven tier, 6.0+. */
-/** Without a book line, an NBA pick needs a player who starts most games and plays starter's minutes. */
-export const NBA_MIN_START_RATE = 0.6;
-export const NBA_MIN_MINUTES = 24;
-
-/** Starts most games with starter's minutes, judged on this season once he has played in it (last season's role can be
- *  stale: a starter traded to the bench, or a player yet to appear this season). */
-export function regularStarter(r: NbaRow): boolean {
-  const e = r.evidence;
-  if (e.start_rate < NBA_MIN_START_RATE || e.minutes < NBA_MIN_MINUTES) return false;
-  if (e.season_games == null) return true;
-  if (e.season_games === 0) return false;
-  return (e.season_starts ?? 0) / e.season_games >= NBA_MIN_START_RATE && (e.season_min ?? 0) >= NBA_MIN_MINUTES;
-}
-
 export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const games = new Map(slate.games.map((g) => [g.game_id, g]));
   const out: LabPick[] = [];
@@ -107,11 +93,10 @@ export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
     if (r.out || r.evidence.minutes_long < 20 || r.line < MIN_LINE || !games.has(r.game_id)) continue;
     // Without a book line the line is the player's usual one. When this game's projection sits far from it (a role or
     // minutes change), no book will post that line, so a near-certain under against it is not a real pick.
-    if (r.line_source !== "book" && Math.abs(r.mean - r.line) > Math.max(1.5, 0.2 * Math.max(r.line, r.mean))) continue;
-    // Only players sure to play: anyone on the injury report (bar probable) is out of the list. Without a book line, only
-    // regular starters with starter's minutes, the players books post props for.
+    // Only lines a book really posts (the pipeline buys them for the likeliest picks' games), and only players sure to
+    // play: anyone on the injury report (bar probable) is out of the list.
+    if (r.line_source !== "book") continue;
     if (r.injury && !/probable/i.test(r.injury)) continue;
-    if (r.line_source !== "book" && !regularStarter(r)) continue;
     const lean = leanOf(r);
     if (!lean) continue;
     const t = nbaTier(ctx.conf, lean.p);
@@ -378,7 +363,8 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): 
     // candidates counts qualifying picks before started games are dropped: some, but none left, means they have all started
     return n >= BOARD_SIZE ? null : !n && sports[sp]?.candidates ? "Every pick that qualified has already started. The next list posts with this sport's next refresh."
       : !n ? "No games with posted lines are left on the board right now."
-      : `Only ${n} ${n === 1 ? "pick is" : "picks are"} on the board right now (one per game and per player, from games that have not started).`;
+      : `Only ${n} ${n === 1 ? "pick is" : "picks are"} on the board right now (one per game and per player, from games that have not started).`
+        + (sp === "nba" ? " NBA picks use only prop lines a book really posts, bought each morning for the games of the day's likeliest picks." : "");
   };
   return {
     generated_at: s.updated_at ?? new Date().toISOString(), board: s.board, sports,

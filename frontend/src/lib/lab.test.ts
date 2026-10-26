@@ -104,25 +104,22 @@ const nbaRow = (id: string, game: number, mu: number, line: number, extra: Parti
 });
 
 describe("nbaCandidates", () => {
-  it("keeps proven leans of rotation players who are not out, each with a write-up", () => {
+  it("keeps proven leans at book lines of rotation players sure to play, each with a write-up", () => {
+    const book = { line_source: "book" as const };
     const tier = (name: string, lo: number, hi: number, rate: number) => ({ tier: name, lo, hi, n: 1000, hits: 0, rate, avg_chance: null, ci: [null, null] as [null, null] });
     const conf = { props: { first_season: 2022, tiers: [tier("Coin flip", 0.5, 0.55, 0.5), tier("Lean", 0.55, 0.6, 0.56), tier("Strong", 0.6, 1, 0.68)],
       by_side: { over: [], under: [] }, note: "", by_market: [] } } as NbaConfidence;
     const slate: Slate = { date: "2026-10-24", generated_at: "", odds: { fetched_at: null, plan: "free", props_priced: false },
       games: [{ game_id: 1, date: "2026-10-24", home: "NY", away: "BOS", time: "2026-10-24T23:30:00Z" }],
-      rows: [nbaRow("1", 1, 25.5, 21.5), nbaRow("2", 1, 20, 19.5), nbaRow("3", 1, 28, 21.5, { out: true }), nbaRow("4", 1, 28, 21.5, { evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
-        // usual line far above this game's projection: no book would post it
-        nbaRow("5", 1, 9, 21.5),
-        // questionable, or a bench player without a book line: not sure to play, or no line a book would post
-        nbaRow("6", 1, 25.5, 21.5, { injury: "Questionable" }), nbaRow("7", 1, 25.5, 21.5, { evidence: { ...nbaRow("7", 1, 1, 1).evidence, start_rate: 0.2 } }),
-        nbaRow("8", 1, 25.5, 21.5, { injury: "Probable" }),
-        // a starter last season who comes off the bench this season, and one yet to play this season
-        nbaRow("9", 1, 25.5, 21.5, { evidence: { ...nbaRow("9", 1, 1, 1).evidence, season_games: 3, season_starts: 0, season_min: 17 } }),
-        nbaRow("10", 1, 25.5, 21.5, { evidence: { ...nbaRow("10", 1, 1, 1).evidence, season_games: 0, season_starts: 0, season_min: null } }),
-        nbaRow("11", 1, 25.5, 21.5, { evidence: { ...nbaRow("11", 1, 1, 1).evidence, season_games: 3, season_starts: 3, season_min: 33 } })] };
+      rows: [nbaRow("1", 1, 25.5, 21.5, book), nbaRow("2", 1, 20, 19.5, book), nbaRow("3", 1, 28, 21.5, { ...book, out: true }),
+        nbaRow("4", 1, 28, 21.5, { ...book, evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
+        // a usual line, not one a book posted
+        nbaRow("5", 1, 25.5, 21.5),
+        // questionable: not sure to play; probable is fine
+        nbaRow("6", 1, 25.5, 21.5, { ...book, injury: "Questionable" }), nbaRow("8", 1, 25.5, 21.5, { ...book, injury: "Probable" })] };
     const c = nbaCandidates(slate, { conf });
-    // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor; row 5's line is not one a book would post
-    expect(c.map((p) => p.player_id)).toEqual(["1", "8", "11"]);
+    // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor
+    expect(c.map((p) => p.player_id)).toEqual(["1", "8"]);
     expect(c[0].chance).toBeGreaterThanOrEqual(0.7);
     expect(c[0].tier).toBe("Strong");
     expect(c[0].sections.length).toBeGreaterThan(2);

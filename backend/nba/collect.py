@@ -8,10 +8,12 @@ Box scores are archived upstream, so they can always be downloaded again. Injury
 archive folder (the hosted collector commits it to the nba-data branch).
 
 Odds API budget. The free plan has 500 credits a month and the NFL Saturday pull needs about 90 of them each week.
-Event list: free. Game lines (spread + total, every game): 2 credits. Player props: 5 credits per game
-(points, rebounds, assists, threes, points+rebounds+assists). On the free plan the collector takes game lines only and
-only while at least NBA_ODDS_RESERVE (default 200) credits would remain, so the NFL pull is never starved. On a paid
-plan (detected from the credit headers) it also takes player props for every game that day, keeping 1,000 in reserve.
+Event list: free. Game lines (spread + total, every game): 2 credits, but only bought when ESPN's scoreboard (free,
+DraftKings' spread and total) has none. Player props: 1 credit per market per game. On the free plan the pipeline
+buys props only for the games and markets of the day's likeliest picks (fetch_props, NBA_PROP_CREDITS a day, default 3),
+so The Lab's NBA picks stand on lines books really post. Nothing is bought below NBA_ODDS_RESERVE (default 200)
+credits, so the NFL pull is never starved. On a paid plan (detected from the credit headers) the collector takes
+props for every game that day, keeping 1,000 in reserve.
 """
 from __future__ import annotations
 
@@ -41,6 +43,7 @@ PROP_MARKETS = {
 }
 GAME_MARKETS = ("spreads", "totals")
 FREE_PLAN_RESERVE = 200
+FREE_PROP_CREDITS = 3     # props bought a day on the free plan, for the likeliest picks' games
 PAID_PLAN_RESERVE = 1000
 PAID_PLAN_MIN = 1000      # monthly allowance above this means a paid plan
 STALE_HOURS = 6
@@ -135,6 +138,28 @@ def save_espn(day: str, log=print) -> dict:
     return out
 
 
+def espn_lines(scoreboard: dict | None) -> dict:
+    """DraftKings' spread and total per game from ESPN's scoreboard (free): {(home, away): {total, home_spread}}."""
+    out = {}
+    for e in ((scoreboard or {}).get("data") or {}).get("events", []):
+        c = (e.get("competitions") or [{}])[0]
+        teams = {t.get("homeAway"): t.get("team", {}).get("abbreviation") for t in c.get("competitors", [])}
+        o = (c.get("odds") or [None])[0]
+        if not o or not teams.get("home") or not teams.get("away"):
+            continue
+        total, spread = o.get("overUnder"), o.get("spread")
+        if total is None and spread is None:
+            continue
+        out[(teams["home"], teams["away"])] = {"total": None if total is None else float(total),
+                                               "home_spread": None if spread is None else float(spread)}
+    return out
+
+
+def load_espn_lines(day: str) -> dict:
+    f = sources.archive_dir() / "scoreboard" / f"{day}.json"
+    return espn_lines(json.loads(f.read_text())) if f.exists() else {}
+
+
 def save_rosters(day: str, log=print) -> dict:
     """Every team's current roster (ESPN athlete ids, the same ids as the box scores). A player traded or signed in
     the offseason stays on his old team in the box scores until he plays for the new one; the roster corrects that."""
@@ -163,8 +188,9 @@ def _credits(hdr: dict) -> tuple[float | None, float | None]:
     return num("x-requests-remaining"), num("x-requests-used")
 
 
-def plan_budget(remaining: float | None, used: float | None, n_games: int, mode: str = "auto") -> dict:
-    """Decide what today's pull may spend. Never spends below the reserve that protects the NFL weekly pull."""
+def plan_budget(remaining: float | None, used: float | None, n_games: int, mode: str = "auto", espn_lines: bool = False) -> dict:
+    """Decide what today's pull may spend. Never spends below the reserve that protects the NFL weekly pull. Game lines
+    are skipped when ESPN's scoreboard already lists them (free)."""
     if remaining is None:
         return {"plan": "unknown", "game_lines": False, "props": False, "reason": "credit balance unavailable"}
     allowance = remaining + (used or 0)
@@ -172,19 +198,21 @@ def plan_budget(remaining: float | None, used: float | None, n_games: int, mode:
     reserve = float(os.environ.get("NBA_ODDS_RESERVE", PAID_PLAN_RESERVE if paid else FREE_PLAN_RESERVE))
     lines_cost = len(GAME_MARKETS)
     props_cost = n_games * len(PROP_MARKETS)
-    lines = n_games > 0 and remaining - lines_cost >= reserve
+    afford = n_games > 0 and remaining - (0 if espn_lines else lines_cost) >= reserve
+    lines = afford and not espn_lines
     want_props = mode == "always" or (mode == "auto" and paid)
-    props = lines and want_props and remaining - lines_cost - props_cost >= reserve
+    props = afford and want_props and remaining - (lines_cost if lines else 0) - props_cost >= reserve
     reason = ("no games today" if n_games == 0 else
-              f"would drop below the {reserve:.0f}-credit reserve" if not lines else
+              f"would drop below the {reserve:.0f}-credit reserve" if not afford else
               "free plan: player props need a paid plan" if not want_props and mode == "auto" else
               "player props turned off" if not want_props else
               f"props would drop below the {reserve:.0f}-credit reserve" if not props else "ok")
-    return {"plan": "paid" if paid else "free", "allowance": allowance, "reserve": reserve, "game_lines": lines,
+    return {"plan": "paid" if paid else "free", "allowance": allowance, "reserve": reserve, "remaining": remaining,
+            "game_lines": lines, "espn_lines": espn_lines,
             "props": props, "cost": (lines_cost if lines else 0) + (props_cost if props else 0), "reason": reason}
 
 
-def fetch_odds(day: str, key: str, log=print, mode: str = "auto", now: datetime | None = None) -> dict:
+def fetch_odds(day: str, key: str, log=print, mode: str = "auto", now: datetime | None = None, espn_lines: bool = False) -> dict:
     now = now or datetime.now(timezone.utc)
     start = datetime.fromisoformat(day).replace(tzinfo=ET)
     lo, hi = max(now, start.astimezone(timezone.utc)), (start + timedelta(days=1, hours=6)).astimezone(timezone.utc)
@@ -193,9 +221,10 @@ def fetch_odds(day: str, key: str, log=print, mode: str = "auto", now: datetime 
                                                    "commenceTimeTo": hi.strftime(fmt)})
     events = [e for e in events if sources.TEAMS.get(e.get("home_team")) and sources.TEAMS.get(e.get("away_team"))]  # type: ignore[union-attr]
     remaining, used = _credits(hdr)
-    budget = plan_budget(remaining, used, len(events), mode)
+    budget = plan_budget(remaining, used, len(events), mode, espn_lines)
     log(f"nba odds: {len(events)} games today; plan {budget['plan']}, {remaining} credits remaining; "
-        f"game lines {'yes' if budget['game_lines'] else 'no'}, props {'yes' if budget['props'] else 'no'} ({budget['reason']})")
+        f"game lines {'yes' if budget['game_lines'] else 'from ESPN' if espn_lines else 'no'}, "
+        f"props {'yes' if budget['props'] else 'no'} ({budget['reason']})")
     games = [{"event_id": e["id"], "commence_time": e["commence_time"], "home": sources.TEAMS[e["home_team"]],
               "away": sources.TEAMS[e["away_team"]]} for e in events]
     lines, props, errors = [], [], []
@@ -215,29 +244,86 @@ def fetch_odds(day: str, key: str, log=print, mode: str = "auto", now: datetime 
         except urllib.error.HTTPError as ex:
             errors.append(f"game lines: HTTP {ex.code}")
     if budget["props"]:
-        feed_to_ours = {v: k for k, v in PROP_MARKETS.items()}
         for g in games:
             try:
-                data, hdr = _get_json(f"{ODDS_API}/events/{g['event_id']}/odds",
-                                      {"apiKey": key, "regions": "us", "oddsFormat": "american",
-                                       "markets": ",".join(PROP_MARKETS.values())})
+                got, remaining = _event_props(key, g["event_id"], list(PROP_MARKETS), remaining)
+                props += got
             except urllib.error.HTTPError as ex:
                 errors.append(f"{g['away']}@{g['home']}: HTTP {ex.code}")
-                continue
-            remaining = _credits(hdr)[0] or remaining
-            for b in data.get("bookmakers", []):  # type: ignore[union-attr]
-                for m in b.get("markets", []):
-                    market = feed_to_ours.get(m["key"])
-                    for o in m.get("outcomes", []) if market else []:
-                        side = str(o.get("name", "")).lower()
-                        if side not in ("over", "under") or o.get("price") is None:
-                            continue
-                        props.append({"event_id": g["event_id"], "market": market, "player": o.get("description") or "",
-                                      "book": b["key"], "side": side, "line": o.get("point"), "price": int(o["price"]),
-                                      "updated": m.get("last_update")})
     return {"date": day, "fetched_at": utcnow(), "source": "The Odds API (the-odds-api.com), US books",
             "budget": budget, "games": games, "game_lines": lines, "props": props, "errors": errors,
             "credits_remaining": remaining}
+
+
+def _event_props(key: str, event_id: str, markets: list[str], remaining: float | None) -> tuple[list[dict], float | None]:
+    """One game's player props for the given markets (1 credit per market)."""
+    feed_to_ours = {v: k for k, v in PROP_MARKETS.items()}
+    data, hdr = _get_json(f"{ODDS_API}/events/{event_id}/odds",
+                          {"apiKey": key, "regions": "us", "oddsFormat": "american",
+                           "markets": ",".join(PROP_MARKETS[m] for m in markets)})
+    out = []
+    for b in data.get("bookmakers", []):  # type: ignore[union-attr]
+        for m in b.get("markets", []):
+            market = feed_to_ours.get(m["key"])
+            for o in m.get("outcomes", []) if market else []:
+                side = str(o.get("name", "")).lower()
+                if side not in ("over", "under") or o.get("price") is None:
+                    continue
+                out.append({"event_id": event_id, "market": market, "player": o.get("description") or "",
+                            "book": b["key"], "side": side, "line": o.get("point"), "price": int(o["price"]),
+                            "updated": m.get("last_update")})
+    return out, _credits(hdr)[0] or remaining
+
+
+def plan_props(wants: list[tuple[str, str, str]], remaining: float | None, reserve: float, cap: int) -> list[tuple[str, str, str]]:
+    """The (home, away, market) pairs to buy, likeliest pick first: one credit each, at most `cap`, never below the
+    reserve, each pair once."""
+    if remaining is None:
+        return []
+    room = int(min(cap, remaining - reserve))
+    out: list[tuple[str, str, str]] = []
+    for w in wants:
+        if len(out) >= room:
+            break
+        if w not in out:
+            out.append(w)
+    return out
+
+
+def fetch_props(day: str, wants: list[tuple[str, str, str]], log=print) -> dict:
+    """Buy real prop lines for the games and markets of the day's likeliest picks (free plan) and add them to today's
+    odds file. Once a day: a file that already holds props is left alone."""
+    key = os.environ.get("ODDS_API_KEY", "").strip()
+    f = sources.archive_dir() / "odds" / f"{day}.json"
+    if not key or not f.exists():
+        return {"skipped": "no key" if not key else "no odds file"}
+    snap = json.loads(f.read_text())
+    if snap.get("props"):
+        return {"skipped": "props already bought today"}
+    budget = snap.get("budget") or {}
+    remaining = snap.get("credits_remaining")
+    cap = int(os.environ.get("NBA_PROP_CREDITS", FREE_PROP_CREDITS))
+    buy = plan_props(wants, remaining, float(budget.get("reserve", FREE_PLAN_RESERVE)), cap)
+    ev = {(g["home"], g["away"]): g["event_id"] for g in snap.get("games", [])}
+    by_game: dict[tuple[str, str], list[str]] = {}
+    for h, a, m in buy:
+        if (h, a) in ev:
+            by_game.setdefault((h, a), []).append(m)
+    props, errors = [], []
+    for (h, a), markets in by_game.items():
+        try:
+            got, remaining = _event_props(key, ev[(h, a)], markets, remaining)
+            props += got
+        except Exception as ex:  # noqa: BLE001 - a game that fails keeps its usual lines
+            errors.append(f"{a}@{h}: {ex}")
+    snap["props"] = props
+    snap["targeted"] = [{"home": h, "away": a, "markets": m} for (h, a), m in by_game.items()]
+    snap["credits_remaining"] = remaining
+    snap["errors"] = snap.get("errors", []) + errors
+    f.write_text(json.dumps(snap))
+    log(f"nba odds: bought {sum(len(m) for m in by_game.values())} prop markets in {len(by_game)} games "
+        f"({len(props)} prices); {remaining} credits remaining")
+    return {"games": len(by_game), "prices": len(props), "credits_remaining": remaining, "errors": errors}
 
 
 def save_odds(day: str, log=print, force: bool = False, now: datetime | None = None) -> dict:
@@ -248,12 +334,13 @@ def save_odds(day: str, log=print, force: bool = False, now: datetime | None = N
     dest = sources.archive_dir() / "odds" / f"{day}.json"
     if dest.exists() and not force:
         prev = json.loads(dest.read_text())
-        # A day that bought nothing (budget or errors) may try again on a later run; one that bought prices is kept.
-        if prev.get("game_lines") or prev.get("props"):
+        # A day that bought nothing (budget or errors) may try again on a later run; one that bought prices, or took
+        # its game lines from ESPN, is kept.
+        if prev.get("game_lines") or prev.get("props") or (prev.get("budget") or {}).get("espn_lines"):
             log(f"nba odds: keeping {dest.name} from {prev['fetched_at']}")
             return {"kept": dest.name}
     try:
-        snap = fetch_odds(day, key, log, os.environ.get("NBA_PROPS", "auto").lower(), now)
+        snap = fetch_odds(day, key, log, os.environ.get("NBA_PROPS", "auto").lower(), now, espn_lines=bool(load_espn_lines(day)))
     except Exception as ex:  # noqa: BLE001 - prices are optional
         log(f"nba odds: not fetched ({ex})")
         return {"error": str(ex)}
