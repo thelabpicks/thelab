@@ -112,10 +112,13 @@ describe("nbaCandidates", () => {
       games: [{ game_id: 1, date: "2026-10-24", home: "NY", away: "BOS", time: "2026-10-24T23:30:00Z" }],
       rows: [nbaRow("1", 1, 25.5, 21.5), nbaRow("2", 1, 20, 19.5), nbaRow("3", 1, 28, 21.5, { out: true }), nbaRow("4", 1, 28, 21.5, { evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
         // usual line far above this game's projection: no book would post it
-        nbaRow("5", 1, 9, 21.5)] };
+        nbaRow("5", 1, 9, 21.5),
+        // questionable, or a bench player without a book line: not sure to play, or no line a book would post
+        nbaRow("6", 1, 25.5, 21.5, { injury: "Questionable" }), nbaRow("7", 1, 25.5, 21.5, { evidence: { ...nbaRow("7", 1, 1, 1).evidence, start_rate: 0.2 } }),
+        nbaRow("8", 1, 25.5, 21.5, { injury: "Probable" })] };
     const c = nbaCandidates(slate, { conf });
     // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor; row 5's line is not one a book would post
-    expect(c.map((p) => p.player_id)).toEqual(["1"]);
+    expect(c.map((p) => p.player_id)).toEqual(["1", "8"]);
     expect(c[0].chance).toBeGreaterThanOrEqual(0.7);
     expect(c[0].tier).toBe("Strong");
     expect(c[0].sections.length).toBeGreaterThan(2);
