@@ -2,12 +2,13 @@ import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy, History,
+  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
 import { useLinkSuffix, useSeasonWeek, useTheme, type WeeksResponse } from "@/lib/state";
 import { Select } from "./ui";
+import { useLiveRecord } from "./LiveRecord";
 import { useCfb, type CfbPrevious, type CfbStatus, type Week as CfbWeek } from "@/lib/cfb";
 import { useNba, type NbaPrevious, type NbaStatus, type Slate } from "@/lib/nba";
 
@@ -16,7 +17,7 @@ type NavSection = { title: string; items: NavItem[] };
 
 /** Every sport gets the NFL tab's menu: the same sections, the same items in the same order, and the same mobile bar
  *  (Home, Props, Ask, Parlay, More). Only the sport's own research pages differ. */
-function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string; previous: string }): NavSection[] {
+function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavSection[] {
   return [
     { title: "Picks", items: [
       { to: base || "/", label: home, short: "Home", icon: LayoutDashboard, end: true },
@@ -27,7 +28,6 @@ function sportNav(base: string, home: string, research: NavItem[], links: { parl
     { title: "Proof", items: [
       { to: links.how, label: "How it works", icon: BookOpen },
       { to: links.record, label: "Track record", icon: BarChart3 },
-      { to: links.previous, label: "Previous weeks", icon: History },
     ] },
     { title: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
   ];
@@ -37,12 +37,12 @@ const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
     { to: "/rankings", label: "Anytime TD", short: "TDs", icon: ListOrdered },
     { to: "/hitrates", label: "Hit rates", icon: Percent },
     { to: "/defenses", label: "Defenses", icon: Shield },
-  ], { parlay: "/builder", how: "/how", record: "/backtest", previous: "/previous" }),
+  ], { parlay: "/builder", how: "/how", record: "/backtest" }),
   cfb: sportNav("/cfb", "This week", [
     { to: "/cfb/games", label: "All games", short: "Games", icon: ListOrdered },
     { to: "/cfb/teams", label: "Teams", icon: Trophy },
-  ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record", previous: "/cfb/previous" }),
-  nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record", previous: "/nba/previous" }),
+  ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
+  nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
 };
 // Mobile bar: Home, Player props, Ask, Parlay builder (then More), whatever the sport.
 const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];
@@ -90,6 +90,15 @@ function SeasonWeekPicker() {
   const { season, week, set } = useSeasonWeek();
   const weeks = useQuery({ queryKey: ["weeks", season], queryFn: () => api.get<WeeksResponse>("/weeks", { season }), staleTime: 60_000 });
   const seasons = weeks.data?.seasons ?? [season];
+  // past weeks' graded picks: the header's way into Previous weeks, as on the other sports
+  const live = useLiveRecord();
+  const nav = useNavigate();
+  const loc = useLocation();
+  const [params] = useSearchParams();
+  const results = (live.data?.previous_weeks ?? []).filter((w) => w.season === season).map((w) => `${w.season}-${w.week}`);
+  const onPrev = loc.pathname === "/previous";
+  const value = onPrev ? `r:${params.get("p") ?? results[0] ?? ""}` : String(week);
+  const pick = (v: string) => (v.startsWith("r:") ? nav(`/previous?p=${encodeURIComponent(v.slice(2))}`) : onPrev ? nav(`/?season=${season}&week=${v}`) : set(season, Number(v)));
   return (
     <div className="flex items-center gap-1.5">
       <label className="sr-only" htmlFor="season-select">Season</label>
@@ -97,12 +106,19 @@ function SeasonWeekPicker() {
         {seasons.map((s) => <option key={s} value={s}>{s}</option>)}
       </Select>
       <label className="sr-only" htmlFor="week-select">Week</label>
-      <Select id="week-select" value={week} onChange={(e) => set(season, Number(e.target.value))} className="h-8 w-[5.5rem] text-xs sm:w-auto">
-        {(weeks.data?.weeks ?? [{ week, status: "", has_predictions: true }]).map((w) => (
-          <option key={w.week} value={w.week} disabled={!w.has_predictions}>
-            Week {w.week}{w.status === "upcoming" ? " · upcoming" : w.status === "in_progress" ? " · live" : ""}{!w.has_predictions ? " · no run" : ""}
-          </option>
-        ))}
+      <Select id="week-select" value={value} onChange={(e) => pick(e.target.value)} className="h-8 w-[5.5rem] text-xs sm:w-auto">
+        <optgroup label="Picks">
+          {(weeks.data?.weeks ?? [{ week, status: "", has_predictions: true }]).map((w) => (
+            <option key={w.week} value={w.week} disabled={!w.has_predictions}>
+              Week {w.week}{w.status === "upcoming" ? " · upcoming" : w.status === "in_progress" ? " · live" : ""}{!w.has_predictions ? " · no run" : ""}
+            </option>
+          ))}
+        </optgroup>
+        {!!results.length && (
+          <optgroup label="Results">
+            {results.map((k) => <option key={k} value={`r:${k}`}>Week {k.split("-")[1]} · results</option>)}
+          </optgroup>
+        )}
       </Select>
     </div>
   );
