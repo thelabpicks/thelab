@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { num, pct } from "@/lib/format";
 import { bookName, fmtPrice, useCfb, type Props, type Week } from "@/lib/cfb";
 import { PageTitle } from "@/components/Layout";
@@ -39,7 +40,7 @@ export default function CfbProps() {
                 return (
                   <div key={`${r.player_id}-${r.market}`} className="flex items-center gap-3 px-4 py-2 text-sm">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium">{r.player} <span className="text-xs text-muted">{r.team}</span></div>
+                      <div className="font-medium"><Link to={`/cfb/players/${r.player_id}`} className="underline decoration-muted/60 decoration-dotted underline-offset-4 hover:text-accent">{r.player}</Link> <span className="text-xs text-muted">{r.team}</span></div>
                       <div className="text-xs text-muted">projects {num(r.mean, 1)} · last {r.recent.slice(0, 5).join(", ")}</div>
                     </div>
                     <div className="text-right">

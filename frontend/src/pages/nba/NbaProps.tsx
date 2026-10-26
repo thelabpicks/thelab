@@ -97,7 +97,7 @@ export default function NbaProps() {
                           <TeamBadge team={r.team} />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1">
-                              <Link to={`/nba/players/${r.player_id}`} className="truncate font-medium hover:text-accent">{r.player_name}</Link>
+                              <Link to={`/nba/players/${r.player_id}`} className="truncate font-medium underline decoration-muted/60 decoration-dotted underline-offset-4 hover:text-accent">{r.player_name}</Link>
                               <NbaSignals edge={edge} due={r.due} />
                             </div>
                             {/* the full injury note is in the row's details; here it stays on one line so the column keeps its width */}

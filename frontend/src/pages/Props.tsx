@@ -220,7 +220,7 @@ export default function PropsPage() {
                       <tr className={cn("border-b border-line/60 hover:bg-raised/50", !r.eligible && "opacity-60")}>
                         <Td className="sticky left-0 z-10 bg-surface">
                           <div className="w-[118px] sm:w-[170px]">
-                            <Link to={`/players/${r.player_id}${suffix}`} className="block truncate font-medium hover:text-accent">{r.player_name}</Link>
+                            <Link to={`/players/${r.player_id}${suffix}`} className="block truncate font-medium underline decoration-muted/60 decoration-dotted underline-offset-4 hover:text-accent">{r.player_name}</Link>
                             <div className="truncate text-[11px] text-muted">{r.team} {r.position} vs {r.opponent}</div>
                             {r.exclusion && <span className="text-[11px] text-danger">{r.exclusion}</span>}
                           </div>

@@ -352,3 +352,20 @@ def test_previous_weeks_grades_every_market_at_its_line():
     assert g({"market": "total", "side": "under", "line": 52.5}, hp, ap)["result"] == "lost"
     assert g({"market": "team_total", "side": "over", "team_side": "away", "line": 23.5}, hp, ap)["result"] == "won"
     assert g({"market": "moneyline", "side": "away"}, hp, ap)["result"] == "lost"
+
+
+def test_player_pages_log_this_season_newest_first():
+    from cfb import sources
+    s = sources.CURRENT_SEASON
+    g = pd.DataFrame({"game_id": [1, 2, 3], "date": pd.to_datetime(["2025-11-01", "2026-09-05", "2026-09-12"]), "season": [s - 1, s, s],
+                      "home_id": [10, 10, 30], "away_id": [20, 40, 10], "home_team": ["Penn State", "Penn State", "Ohio State"],
+                      "away_team": ["Iowa", "Rutgers", "Penn State"]})
+    z = {"pass_yds": 0.0, "pass_att": 0.0, "pass_td": 0.0, "rush_att": 0.0, "rec_yds": 0.0, "receptions": 0.0}
+    pg = pd.DataFrame([{"game_id": gid, "season": 0, "athlete_id": 7, "athlete_name": "Kaytron Allen", "team_id": 10, **z, "rush_yds": y}
+                       for gid, y in ((1, 50.0), (2, 88.0), (3, 112.0))])
+    pages = pipeline.player_pages(g, pg, [{"player_id": "7", "market": "rush_yds", "line": 79.5}])
+    p = pages["7"]
+    assert [x["rush_yds"] for x in p["log"]] == [112.0, 88.0]          # last season's game left out
+    assert [x["opp"] for x in p["log"]] == ["Ohio State", "Rutgers"] and p["log"][0]["home"] == 0
+    assert p["props"][0]["line"] == 79.5
+    assert pipeline.player_pages(g, pg, []) == {}

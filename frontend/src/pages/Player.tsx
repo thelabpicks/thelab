@@ -10,7 +10,8 @@ import type { Reason } from "@/lib/types";
 import { Badge, Card, CardBody, CardHeader, ErrorState, LoadingBlock, Notice, PosBadge, Segmented, Stat, TableWrap, Td, TeamBadge, Th } from "@/components/ui";
 import { ConfidenceBadge, Estimate, Flags, Outcome, ReasonList, SignalIcons } from "@/components/shared";
 import { useFeed } from "@/lib/feed";
-import { PlayerProps } from "@/components/PlayerProps";
+import { PlayerProps, usePlayerPropRows } from "@/components/PlayerProps";
+import { GameByGame, type LogGame, type LogStat } from "@/components/GameByGame";
 import { DUE_GAP, dueOf, tdEdge, tdLuck, useDueStudy } from "@/lib/signals";
 
 type Game = { week: number; opponent: string; carries: number; targets: number; receptions: number; rush_tds: number; rec_tds: number; anytime_tds: number;
@@ -43,6 +44,8 @@ export default function PlayerPage() {
   const feed = useFeed(season, week);
   const qb = d?.position === "QB";
   const tot = (k: keyof Game) => (d?.games ?? []).reduce((a, g) => a + (Number(g[k]) || 0), 0);
+  const lines = usePlayerPropRows(id, season, week, feed).rows;
+  const log = gameLog(d?.position ?? "", d?.games ?? [], (m) => lines.find((x) => x.m.market === m));
 
   return (
     <div className="space-y-5">
@@ -51,7 +54,7 @@ export default function PlayerPage() {
       {q.isLoading && <Card><LoadingBlock rows={8} className="p-4" /></Card>}
       {d && (
         <>
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
             {/* Identity / game */}
             <Card>
               <CardBody className="space-y-4">
@@ -83,7 +86,13 @@ export default function PlayerPage() {
                 ) : <Notice tone="info">No candidate row for {season} Week {week} (bye, inactive, or no earlier games).</Notice>}
               </CardBody>
             </Card>
+            <GameByGame stats={log.stats} games={log.games} initial={log.initial}
+              extra={[{ label: "Snap%", value: (g) => pct(d.games.find((x) => `w${x.week}` === g.id)?.offense_pct, 0) }]} />
+          </div>
 
+          <PlayerProps playerId={d.player_id} season={season} week={week} feed={feed} />
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             {/* Opportunity */}
             <div className="space-y-5">
               <Card>
@@ -156,10 +165,8 @@ export default function PlayerPage() {
             </div>
           </div>
 
-          <PlayerProps playerId={d.player_id} season={season} week={week} feed={feed} />
-
           <Card>
-            <CardHeader title="Game log" subtitle="Box score + play-by-play opportunity counts (zero-TD games included)" />
+            <CardHeader title="Full game log" subtitle="Box score + play-by-play opportunity counts (zero-TD games included)" />
             <TableWrap>
               <table className="w-full"><thead><tr><Th>Wk</Th><Th>Opp</Th><Th className="text-right">Snap%</Th>{qb && <><Th className="text-right">Cmp/Att</Th><Th className="text-right">Pass yds</Th><Th className="text-right">Pass TD</Th><Th className="text-right">INT</Th></>}<Th className="text-right">Car</Th><Th className="text-right">Rush yds</Th><Th className="text-right">Tgt</Th><Th className="text-right">Rec</Th><Th className="text-right">Rec yds</Th><Th className="text-right">≤5 car</Th><Th className="text-right">≤10 car</Th><Th className="text-right">RZ car</Th><Th className="text-right">≤5 tgt</Th><Th className="text-right">RZ tgt</Th><Th className="text-right">EZ proxy</Th><Th className="text-right" title="Inside-20 targets without a TD; not drops">Missed RZ tgt</Th><Th className="text-right">TDs</Th><Th className="text-right">xTD</Th></tr></thead>
                 <tbody>{d.games.map((g) => (
@@ -195,6 +202,33 @@ export default function PlayerPage() {
       )}
     </div>
   );
+}
+
+type PropLine = { line: number; source: string } | undefined;
+
+/** The stats books post for his position, main market first, each at this week's line. */
+function gameLog(pos: string, games: Game[], lineOf: (market: string) => PropLine): { stats: LogStat[]; games: LogGame[]; initial: string } {
+  const st = (key: string, label: string, short: string, market?: string): LogStat => {
+    const l = market ? lineOf(market) : undefined;
+    return { key, label, short, line: l?.line ?? null, lineNote: l ? (l.source === "book" ? "This week's book line" : l.source === "projected" ? "Projected line (no book line yet)" : "His usual line (no book line yet)") : undefined };
+  };
+  const td: LogStat = { key: "td", label: "Touchdowns", short: "TD", line: 0.5, lineNote: "Anytime TD: a game with a rushing or receiving score is a hit" };
+  const rushRec = st("rush_rec", "Rush + rec yards", "R+R", "rush_rec_yards");
+  const stats = pos === "QB"
+    ? [st("pass_yds", "Passing yards", "Pass yds", "pass_yards"), st("cmp", "Completions", "Cmp", "completions"), st("att", "Pass attempts", "Att", "pass_attempts"),
+      st("pass_td", "Passing TDs", "Pass TD", "pass_tds"), st("int", "Interceptions", "INT", "interceptions"), st("rush_yds", "Rushing yards", "Rush yds", "rush_yards"),
+      st("car", "Rush attempts", "Car", "carries")]
+    : pos === "RB"
+      ? [st("rush_yds", "Rushing yards", "Rush yds", "rush_yards"), st("car", "Rush attempts", "Car", "carries"), st("rec_yds", "Receiving yards", "Rec yds", "rec_yards"),
+        st("rec", "Receptions", "Rec", "receptions"), rushRec, td]
+      : [st("rec_yds", "Receiving yards", "Rec yds", "rec_yards"), st("rec", "Receptions", "Rec", "receptions"), st("tgt", "Targets", "Tgt"), rushRec, td];
+  return {
+    stats, initial: stats[0].key,
+    games: games.map((g) => ({ id: `w${g.week}`, when: `W${g.week}`, opp: g.opponent, values: {
+      pass_yds: g.pass_yards, cmp: g.completions, att: g.attempts, pass_td: g.pass_tds, int: g.interceptions, rush_yds: g.rush_yards, car: g.carries,
+      rec_yds: g.rec_yards, rec: g.receptions, tgt: g.targets, td: g.anytime_tds,
+      rush_rec: g.rush_yards == null && g.rec_yards == null ? null : (g.rush_yards ?? 0) + (g.rec_yards ?? 0) } })),
+  };
 }
 
 function Signals({ features, chance, playerId, feed }: { features: Record<string, unknown>; chance: number | null; playerId: string; feed: ReturnType<typeof useFeed> }) {

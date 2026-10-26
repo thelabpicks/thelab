@@ -61,7 +61,7 @@ export default function CfbAsk() {
             ))}
             {a.props.map((r) => (
               <div key={`${r.player_id}-${r.market}`} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <div className="min-w-0 flex-1"><div className="font-medium">{r.player}</div><div className="text-xs text-muted">{r.team} vs {r.opp} · projects {num(r.mean, 1)}</div></div>
+                <div className="min-w-0 flex-1"><Link to={`/cfb/players/${r.player_id}`} className="font-medium hover:text-accent">{r.player}</Link><div className="text-xs text-muted">{r.team} vs {r.opp} · projects {num(r.mean, 1)}</div></div>
                 <div className="text-right"><div className="font-semibold">{r.side === "over" ? "Over" : "Under"} {r.line} {r.label.toLowerCase()}</div>
                   <div className="text-xs text-muted"><RatingMeter size="sm" score={r.score} p={r.p} fair={r.fair_p} ev={r.ev} proven={r.proven} /> · {r.line_source === "book" ? "book line" : "usual line"}</div></div>
               </div>
