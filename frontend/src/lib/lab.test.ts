@@ -64,6 +64,14 @@ describe("grade", () => {
 });
 
 describe("advance", () => {
+  it("regrades a voided pick once newer results show the player played", () => {
+    const now = new Date("2026-10-26T20:00:00Z");
+    const p = pick({ id: "v", sport: "nfl", game_id: "g", player_id: "1", market: "rec_yds", side: "over", line: 45.5,
+      kickoff: "2026-10-25T17:00:00Z", result: "void", actual: "Did not play" });
+    const s = advance({ updated_at: null, board: [], frozen: [p] }, [],
+      { nfl: [{ game_id: "g", player_id: "1", market: "rec_yds", status: "graded", actual: 60 }] }, now);
+    expect(s.frozen[0].result).toBe("won");
+  });
   it("freezes picks from the last board once their game starts, and only lists games not yet started", () => {
     const now = new Date("2026-10-24T23:10:00Z");
     const started = pick({ id: "s", game_id: "9", player_id: "5", kickoff: "2026-10-24T23:00:00Z", rank: 1 });
