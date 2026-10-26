@@ -2,6 +2,7 @@
    green check or red X for whether it hit, like the Top 10 results card. Each sport's page turns its own published
    results into PrevPeriod lists; nothing here is graded in the browser. */
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import { History } from "lucide-react";
 import { cn, pct } from "@/lib/format";
 import { Card, CardBody, CardHeader, EmptyState, Select, Segmented, Switch } from "@/components/ui";
@@ -47,13 +48,16 @@ export function PreviousWeeks({ periods, markets, note, layout, noun = "week", s
   /** boxes: one labeled box per market inside each game (game lines). list: one row per pick (player props). */
   layout: "boxes" | "list"; noun?: "week" | "day"; strongLabel?: string; hiddenLabel?: string; chanceSteps?: number[]; perGame?: number;
 }) {
-  const [period, setPeriod] = React.useState(periods[0]?.key ?? ALL);
+  // the week (or day) lives in the address (?p=), so the header's week picker can open this page on it
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("p");
+  const period = asked === ALL || periods.some((p) => p.key === asked) ? asked! : periods[0]?.key ?? ALL;
+  const setPeriod = (k: string) => setParams((q) => { q.set("p", k); return q; }, { replace: true });
   const [market, setMarket] = React.useState(ALL);
   const [show, setShow] = React.useState<Show>("all");
   const [strong, setStrong] = React.useState(false);
   const [withHidden, setWithHidden] = React.useState(false);
   const [minChance, setMinChance] = React.useState(0);
-  React.useEffect(() => { if (period !== ALL && !periods.some((p) => p.key === period)) setPeriod(periods[0]?.key ?? ALL); }, [periods, period]);
 
   if (!periods.length) return <Card><EmptyState icon={<History className="h-5 w-5" />} title="No finished games yet">{note}</EmptyState></Card>;
 
@@ -112,7 +116,7 @@ export function PreviousWeeks({ periods, markets, note, layout, noun = "week", s
               <button key={m.market} type="button" onClick={() => setMarket(market === m.market ? ALL : m.market)}
                 className={cn("rounded-lg border px-3 py-2 text-left transition-colors", market === m.market ? "border-accent bg-accent/5" : "border-line bg-raised/30 hover:bg-raised/60")}>
                 <div className="text-[11px] font-medium uppercase tracking-wider text-muted">{m.label}</div>
-                <div className="text-[17px] font-bold tabular-nums">{recText(t)}<span className="ml-1 text-xs font-semibold text-muted">{pct(t.rate, 0)}</span></div>
+                <div className="text-[17px] font-bold tabular-nums">{recText(t)}{t.rate != null && <span className="ml-1 text-xs font-semibold text-muted">{pct(t.rate, 0)}</span>}</div>
                 {period !== ALL && <div className="text-[11px] text-muted">Every {noun}: {recText(s)}{s.rate != null ? ` · ${pct(s.rate, 0)}` : ""}</div>}
               </button>
             );
