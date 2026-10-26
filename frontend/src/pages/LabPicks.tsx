@@ -171,7 +171,10 @@ function DailyCard({ b }: { b: LabBoard }) {
 const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "–");
 
 /** Every pick that was on the list at kickoff (and every pick of the day), graded after the final: hit or miss, by day. */
-function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
+function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
+  // flips between sports on its own, starting on the sport the page shows
+  const [sport, setSport] = React.useState<Sport>(shown);
+  React.useEffect(() => setSport(shown), [shown]);
   const r = b.record.by_sport[sport];
   const dr = b.daily?.record.by_sport[sport];
   const recent = b.recent.filter((p) => p.sport === sport);
@@ -190,12 +193,11 @@ function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
       <CardHeader title={`${SPORT_LABEL[sport]} results`} icon={<Trophy className="h-4 w-4 text-accent" />}
         subtitle="Every pick that was on the list when its game started, graded after the final. Picks are never changed after kickoff." />
       <CardBody className="space-y-3">
+        <Segmented size="sm" label="Results for" value={sport} onChange={(v) => setSport(v as Sport)}
+          options={SPORTS.map((s) => ({ value: s, label: `${SPORT_LABEL[s]} · ${recText(b.record.by_sport[s])}` }))} />
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <div><div className="label">Top 10</div><div className="font-display text-xl font-bold">{recText(r)}{r.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(r.rate, 0)}</span>}</div></div>
           {dr && <div><div className="label">Picks of the day</div><div className="font-display text-xl font-bold">{recText(dr)}{dr.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(dr.rate, 0)}</span>}</div></div>}
-          {SPORTS.filter((s) => s !== sport).map((s) => (
-            <div key={s}><div className="label">{SPORT_LABEL[s]} top 10</div><div className="font-semibold">{recText(b.record.by_sport[s])}</div></div>
-          ))}
         </div>
         {!rows.length && <p className="text-sm text-muted">Results show here once the first games on the list are played.</p>}
         {pending > 0 && <p className="text-xs text-muted">{pending} {pending === 1 ? "pick is" : "picks are"} waiting on a final score.</p>}
