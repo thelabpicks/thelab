@@ -172,6 +172,27 @@ describe("picks of the day", () => {
     // a later refresh with a likelier pick keeps today's three as chosen
     expect(chooseDaily(d, [...cands, at(9, { chance: 0.98 })], now).filter((x) => x.date === "2026-10-24").map((x) => x.id)).toEqual(["p2", "p3", "p4"]);
   });
+  it("skips picks under 60% and withdraws a locked pick before kickoff once the model backs the other side", () => {
+    const d = chooseDaily([], [at(1, { chance: 0.59 }), at(2, { chance: 0.61 })], now);
+    expect(d.map((x) => x.id)).toEqual(["p2"]);
+    const del = at(3, { market: "moneyline", side: "away", chance: 0.62 });
+    const s = advance({ updated_at: null, board: [], frozen: [] }, [del], {}, now);
+    const wku = at(4, { game_id: "3", player_id: "3", market: "moneyline", side: "home", chance: 0.58 });
+    const s2 = advance(s, [wku], {}, new Date("2026-10-24T18:00:00Z"));
+    const w = s2.daily!.find((x) => x.id === "p3")!;
+    expect([w.result, w.withdrawn]).toEqual(["void", true]);
+    // the final score never turns a withdrawn pick into a result
+    const s3 = advance(s2, [], { nba: { rows: [{ date: "2026-10-24", game_id: 3, player_id: "3", market: "points", actual: 99 }], through: "2026-10-24" } },
+      new Date("2026-10-25T15:00:00Z"));
+    expect(s3.daily!.find((x) => x.id === "p3")!.result).toBe("void");
+  });
+  it("withdraws a locked pick under the 60% floor before kickoff, but never one already played", () => {
+    const old = { ...at(5, { chance: 0.51 }), date: "2026-10-24", slot: 1, chosen_at: "2026-10-23T12:00:00Z" };
+    const done = { ...at(6, { chance: 0.52, kickoff: "2026-10-23T23:00:00Z" }), date: "2026-10-23", slot: 1, chosen_at: "2026-10-22T12:00:00Z" };
+    const s = advance({ updated_at: null, board: [], frozen: [], daily: [old, done] }, [], {}, now);
+    expect(s.daily!.find((x) => x.id === "p5")!.withdrawn).toBe(true);
+    expect(s.daily!.find((x) => x.id === "p6")!.withdrawn).toBeUndefined();
+  });
   it("grades picks of the day and keeps their own record", () => {
     const s = advance({ updated_at: null, board: [], frozen: [] }, [at(2, { game_id: "9", player_id: "5", side: "over", line: 20.5 })], {}, now);
     expect(s.daily?.length).toBe(1);
