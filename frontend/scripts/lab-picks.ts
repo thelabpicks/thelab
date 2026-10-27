@@ -28,7 +28,7 @@ function read<T>(file: string): T | null {
 const nflFile = <T>(p: string, params: Params = {}) => read<T>(staticKey(p, params));
 
 /** The same inputs the NFL Ask page loads (pages/Ask.tsx useAskData), from the exported files. */
-function nflData(): { d: AskData; settled: NflSettled[] } | null {
+function nflData(): AskData | null {
   const weeks = nflFile<{ current_season: number; current_week: number }>("/weeks");
   if (!weeks) return null;
   const sw = { season: weeks.current_season, week: weeks.current_week };
@@ -50,8 +50,7 @@ function nflData(): { d: AskData; settled: NflSettled[] } | null {
     conf: nflFile<Confidence>("/backtest/confidence") ?? undefined, buckets: model?.buckets ?? {}, useCorr: !!model?.use_correlation,
     dueRecord: dueRecord(nflFile<DueStudy>("/backtest/due") ?? undefined), defenses: nflFile<AskDefenses>("/defenses", sw),
   };
-  const live = nflFile<{ recent_rows?: NflSettled[] }>("/backtest/live");
-  return { d, settled: live?.recent_rows ?? [] };
+  return d;
 }
 
 const sports: Record<Sport, { loaded: boolean; candidates: number }> = { nfl: { loaded: false, candidates: 0 }, nba: { loaded: false, candidates: 0 }, cfb: { loaded: false, candidates: 0 } };
@@ -65,10 +64,10 @@ const tryRun = (sport: Sport, f: () => LabPick[] | null) => {
 };
 
 tryRun("nfl", () => {
-  const x = nflData();
-  if (!x) return null;
-  res.nfl = x.settled;
-  return nflCandidates(x.d);
+  // results are graded even between weeks, when the new week has no rankings yet (Tuesday until rosters post)
+  res.nfl = nflFile<{ recent_rows?: NflSettled[] }>("/backtest/live")?.recent_rows ?? [];
+  const d = nflData();
+  return d ? nflCandidates(d) : null;
 });
 tryRun("nba", () => {
   const slate = read<Slate>("nba/slate.json");
