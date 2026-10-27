@@ -185,10 +185,15 @@ def parse_injury_report(text: str, teams: dict[str, str] | None = None) -> list[
     return out
 
 
+def official_index_url(season: int = sources.CURRENT_SEASON) -> str:
+    """The league's page for the season, named like nba-injury-report-2026-27-season (two-digit second year)."""
+    return OFFICIAL_INDEX.format(y0=season - 1, y1=f"{season % 100:02d}")
+
+
 def _latest_report_url(day: str, season: int = sources.CURRENT_SEASON) -> str | None:
     """The newest report PDF for `day` listed on the league's injury report page."""
     import re  # noqa: PLC0415
-    req = urllib.request.Request(OFFICIAL_INDEX.format(y0=season - 1, y1=season), headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(official_index_url(season), headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as r:
         html = r.read().decode("utf-8", "replace")
     links = sorted(set(re.findall(rf"https://[^\"']+Injury-Report_{day}_[^\"']+\.pdf", html)))
