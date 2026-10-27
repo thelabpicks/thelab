@@ -1,6 +1,6 @@
 {
   "date": "2026-10-26",
-  "ran_at": "2026-10-26T23:00:18+00:00",
+  "ran_at": "2026-10-27T00:33:48+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -54,7 +54,7 @@
   "espn": {
     "injuries": {
       "saved": "2026-10-26.json",
-      "items": 27
+      "items": 26
     },
     "scoreboard": {
       "saved": "2026-10-26.json",
