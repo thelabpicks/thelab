@@ -167,6 +167,26 @@ def test_api_masks_uncalibrated_probability_and_locks_are_immutable(env):
         c.execute("DELETE FROM top3_locks WHERE lock_id='lock-1'")
 
 
+def test_weeks_open_on_the_last_week_with_picks_until_the_new_week_runs(env):
+    c, raw = env
+    _import_all(c, raw)
+    from fastapi.testclient import TestClient
+
+    import main
+
+    client = TestClient(main.app)
+    with c:
+        c.execute("INSERT INTO model_runs VALUES ('pr-w2','prediction','m','2026-01-01T00:00:00+00:00',"
+                  "2026,2,'2026-09-14',NULL,'{}','{}','{}',0,0)")
+    body = client.get("/api/weeks").json()   # week 3 is current (week 2 played) but has no run yet
+    assert body["current_week"] == 2 and body["next_week"] == 3
+    with c:
+        c.execute("INSERT INTO model_runs VALUES ('pr-w3','prediction','m','2026-01-02T00:00:00+00:00',"
+                  "2026,3,'2026-09-21',NULL,'{}','{}','{}',0,0)")
+    body = client.get("/api/weeks").json()
+    assert body["current_week"] == 3 and body["next_week"] is None
+
+
 def test_odds_and_wilson():
     from app.core import implied_probability
     from engine.backtest import wilson
