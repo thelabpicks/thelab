@@ -151,7 +151,7 @@ def live_lines(today: str) -> dict:
             "source": f"{len({l['book'] for l in ls})} sportsbooks" if use_books else espn_src,
             "fetched_at": fetched.get(gid) if use_books else (espn_at or fetched.get(gid)),
             "books_at": fetched.get(gid),
-            # once the book prices are stale they stay in the line-shopping table but are never quoted as a pick's price
+            # once the book prices are stale they are dropped from the picks and the line-shopping table: ESPN has the current line
             "books_stale": stale and not use_books,
             "offers": ls, "team_totals": tts.get(gid, []), "props": prs.get(gid, []), "alts": alts.get(gid, []),
             "home_rank": e.get("home_rank"), "away_rank": e.get("away_rank"), "tv": e.get("tv"),
