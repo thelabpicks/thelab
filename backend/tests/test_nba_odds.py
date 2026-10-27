@@ -96,3 +96,10 @@ def test_official_report_overrides_espn(tmp_path, monkeypatch):
 
 def test_official_injury_page_uses_two_digit_second_year():
     assert collect.official_index_url(2027) == "https://official.nba.com/nba-injury-report-2026-27-season/"
+
+
+def test_props_are_bought_only_once_books_post_them():
+    from datetime import datetime, timezone
+    assert not pipeline.props_posted(datetime(2026, 10, 27, 9, 0, tzinfo=timezone.utc))   # 5 am ET
+    assert pipeline.props_posted(datetime(2026, 10, 27, 16, 0, tzinfo=timezone.utc))      # noon ET
+    assert pipeline.props_posted(datetime(2026, 10, 27, 0, 30, tzinfo=timezone.utc))      # 8:30 pm ET the day before

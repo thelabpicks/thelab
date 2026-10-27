@@ -139,7 +139,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     due_markets = {m for m, v in due["markets"].items() if v["beat_projection"] >= v["others_beat_projection"]}
     rows = slate_json(proj, f, oos, reports, odds, due_markets) if len(proj) else []
     # Free plan: buy real prop lines for the likeliest picks' games and markets, then rebuild the rows at those lines.
-    if rows and not odds["props"] and len(slate) and str(slate.game_date.min().date()) == today:
+    if rows and not odds["props"] and len(slate) and str(slate.game_date.min().date()) == today and props_posted():
         teams = {g.game_id: (g.home_abbreviation, g.away_abbreviation) for g in slate.itertuples()}
         got = collect.fetch_props(today, prop_targets(rows, teams), log=log)
         if got.get("prices"):
@@ -192,6 +192,14 @@ def regular_starter(e: dict) -> bool:
     if g is None:
         return True
     return g > 0 and (e.get("season_starts") or 0) / g >= MIN_START_RATE and (e.get("season_min") or 0) >= MIN_MINUTES
+
+
+PROPS_FROM_HOUR_ET = 10   # books post most of the day's player props by mid-morning; the early run must not spend the day's one buy
+
+
+def props_posted(now: datetime | None = None) -> bool:
+    """True once the day's player props are reliably posted (10 am ET), so the single daily buy gets full markets."""
+    return (now or datetime.now(timezone.utc)).astimezone(collect.ET).hour >= PROPS_FROM_HOUR_ET
 
 
 def prop_targets(rows: list[dict], teams: dict) -> list[tuple[str, str, str]]:
