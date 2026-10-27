@@ -174,3 +174,11 @@ def test_previous_days_groups_leans_by_day_and_game():
     assert (g["home"], g["away"], g["score"]) == ("UTAH", "LAL", [123.0, 132.0])
     assert [p[1] for p in g["picks"]] == ["B", "A"]   # likeliest first
     assert g["picks"][0][-1] == 0
+
+
+def test_model_rows_carry_this_season_evidence_for_the_site():
+    # slate_json reads season_games, season_starts and season_min off each projected row
+    rows = props.model_rows(history.build_features(_box()), "points")
+    assert {"season_games", "season_starts", "season_min"} <= set(rows.columns)
+    last = rows[rows.player_id == 100].sort_values("game_date").iloc[-1]
+    assert last.season_starts == last.season_games == 39
