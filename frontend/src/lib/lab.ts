@@ -5,7 +5,7 @@
    frozen as shown and graded after the final, so the record is never written with hindsight. */
 import { ALT_MIN_PRICE, altPool, anyPool, gameLabel, isProven, answerWhy, type AskData, type Pick } from "./ask";
 import { easternToUtc } from "./static";
-import { bestOffer, leanOf, marketLabel, MIN_LINE, nbaTier, type NbaRow, type Slate } from "./nba";
+import { bestOffer, leanOf, marketLabel, MIN_LINE, nbaTier, starsOf, suggestable, type NbaRow, type Slate } from "./nba";
 import type { AskContext as NbaCtx } from "./nbaAsk";
 import { explainRow } from "./nbaAsk";
 import { bookName as cfbBook, fmtPrice, pickText, tierOf, type Backtest, type CfbPick, type PropRow as CfbPropRow, type Team, type Week } from "./cfb";
@@ -89,8 +89,11 @@ function nflPick(d: AskData, p: Pick, kickoff: string): LabPick {
 export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const games = new Map(slate.games.map((g) => [g.game_id, g]));
   const out: LabPick[] = [];
+  const stars = starsOf(slate.rows);
   for (const r of slate.rows) {
     if (r.out || r.evidence.minutes_long < 20 || r.line < MIN_LINE || !games.has(r.game_id)) continue;
+    // stars only, at a line DraftKings posts (nba.ts suggestable: the same rule as the NBA home's leans)
+    if (!suggestable(r, stars)) continue;
     // Without a book line the line is the player's usual one. When this game's projection sits far from it (a role or
     // minutes change), no book will post that line, so a near-certain under against it is not a real pick.
     // Only lines a book really posts (the pipeline buys them for the likeliest picks' games), and only players sure to

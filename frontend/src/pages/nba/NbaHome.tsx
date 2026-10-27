@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Dices, MessageCircleQuestion } from "lucide-react";
 import { num, pct } from "@/lib/format";
-import { MIN_LINE, edgeOf, leanOf, marketLabel, nbaTier, score10, useNba, type NbaConfidence, type NbaStatus, type Slate } from "@/lib/nba";
+import { edgeOf, leanOf, marketLabel, nbaTier, score10, starsOf, suggestable, useNba, type NbaConfidence, type NbaStatus, type Slate } from "@/lib/nba";
 import { PageTitle } from "@/components/Layout";
 import { Button, Card, CardBody, CardHeader, Input, LoadingBlock, Notice, TeamBadge } from "@/components/ui";
 import { TierBadge } from "@/components/shared";
@@ -18,7 +18,8 @@ export default function NbaHome() {
   const [q, setQ] = React.useState("");
   if (slate.isError) return <NotPublished error={slate.error} />;
   const d = slate.data;
-  const picks = (d?.rows ?? []).filter((r) => !r.out && r.evidence.minutes_long >= 20 && r.line >= MIN_LINE)
+  const stars = starsOf(d?.rows ?? []);
+  const picks = (d?.rows ?? []).filter((r) => suggestable(r, stars))
     .map((r) => ({ r, lean: leanOf(r) })).filter((x) => x.lean && x.lean.p >= 0.6)
     .map((x) => ({ ...x, edge: edgeOf(x.r, x.lean), tier: nbaTier(conf.data, x.lean!.p) }))
     .sort((a, b) => b.lean!.p - a.lean!.p).slice(0, 12);
@@ -46,7 +47,7 @@ export default function NbaHome() {
       )}
       {d && !!picks.length && (
         <Card>
-          <CardHeader title="Strongest leans today" subtitle={strong?.rate != null ? `Leans of 6.5+ out of 10 hit ${pct(strong.rate, 0)} of ${strong.n.toLocaleString()} unseen games in testing` : "Players averaging 20+ minutes, at the line shown"} />
+          <CardHeader title="Strongest leans today" subtitle={strong?.rate != null ? `Leans of 6.5+ out of 10 hit ${pct(strong.rate, 0)} of ${strong.n.toLocaleString()} unseen games in testing` : "Each team's top scorers, at the line DraftKings posts"} />
           <div className="divide-y divide-line/60">
             {picks.map(({ r, lean, edge, tier }) => (
               <Link key={`${r.player_id}-${r.market}`} to={`/nba/players/${r.player_id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-raised/50">
@@ -64,7 +65,7 @@ export default function NbaHome() {
           </div>
         </Card>
       )}
-      {d && d.games.length > 0 && !picks.length && <Notice title="No strong leans yet">No validated lean reaches 6.0 out of 10 today. See all players on the props page.</Notice>}
+      {d && d.games.length > 0 && !picks.length && <Notice title="No strong leans yet">{d.odds.props_priced ? "No star with a DraftKings line reaches 6.0 out of 10 today." : "Star picks appear once DraftKings posts player props, about 10 AM Eastern."} See all players on the props page.</Notice>}
       {status.data && (
         <Card><CardBody className="text-xs text-muted">
           Built from {status.data.history.games.toLocaleString()} games since {status.data.history.first_season - 1}-{String(status.data.history.first_season).slice(2)} (the last two seasons count most; a game's weight halves every {status.data.recency_half_life_seasons} seasons).
