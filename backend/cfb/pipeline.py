@@ -144,11 +144,15 @@ def live_lines(today: str) -> dict:
         row = {
             "spread": float(np.median(sp)) if sp and use_books else e.get("home_spread") if e.get("home_spread") is not None else (float(np.median(sp)) if sp else None),
             "total": float(np.median(tot)) if tot and use_books else e.get("total") if e.get("total") is not None else (float(np.median(tot)) if tot else None),
-            "ml_home": mlp["home"] if mlp["home"] is not None and use_books else e.get("ml_home") if e.get("ml_home") is not None else mlp["home"],
-            "ml_away": mlp["away"] if mlp["away"] is not None and use_books else e.get("ml_away") if e.get("ml_away") is not None else mlp["away"],
+            "ml_home": mlp["home"] if mlp["home"] is not None and use_books else e.get("ml_home") if e.get("ml_home") is not None
+            else None if stale else mlp["home"],
+            "ml_away": mlp["away"] if mlp["away"] is not None and use_books else e.get("ml_away") if e.get("ml_away") is not None
+            else None if stale else mlp["away"],
             "source": f"{len({l['book'] for l in ls})} sportsbooks" if use_books else espn_src,
             "fetched_at": fetched.get(gid) if use_books else (espn_at or fetched.get(gid)),
             "books_at": fetched.get(gid),
+            # once the book prices are stale they stay in the line-shopping table but are never quoted as a pick's price
+            "books_stale": stale and not use_books,
             "offers": ls, "team_totals": tts.get(gid, []), "props": prs.get(gid, []), "alts": alts.get(gid, []),
             "home_rank": e.get("home_rank"), "away_rank": e.get("away_rank"), "tv": e.get("tv"),
             "espn_spread": e.get("home_spread"), "espn_home_id": e.get("home_id"), "espn_away_id": e.get("away_id"),
@@ -244,7 +248,7 @@ def game_rows(up: pd.DataFrame, ch: dict, summary: dict, lines: dict, qb: dict |
     rows = []
     for i, g in enumerate(up.itertuples()):
         L = lines.get(g.game_id, {})
-        offers = L.get("offers", [])
+        offers = [] if L.get("books_stale") else L.get("offers", [])
         markets = []
         if g.spread == g.spread:
             p = float(ch["p_home_cover"][i])

@@ -369,3 +369,35 @@ def test_player_pages_log_this_season_newest_first():
     assert [x["opp"] for x in p["log"]] == ["Ohio State", "Rutgers"] and p["log"][0]["home"] == 0
     assert p["props"][0]["line"] == 79.5
     assert pipeline.player_pages(g, pg, []) == {}
+
+
+def _wku_game(odds: dict) -> dict:
+    return {"id": "401871071", "date": "2026-10-27T23:00Z", "status": {"type": {"name": "STATUS_SCHEDULED"}},
+            "competitions": [{"neutralSite": False, "broadcasts": [], "competitors": [
+                {"homeAway": "home", "team": {"id": "98", "abbreviation": "WKU"}},
+                {"homeAway": "away", "team": {"id": "48", "abbreviation": "DEL"}}], "odds": [odds]}]}
+
+
+def test_scoreboard_reads_the_moneyline_block():
+    odds = {"provider": {"name": "DraftKings"}, "details": "WKU -1.5", "spread": -1.5, "overUnder": 56.5,
+            "homeTeamOdds": {"favorite": True}, "awayTeamOdds": {"underdog": True},
+            "moneyline": {"home": {"open": {"odds": "+110"}, "close": {"odds": "-115"}}, "away": {"close": {"odds": "-105"}}}}
+    r = collect.parse_scoreboard({"data": {"events": [_wku_game(odds)]}})[0]
+    assert r["ml_home"] == -115 and r["ml_away"] == -105
+
+
+def test_stale_book_prices_are_never_quoted(tmp_path, monkeypatch):
+    # Saturday's books had Delaware -134 / WKU +112; by Monday ESPN has WKU -1.5 and -115
+    monkeypatch.setenv("CFB_ARCHIVE_DIR", str(tmp_path))
+    (tmp_path / "scoreboard").mkdir()
+    (tmp_path / "odds").mkdir()
+    odds = {"provider": {"name": "DraftKings"}, "details": "WKU -1.5", "spread": -1.5, "overUnder": 56.5,
+            "moneyline": {"home": {"close": {"odds": "-115"}}, "away": {"close": {"odds": "-105"}}}}
+    (tmp_path / "scoreboard" / "2026-10-26.json").write_text(json.dumps(
+        {"fetched_at": "2026-10-26T15:56:17+00:00", "data": {"events": [_wku_game(odds)]}}))
+    book = lambda market, side, price, point=None: {"game_id": 401871071, "book": "fanduel", "market": market, "side": side,  # noqa: E731
+                                                   "price": price, "point": point}
+    (tmp_path / "odds" / "2026-10-24.json").write_text(json.dumps({"fetched_at": "2026-10-24T15:16:22+00:00", "game_lines": [
+        book("h2h", "home", 112), book("h2h", "away", -134), book("spreads", "home", -110, 2.5), book("totals", "over", -110, 55.5)]}))
+    L = pipeline.live_lines("2026-10-26")[401871071]
+    assert L["books_stale"] and L["spread"] == -1.5 and L["ml_home"] == -115 and L["ml_away"] == -105
