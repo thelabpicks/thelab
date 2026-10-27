@@ -176,8 +176,20 @@ def parse_injury_report(text: str, teams: dict[str, str] | None = None) -> list[
     word = r"[A-Z][A-Za-z'\-]+\.?"
     pat = re.compile(rf"(?:@([A-Z]{{2,4}})@\s+)?((?:{word} ){{0,2}}{word}(?: (?:Jr\.|Sr\.|II|III|IV))?), "
                      rf"({word}(?: {word})?) ({'|'.join(STATUSES)})\b(?: ([^\n]*))?")
+    # Some PDFs extract one table cell per line: put a team, a status and its reason back on the player's line.
+    status = rf"(?:{'|'.join(STATUSES)})"
+    lines: list[str] = []
+    for line in (x.strip() for x in text.splitlines()):
+        if not line:
+            continue
+        prev = lines[-1] if lines else ""
+        if prev.endswith("@") or (re.match(rf"{status}\b", line) and re.search(rf", {word}(?: {word})?$", prev)) \
+                or (re.search(rf" {status}$", prev) and "," not in line and "@" not in line and not re.match(r"\d", line)):
+            lines[-1] = f"{prev} {line}"
+        else:
+            lines.append(line)
     out, team = [], None
-    for line in text.splitlines():
+    for line in lines:
         for m in pat.finditer(line):
             team = m.group(1) or team
             out.append({"name": f"{m.group(3)} {m.group(2)}", "team": team, "status": m.group(4),
@@ -221,10 +233,16 @@ def save_official_injuries(day: str, log=print) -> dict:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as r:
             pdf = PdfReader(BytesIO(r.read()))
-        rows = parse_injury_report("\n".join(page.extract_text() or "" for page in pdf.pages))
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        rows = parse_injury_report(text)
     except Exception as ex:  # noqa: BLE001 - ESPN's report still stands
         log(f"nba: official injury report not saved ({ex})")
         return {"error": str(ex)}
+    if not rows:
+        # a posted report always lists someone: nothing read means the PDF's layout changed. Keep ESPN's list and show
+        # the start of the text in the run log so the parser can be fixed.
+        log(f"nba: official injury report read no players ({url.rsplit('/', 1)[-1]}); text starts:\n{text[:1500]!r}")
+        return {"error": "no players read", "report": url.rsplit("/", 1)[-1]}
     dest = sources.archive_dir() / "official_injuries" / f"{day}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps({"fetched_at": utcnow(), "source": url, "players": rows}))

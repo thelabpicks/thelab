@@ -77,6 +77,13 @@ def test_official_injury_report_rows():
         ("Cody Williams", "UTAH", "Available"),
         ("Stephen Curry", "GS", "Probable")]
     assert rows[0]["reason"].startswith("Injury/Illness - Left Ankle")
+    # the same report extracted one table cell per line
+    cells = ("10/26/2026\n08:00 (ET)\nMEM@UTA\nMemphis Grizzlies\nSmall, Javon\nOut\nInjury/Illness - Left Ankle; Sprain\n"
+             "Jackson Jr., Jaren\nQuestionable\nInjury/Illness - Right Knee; Soreness\nUtah Jazz\nWilliams, Cody\nAvailable\n"
+             "09:00 (ET)\nGSW@DEN\nGolden State Warriors\nCurry, Stephen\nProbable\nRest\n")
+    split = collect.parse_injury_report(cells)
+    assert [(r["name"], r["team"], r["status"]) for r in split] == [(r["name"], r["team"], r["status"]) for r in rows]
+    assert split[0]["reason"].startswith("Injury/Illness - Left Ankle") and split[-1]["reason"] == "Rest"
 
 
 def test_official_report_overrides_espn(tmp_path, monkeypatch):
