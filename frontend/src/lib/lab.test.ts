@@ -104,22 +104,31 @@ const nbaRow = (id: string, game: number, mu: number, line: number, extra: Parti
 });
 
 describe("nbaCandidates", () => {
-  it("keeps proven leans at book lines of rotation players sure to play, each with a write-up", () => {
-    const book = { line_source: "book" as const };
+  it("keeps proven leans of stars sure to play at lines DraftKings posts, each with a write-up", () => {
+    const dk = (line: number) => (["over", "under"] as const).map((side) => ({ book: "draftkings", side, line, price: -110 }));
+    // each row its own team, so each is that team's top scorer unless a test says otherwise
+    const at = (id: string, mu: number, line: number, extra: Partial<NbaRow> = {}) =>
+      nbaRow(id, 1, mu, line, { team: `T${id}`, line_source: "book", offers: dk(line), ...extra });
     const tier = (name: string, lo: number, hi: number, rate: number) => ({ tier: name, lo, hi, n: 1000, hits: 0, rate, avg_chance: null, ci: [null, null] as [null, null] });
     const conf = { props: { first_season: 2022, tiers: [tier("Coin flip", 0.5, 0.55, 0.5), tier("Lean", 0.55, 0.6, 0.56), tier("Strong", 0.6, 1, 0.68)],
       by_side: { over: [], under: [] }, note: "", by_market: [] } } as NbaConfidence;
-    const slate: Slate = { date: "2026-10-24", generated_at: "", odds: { fetched_at: null, plan: "free", props_priced: false },
+    const slate: Slate = { date: "2026-10-24", generated_at: "", odds: { fetched_at: null, plan: "free", props_priced: true },
       games: [{ game_id: 1, date: "2026-10-24", home: "NY", away: "BOS", time: "2026-10-24T23:30:00Z" }],
-      rows: [nbaRow("1", 1, 25.5, 21.5, book), nbaRow("2", 1, 20, 19.5, book), nbaRow("3", 1, 28, 21.5, { ...book, out: true }),
-        nbaRow("4", 1, 28, 21.5, { ...book, evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
+      rows: [at("1", 25.5, 21.5), at("2", 20, 19.5), at("3", 28, 21.5, { out: true }),
+        at("4", 28, 21.5, { evidence: { ...nbaRow("4", 1, 1, 1).evidence, minutes_long: 12 } }),
         // a usual line, not one a book posted
-        nbaRow("5", 1, 25.5, 21.5),
+        nbaRow("5", 1, 25.5, 21.5, { team: "T5" }),
         // questionable: not sure to play; probable is fine
-        nbaRow("6", 1, 25.5, 21.5, { ...book, injury: "Questionable" }), nbaRow("8", 1, 25.5, 21.5, { ...book, injury: "Probable" })] };
+        at("6", 25.5, 21.5, { injury: "Questionable" }), at("8", 25.5, 21.5, { injury: "Probable" }),
+        // posted by other books but not DraftKings
+        at("9", 25.5, 21.5, { offers: [{ book: "bovada", side: "over", line: 21.5, price: -110 }] }),
+        // T10's fourth scorer is no star, however strong the lean
+        at("10", 30, 26.5, { team: "T10" }), at("11", 29, 26.5, { team: "T10" }), at("12", 28, 26.5, { team: "T10" }), at("13", 25.5, 18.5, { team: "T10" }),
+        // a bench player is no star either
+        at("14", 25.5, 21.5, { evidence: { ...nbaRow("14", 1, 1, 1).evidence, start_rate: 0.1 } })] };
     const c = nbaCandidates(slate, { conf });
     // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor
-    expect(c.map((p) => p.player_id)).toEqual(["1", "8"]);
+    expect(c.map((p) => p.player_id)).toEqual(["1", "8", "10", "11", "12"]);
     expect(c[0].chance).toBeGreaterThanOrEqual(0.7);
     expect(c[0].tier).toBe("Strong");
     expect(c[0].sections.length).toBeGreaterThan(2);

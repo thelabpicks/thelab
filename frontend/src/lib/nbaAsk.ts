@@ -3,7 +3,7 @@
    is simulated with the published same-game links, and every claim about accuracy quotes the published backtest.
    Any question gets an answer: when nothing specific is recognised it says what it read and shows tonight's
    strongest leans. */
-import { MIN_LINE, NBA_MARKETS, bestOffer, bookName, edgeOf, leanOf, marketLabel, overAt, type MarketReport, type NbaGame, type NbaConfidence, type NbaDue,
+import { MIN_LINE, NBA_MARKETS, bestOffer, bookName, edgeOf, leanOf, marketLabel, overAt, starsOf, suggestable, type MarketReport, type NbaGame, type NbaConfidence, type NbaDue,
   type NbaRecord, type NbaRow, type NbaStatus, type Slate } from "./nba";
 import type { Buckets, SimLeg } from "./sim";
 import { simulate } from "./sim";
@@ -173,6 +173,9 @@ export function answer(question: string, slate: Slate, buckets: Buckets = {}, us
   const num = numberOf(q);
   const scoped = rows.filter((r) => (!market || markets.includes(r.market)) && (!teams.length || teams.includes(r.team) || (teams.length === 1 && teams.includes(r.opp)))
     && (!pos || r.pos === pos));
+  // suggestions (best, safest, due, hot) name only stars with a DraftKings line; questions naming a player still answer for him
+  const stars = starsOf(all);
+  const picks = scoped.filter((r) => suggestable(r, stars));
   const leans = (rs: NbaRow[]) => rs.map((r) => ({ r, l: leanOf(r)! })).filter((x) => x.l && (!wantUnder || x.l.side === "under") && (!wantOver || x.l.side === "over"))
     .sort((a, b) => b.l.p - a.l.p);
   const filterWords = [market && marketLabel(market).toLowerCase(), teams.length && teams.join(" / "), pos && { G: "guards", F: "forwards", C: "centers" }[pos]].filter(Boolean).join(", ");
@@ -241,7 +244,7 @@ export function answer(question: string, slate: Slate, buckets: Buckets = {}, us
 
   // ---- Due
   if (/\b(due|bounce[- ]?back|cold|slump\w*|struggl\w*|regress\w*|buy[- ]low|been bad|under ?perform\w*)\b/.test(q)) {
-    const due = scoped.filter((r) => r.due).map((r) => leanItem(r, recentNote(r, 4))!).filter(Boolean);
+    const due = picks.filter((r) => r.due).map((r) => leanItem(r, recentNote(r, 4))!).filter(Boolean);
     const study = market ? ctx.due?.markets[market] : undefined;
     return { title: "Due: under his projection 4 games running", items: due.sort((a, b) => b.p - a.p).slice(0, countOf(q, 15)),
       text: due.length ? "The scores already account for the slump. Due is a label, not a boost." : "Nobody qualifies tonight" + (filterWords ? ` (${filterWords})` : "") + ".",
@@ -250,7 +253,7 @@ export function answer(question: string, slate: Slate, buckets: Buckets = {}, us
 
   // ---- hot streaks
   if (/\b(hot|streak\w*|on fire|heater|rolling|trending|form)\b/.test(q)) {
-    const hot = scoped.filter((r) => r.recent.length >= 4 && r.recent.slice(0, 4).every((v) => v > r.line))
+    const hot = picks.filter((r) => r.recent.length >= 4 && r.recent.slice(0, 4).every((v) => v > r.line))
       .map((r) => leanItem(r, `last 4 over ${r.line}: ${r.recent.slice(0, 4).map((v) => fmt(v, 0)).join(", ")}`)!).filter(Boolean);
     return { title: "Hot: over tonight's line in each of his last 4", items: hot.sort((a, b) => b.p - a.p).slice(0, countOf(q, 15)),
       text: hot.length ? "A streak is not a reason by itself; the score is the model's chance with the streak already counted." : "Nobody has cleared tonight's line 4 straight." };
@@ -306,7 +309,7 @@ export function answer(question: string, slate: Slate, buckets: Buckets = {}, us
 
   // ---- "why are these the picks", "explain your best bet"
   if (WHY.test(q) && /\b(picks?|bets?|plays?|locks?|leans?|best|top|safest|strongest|these|them|your)\b/.test(q)) {
-    const pool = leans(scoped.filter((r) => r.evidence.minutes_long >= 20));
+    const pool = leans(picks);
     const top = pool.slice(0, countOf(q, /\b(pick|bet|play|lock|lean)\b(?!s)/.test(q) ? 1 : 3));
     if (top.length) return { title: top.length === 1 ? `Why ${top[0].r.player_name} ${top[0].l.side} ${top[0].r.line} ${marketLabel(top[0].r.market).toLowerCase()} is the top lean` : `Why these are tonight's ${top.length} strongest leans`,
       items: top.map((x) => item(x.r, x.l.side, x.r.line, x.l.p, `projects ${fmt(x.r.mean)}`)),
@@ -319,10 +322,10 @@ export function answer(question: string, slate: Slate, buckets: Buckets = {}, us
   // ---- safest / locks / confidence
   const safe = /\b(safe\w*|locks?|lock of|sure ?things?|confident|confidence|best bets?|strongest|most likely|highest (chance|probability|score)|guaranteed|bankers?|anchors?)\b/.test(q);
   const n = countOf(q, safe ? 5 : 10);
-  const pool = leans(scoped.filter((r) => r.evidence.minutes_long >= 20));
+  const pool = leans(picks);
   if (!pool.length) {
     return { title: "Nothing matches that", text: `I read: ${describe(q, markets, teams, pos, wantOver, wantUnder) || "no market, team or player"}. No validated lean fits${filterWords ? ` (${filterWords})` : ""}. Here are tonight's strongest instead.`,
-      items: fallbackItems(rows), suggestions: SUGGESTIONS };
+      items: fallbackItems(rows.filter((r) => suggestable(r, stars))), suggestions: SUGGESTIONS };
   }
   const what = `${wantUnder ? "unders" : wantOver ? "overs" : "leans"}${filterWords ? ` (${filterWords})` : ""}`;
   const items = pool.slice(0, n).map((x) => item(x.r, x.l.side, x.r.line, x.l.p, `projects ${fmt(x.r.mean)}, ${recentNote(x.r)}`));
