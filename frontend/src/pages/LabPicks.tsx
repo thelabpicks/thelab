@@ -98,7 +98,7 @@ function PickRow({ p, open, onToggle }: { p: LabPick; open: boolean; onToggle: (
       {open && (
         <div className="border-t border-line/60 bg-bg/30">
           <WriteUp sections={p.sections} />
-          <div className="px-4 py-2.5 text-xs sm:px-5"><Link to={p.link} className="text-accent hover:underline">Open in {SPORT_LABEL[p.sport]}</Link></div>
+          <div className="px-4 py-2.5 text-xs sm:px-5"><Link to={p.link} className="text-accent hover:underline">{p.link.includes("/players/") ? "Game-by-game stats →" : `Open in ${SPORT_LABEL[p.sport]}`}</Link></div>
         </div>
       )}
     </li>

@@ -833,6 +833,24 @@ def prop_rows(g: pd.DataFrame, oos: pd.DataFrame, up: pd.DataFrame, featured: se
                                            "prop lines are sharper, so the live record on posted lines is what counts."}
 
 
+def player_pages(g: pd.DataFrame, pg: pd.DataFrame, props_rows: list[dict]) -> dict:
+    """This season's game log for every player with a prop this week (newest first), for the tap-a-player page."""
+    ids = {int(r["player_id"]) for r in props_rows}
+    if pg.empty or not ids:
+        return {}
+    d = props.attach_games(pg[pg.athlete_id.isin(ids)], g[g.season == sources.CURRENT_SEASON])
+    pages = {}
+    for aid, x in d.groupby("athlete_id"):
+        pid = str(int(aid))
+        x = x.sort_values("date", ascending=False)
+        pages[pid] = {"player_id": pid, "player_name": x.athlete_name.iloc[0], "team": x.team.iloc[0],
+                      "log": [{"date": str(pd.Timestamp(y.date).date()), "opp": y.opp, "home": int(y.home),
+                               **{c: float(getattr(y, c)) for c in ("pass_yds", "pass_att", "pass_td", "rush_yds", "rush_att", "rec_yds", "receptions")}}
+                              for y in x.itertuples()],
+                      "props": [r for r in props_rows if r["player_id"] == pid]}
+    return pages
+
+
 PROP_TIERS = [("Coin flip", 0.50, 0.55), ("Lean", 0.55, 0.60), ("Solid", 0.60, 0.65), ("Strong", 0.65, 1.0)]
 
 
@@ -929,6 +947,11 @@ def run(out: Path, log=print, today: str | None = None, now: datetime | None = N
     _write(out, "findings.json", {"rules": finds, "break_even": report.BREAK_EVEN})
     _write(out, "record.json", {**rec, "report_card": card})
     _write(out, "teams.json", {"season": sources.CURRENT_SEASON, "teams": teams})
+    try:
+        for pid, page in player_pages(g, pg_now, props_rows).items():
+            _write(out, f"players/{pid}.json", page)
+    except Exception as ex:  # noqa: BLE001 - same as props: never block the game lines
+        log(f"cfb player pages: skipped ({ex})")
     prev_rater = rating.fit(legs[legs.season < sources.CURRENT_SEASON]) if (legs.season < sources.CURRENT_SEASON).any() else rater
     _write(out, "previous.json", previous_weeks(g, bt, summary, prev_rater, sources.CURRENT_SEASON))
     fin = g[g.final]

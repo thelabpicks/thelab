@@ -16,9 +16,8 @@ import { LineLadder, Outlook } from "@/pages/Props";
 
 type MarketMeta = { market: string; label: string; validated: boolean };
 
-export function PlayerProps({ playerId, season, week, feed }: { playerId: string; season: number; week: number; feed: Feed }) {
-  const conf = useConfidence();
-  const [open, setOpen] = React.useState<string | null>(null);
+/** His validated markets this week with the line in play (book line, else his usual or projected line), strongest lean first. */
+export function usePlayerPropRows(playerId: string, season: number, week: number, feed: Feed) {
   const markets = useQuery({ queryKey: ["props-markets"], queryFn: () => api.get<{ markets: MarketMeta[] }>("/props/markets") });
   const validated = (markets.data?.markets ?? []).filter((m) => m.validated);
   const props = useQueries({ queries: validated.map((m) => ({ queryKey: ["props", season, week, m.market],
@@ -37,7 +36,14 @@ export function PlayerProps({ playerId, season, week, feed }: { playerId: string
     const reasons = (lean === "under" ? underReasons : overReasons)(r, m.market, m.label, line);
     return [{ m, r, line, source: book != null ? "book" : est.kind, over, lean, leanP, hits, games: rec.length, reasons }];
   }).sort((a, b) => b.leanP - a.leanP);
-  if (markets.isLoading || props.some((p) => p.isLoading)) return null;
+  return { rows, loading: markets.isLoading || props.some((p) => p.isLoading) };
+}
+
+export function PlayerProps({ playerId, season, week, feed }: { playerId: string; season: number; week: number; feed: Feed }) {
+  const conf = useConfidence();
+  const [open, setOpen] = React.useState<string | null>(null);
+  const { rows, loading } = usePlayerPropRows(playerId, season, week, feed);
+  if (loading) return null;
   if (!rows.length) return null;
   return (
     <Card>

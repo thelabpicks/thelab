@@ -88,6 +88,9 @@ export type PropRow = { game_id: number; player: string; player_id: string; team
   mean: number; line: number; line_source: "book" | "usual"; p_over: number; side: "over" | "under"; p: number; score: number;
   fair_p?: number; ev?: number; rating?: number;
   tier: string | null; proven: boolean; recent: number[]; best: Offer | null };
+/** players/{id}.json: this season's games (newest first) and this week's props, for players with a prop this week. */
+export type CfbPlayerPage = { player_id: string; player_name: string; team: string; props: PropRow[];
+  log: { date: string; opp: string; home: number; pass_yds: number; pass_att: number; pass_td: number; rush_yds: number; rush_att: number; rec_yds: number; receptions: number }[] };
 export type Props = { generated_at: string; rows: PropRow[]; backtest: { markets: Record<string, MarketReport>; note: string } };
 export type CfbRecord = { games: number; picks: number; empty_reason?: string; first_date?: string; last_date?: string;
   by_market_tier?: { market: CfbMarket; tier: string | null; n: number; hits: number; rate: number; roi: number | null }[];

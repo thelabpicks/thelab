@@ -5,6 +5,7 @@ import { NBA_MARKETS, bestOffer, bookName, edgeOf, fmtPrice, leanOf, marketLabel
 import { PageTitle } from "@/components/Layout";
 import { Card, CardBody, CardHeader, LoadingBlock, TableWrap, Td, TeamBadge, Th } from "@/components/ui";
 import { TierBadge } from "@/components/shared";
+import { GameByGame } from "@/components/GameByGame";
 import { Headshot, NotPublished, ScoreSplit } from "./shared";
 
 export default function NbaPlayer() {
@@ -56,6 +57,14 @@ export default function NbaPlayer() {
           </table></TableWrap>
         </Card>
       )}
+      <GameByGame initial={first?.market}
+        stats={NBA_MARKETS.map((m) => {
+          const r = p.props.find((x) => x.market === m.market);
+          return { key: m.market, label: m.label, short: m.short, line: r?.line ?? null, lineNote: r ? (r.line_source === "book" ? "Tonight's book line" : "His usual line (no book line yet)") : undefined };
+        })}
+        games={[...p.log].reverse().map((g) => ({ id: g.date, when: shortDate(g.date), opp: `${g.home ? "vs" : "@"} ${g.opp}`, season: nbaSeason(g.date),
+          values: { points: g.points, rebounds: g.rebounds, assists: g.assists, threes: g.threes, pra: g.pra } }))}
+        extra={[{ label: "Min", value: (g) => num(p.log.find((x) => x.date === g.id)?.minutes, 0) }]} />
       {(edges.length > 0 || dues.length > 0) && (
         <Card><CardBody className="space-y-2 text-sm">
           <div className="font-semibold">Signals</div>
@@ -79,21 +88,11 @@ export default function NbaPlayer() {
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted">{nbaReasons(r, lean!).map((t) => <li key={t}>{t}</li>)}</ul>
         </CardBody></Card>
       ))}
-      <Card>
-        <CardHeader title="Game log" subtitle="Most recent first" />
-        <TableWrap><table className="w-full text-sm">
-          <thead><tr><Th>Date</Th><Th>Opp</Th><Th className="text-right">Min</Th><Th className="text-right">PTS</Th><Th className="text-right">REB</Th><Th className="text-right">AST</Th><Th className="text-right">3PM</Th><Th className="text-right">PRA</Th></tr></thead>
-          <tbody>
-            {p.log.map((g) => (
-              <tr key={g.date} className="border-b border-line/60">
-                <Td className="text-muted">{g.date}</Td><Td>{g.home ? "vs" : "@"} {g.opp}</Td><Td className="text-right">{num(g.minutes, 0)}</Td>
-                <Td className="text-right">{g.points}</Td><Td className="text-right">{g.rebounds}</Td><Td className="text-right">{g.assists}</Td>
-                <Td className="text-right">{g.threes}</Td><Td className="text-right font-medium">{g.pra}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </table></TableWrap>
-      </Card>
     </div>
   );
 }
+
+/** "2026-10-24" -> "Oct 24". */
+const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+/** NBA seasons start in October: "2026-27". */
+const nbaSeason = (d: string) => { const y = +d.slice(0, 4), start = +d.slice(5, 7) >= 8 ? y : y - 1; return `${start}-${String(start + 1).slice(2)}`; };

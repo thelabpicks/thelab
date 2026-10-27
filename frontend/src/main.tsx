@@ -40,6 +40,7 @@ import LabPicks from "./pages/LabPicks";
 import Previous from "./pages/Previous";
 import NbaPrevious from "./pages/nba/NbaPrevious";
 import CfbPrevious from "./pages/cfb/CfbPrevious";
+import CfbPlayer from "./pages/cfb/CfbPlayer";
 import { EmptyState } from "./components/ui";
 import { STATIC } from "./lib/api";
 
@@ -93,6 +94,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="cfb/parlay" element={<CfbParlay />} />
               <Route path="cfb/games" element={<CfbGames />} />
               <Route path="cfb/previous" element={<CfbPrevious />} />
+              <Route path="cfb/players/:id" element={<CfbPlayer />} />
               <Route path="*" element={<EmptyState title="Page not found">That route does not exist.</EmptyState>} />
             </Route>
           </Routes>
