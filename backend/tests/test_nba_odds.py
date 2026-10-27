@@ -92,3 +92,7 @@ def test_official_report_overrides_espn(tmp_path, monkeypatch):
         {"name": "Javon Small", "team": "MEM", "status": "Out", "reason": "Left Ankle"}]}))
     inj = predict.injuries()
     assert "cody williams" not in inj and inj["javon small"]["status"] == "Out"
+
+
+def test_official_injury_page_uses_two_digit_second_year():
+    assert collect.official_index_url(2027) == "https://official.nba.com/nba-injury-report-2026-27-season/"
