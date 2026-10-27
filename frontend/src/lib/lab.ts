@@ -293,7 +293,7 @@ export function grade(p: LabPick, res: Results): { result: LabResult; actual: st
 /* ------------------------------------------------------------------ the weekly state */
 
 /** A pick of the day: locked once chosen, graded after the final, never swapped. */
-export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string };
+export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string; withdrawn?: boolean };
 export type LabState = { updated_at: string | null; board: LabPick[]; frozen: LabPick[]; daily?: DailyPick[] };
 export type LabRecord = { n: number; won: number; lost: number; push: number; void: number; rate: number | null };
 export type LabBoard = {
@@ -311,6 +311,8 @@ export type LabBoard = {
  *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing. */
 export const DAILY_SIZE = 3;
 export const DAILY_MIN_PRICE = -1000;
+/** A pick of the day must be at least this likely: a 51% favorite is too close to a coin flip to post. */
+export const DAILY_MIN_CHANCE = 0.6;
 const DAILY_KEEP_DAYS = 90;
 /** The Central-time date a game is played on: picks of the day follow the US sports day, not UTC. */
 export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -327,7 +329,7 @@ export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): Dail
       if (have.length >= DAILY_SIZE) continue;
       const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
       const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now
-        && (p.price == null || p.price >= DAILY_MIN_PRICE) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
+        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
       rankBoard(pool, DAILY_SIZE - have.length).forEach((p, i) => {
         const { frozen_at: _f, ...rest } = p;
         out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: now.toISOString() });
@@ -347,8 +349,15 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
   const open = cands.filter((c) => !started(c));
   const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp)));
   const cutoff = playDate(new Date(now.getTime() - DAILY_KEEP_DAYS * 864e5));
+  // a locked pick whose game has not started is withdrawn (and never counted) once the model backs the other side of it
+  const flipped = (d: DailyPick) => !d.result && !started(d) && open.some((c) => c.sport === d.sport && c.game_id === d.game_id
+    && c.market === d.market && c.id !== d.id && (c.player_id ?? null) === (d.player_id ?? null) && (c.team_side ?? null) === (d.team_side ?? null));
   const daily = chooseDaily((prev.daily ?? []).filter((d) => d.date >= cutoff), open, now)
-    .map((d) => { if (d.result && d.result !== "void") return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
+    .map((d) => flipped(d) ? { ...d, result: "void" as const, actual: "Withdrawn before kickoff: the model now backs the other side", withdrawn: true } : d)
+    // and so is one locked before the 60% floor existed that sits under it
+    .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
+      ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
+    .map((d) => { if (d.withdrawn || (d.result && d.result !== "void")) return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
   return { updated_at: now.toISOString(), board, frozen, daily };
 }
 
