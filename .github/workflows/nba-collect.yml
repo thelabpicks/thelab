@@ -7,6 +7,8 @@ name: Collect NBA data
 
 on:
   schedule:
+    - cron: "0 9 * * *"    # early refresh, 09:00 UTC (4-5 am Central): last night graded, new projections and injuries.
+                           # Prop lines are not bought yet (too few are posted this early); the 16:00 run buys them.
     - cron: "0 16 * * *"   # every day 16:00 UTC (noon ET in summer time, 11:00 ET in winter), before tip-off
     - cron: "30 22 * * *"  # pre-tip refresh (6:30 pm ET in summer time, 5:30 pm in winter): latest injury report, rosters and
                            # box scores; re-saves the leans of games not yet started. Odds are kept from the morning (no credits).

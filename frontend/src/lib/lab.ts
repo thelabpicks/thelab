@@ -364,7 +364,7 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): 
     return n >= BOARD_SIZE ? null : !n && sports[sp]?.candidates ? "Every pick that qualified has already started. The next list posts with this sport's next refresh."
       : !n ? "No games with posted lines are left on the board right now."
       : `Only ${n} ${n === 1 ? "pick is" : "picks are"} on the board right now (one per game and per player, from games that have not started).`
-        + (sp === "nba" ? " NBA picks use only prop lines a book really posts, bought each morning for the games of the day's likeliest picks." : "");
+        + (sp === "nba" ? " NBA picks use only prop lines a book really posts, bought late each morning (about 11 am Central) for the games of the day's likeliest picks." : "");
   };
   return {
     generated_at: s.updated_at ?? new Date().toISOString(), board: s.board, sports,
