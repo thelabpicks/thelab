@@ -71,6 +71,12 @@ def weeks(season: int | None = None, c: sqlite3.Connection = Depends(get_db)):
     rows = c.execute("""SELECT week, COUNT(*) AS games, SUM(home_score IS NOT NULL) AS completed, MIN(gameday) AS first_day,
                         MAX(gameday) AS last_day FROM games WHERE season=? GROUP BY week ORDER BY week""", (season,)).fetchall()
     runs = {r[0]: r[1] for r in c.execute("SELECT week, MAX(created_at) FROM model_runs WHERE kind='prediction' AND season=? GROUP BY week", (season,))}
-    return {"season": season, "seasons": seasons or [season], "current_season": s, "current_week": cur,
+    # Between weeks (Tuesday until rosters post) the new week has no run yet: open the site on the last week that has one
+    # and name the next week, so no page asks for data that is not there.
+    cur_runs = runs if season == s else {r[0] for r in c.execute(
+        "SELECT DISTINCT week FROM model_runs WHERE kind='prediction' AND season=?", (s,))}
+    shown = cur if cur in cur_runs or not any(w <= cur for w in cur_runs) else max(w for w in cur_runs if w <= cur)
+    return {"season": season, "seasons": seasons or [season], "current_season": s, "current_week": shown,
+            "next_week": cur if shown != cur else None,
             "weeks": [dict(r) | {"has_predictions": r["week"] in runs, "status": "completed" if r["completed"] == r["games"] else
                                  ("in_progress" if r["completed"] else "upcoming")} for r in rows]}

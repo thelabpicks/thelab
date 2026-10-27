@@ -86,6 +86,18 @@ export function Logo({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/** Tuesday until rosters post, the new NFL week has no picks yet: the site shows the last week and says when the next posts. */
+function NextWeekNote() {
+  const { season, week, defaults } = useSeasonWeek();
+  const next = defaults?.next_week;
+  if (!next || season !== defaults?.current_season || week !== defaults?.current_week) return null;
+  return (
+    <div className="mb-4 rounded-lg border border-line bg-surface/60 px-3 py-2 text-sm text-muted">
+      Week {next} picks post Thursday, once rosters are out. Showing Week {week} results until then.
+    </div>
+  );
+}
+
 function SeasonWeekPicker() {
   const { season, week, set } = useSeasonWeek();
   const weeks = useQuery({ queryKey: ["weeks", season], queryFn: () => api.get<WeeksResponse>("/weeks", { season }), staleTime: 60_000 });
@@ -289,6 +301,7 @@ export function Layout() {
           <ThemeToggle />
         </header>
         <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-5 sm:px-6 lg:pb-10">
+          {!other && <NextWeekNote />}
           <Outlet />
         </main>
       </div>

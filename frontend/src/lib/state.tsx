@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "./api";
 
 export type WeekInfo = { week: number; games: number; completed: number; status: string; has_predictions: boolean; first_day: string };
-export type WeeksResponse = { season: number; seasons: number[]; current_season: number; current_week: number; weeks: WeekInfo[] };
+export type WeeksResponse = { season: number; seasons: number[]; current_season: number; current_week: number; next_week?: number | null; weeks: WeekInfo[] };
 
 /** Season/week live in the URL (?season=&week=) so views are linkable and switching is instant. */
 export function useSeasonWeek() {
