@@ -210,6 +210,10 @@ def parse_scoreboard(snap: dict) -> list[dict]:
             row["home_spread"] = sp
             row["ml_home"] = _f((odds.get("homeTeamOdds") or {}).get("moneyLine"))
             row["ml_away"] = _f((odds.get("awayTeamOdds") or {}).get("moneyLine"))
+            # ESPN now posts the moneyline under odds.moneyline.{home,away}.{close,current,open}.odds (e.g. "-115")
+            for side in ("home", "away"):
+                if row[f"ml_{side}"] is None:
+                    row[f"ml_{side}"] = _espn_price((odds.get("moneyline") or {}).get(side) or {})
         rows.append(row)
     return rows
 
@@ -220,6 +224,18 @@ def _f(v) -> float | None:
         return x if x == x else None
     except (TypeError, ValueError):
         return None
+
+
+def _espn_price(m: dict) -> float | None:
+    """The latest American price in one side of ESPN's moneyline block: close, then current, then open."""
+    for k in ("close", "current", "open"):
+        v = str((m.get(k) or {}).get("odds") or "").strip().upper()
+        if v in ("EVEN", "EV"):
+            return 100.0
+        x = _f(v.replace("+", ""))
+        if x is not None and abs(x) >= 100:
+            return x
+    return None
 
 
 def _spread_from_details(details, h: dict, a: dict) -> float | None:
