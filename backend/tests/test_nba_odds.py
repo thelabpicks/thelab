@@ -86,6 +86,22 @@ def test_official_injury_report_rows():
     assert split[0]["reason"].startswith("Injury/Illness - Left Ankle") and split[-1]["reason"] == "Rest"
 
 
+def test_official_injury_report_one_word_per_line():
+    # how the league's 10/28/26 report really extracted: one word per line, page headers mid-team
+    text = "\n".join(("Injury Report: 10/28/26 05:30 AM Page 1 of 7 Game Date Game Time Matchup Team Player Name Current Status Reason "
+                      "10/28/2026 07:00 (ET) CHA@DET Charlotte Hornets Knueppel, Kon Out Injury/Illness - Left Hamstring Strain "
+                      "White, Coby Out Injury/Illness - Left Calf Strain Detroit Pistons NOT YET SUBMITTED MIA@ATL Miami Heat "
+                      "Fontecchio, Simone Doubtful Injury/Illness - Illness PHI@IND Philadelphia 76ers Barlow, Dominick Out Injury/Illness - "
+                      "Low Back Stress Reaction Injury Report: 10/28/26 05:30 AM Page 2 of 7 Fall, Tacko Out Injury/Illness - Left "
+                      "Quadriceps Strain Indiana Pacers Haliburton, Tyrese Questionable Injury/Illness - Left Hamstring Strain").split())
+    rows = collect.parse_injury_report(text)
+    assert [(r["name"], r["team"], r["status"]) for r in rows] == [
+        ("Kon Knueppel", "CHA", "Out"), ("Coby White", "CHA", "Out"), ("Simone Fontecchio", "MIA", "Doubtful"),
+        ("Dominick Barlow", "PHI", "Out"), ("Tacko Fall", "PHI", "Out"), ("Tyrese Haliburton", "IND", "Questionable")]
+    assert rows[1]["reason"] == "Injury/Illness - Left Calf Strain"
+    assert rows[3]["reason"] == "Injury/Illness - Low Back Stress Reaction"
+
+
 def test_official_report_overrides_espn(tmp_path, monkeypatch):
     from nba import predict
     monkeypatch.setenv("NBA_ARCHIVE_DIR", str(tmp_path))
