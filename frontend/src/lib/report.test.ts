@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addToIndex, buildReport, reportText } from "./report";
+import { buildReport, reportText } from "./report";
 import type { DailyPick, LabPick, LabState } from "./lab";
 
 const pick = (o: Partial<LabPick>): LabPick => ({
@@ -27,7 +27,9 @@ describe("buildReport", () => {
       daily({ id: "t", date: "2026-10-28", kickoff: "2026-10-28T23:00:00Z", game_id: "3" }),
     ],
   };
-  const r = buildReport({ state, previous: { date: "2026-10-27", results_date: "2026-10-26", generated_at: "", headline: "", sports: [], changes: [], graded_ids: ["a"] } }, NOW);
+  const r = buildReport({ state, previous: { date: "2026-10-27", results_date: "2026-10-26", generated_at: "", headline: "", sports: [], graded_ids: ["a"] },
+    nba: { previous: { generated_at: "", days: [{ date: "2026-10-27", line_source: "usual", games: [{ game_id: 1, home: "B", away: "A", score: [100, 90],
+      picks: [["1", "P1", "B", "points", "under", 20.5, 0.8, 15, 30, 0], ["2", "P2", "B", "threes", "under", 2.5, 0.72, 1.4, 1, 1], ["3", "P3", "A", "assists", "over", 4.5, 0.55, 5, 6, 1]] }] }] } } }, NOW);
   const nba = r.sports.find((s) => s.sport === "nba")!;
 
   it("dates the report by the morning and grades the day before", () => {
@@ -51,8 +53,9 @@ describe("buildReport", () => {
     expect(r.headline).toBe("Tue, Oct 27: CFB 1 void, NBA 1-2 with 1 pending.");
     expect(r.graded_ids).toEqual(expect.arrayContaining(["a", "b", "old", "n"]));
     expect(reportText(r)).toContain("NBA: 2-1 / 1-1");
-    const idx = addToIndex(addToIndex({ latest: null, reports: [] }, { ...r, date: "2026-10-27" }), r);
-    expect(idx.latest).toBe("2026-10-28");
-    expect(idx.reports.length).toBe(2);
+  });
+  it("grades every lean the model made, by confidence, and names the furthest miss", () => {
+    expect(nba.model[0]).toBe("Every lean the model made on 1 game: 2-1 (67%). By confidence: 70%+ hit 50% of 2, under 60% hit 100% of 1.");
+    expect(nba.model.at(-1)).toContain("P1 points (projected 15, had 30, line 20.5)");
   });
 });

@@ -2,7 +2,7 @@ import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy, FileText,
+  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
@@ -28,7 +28,6 @@ function sportNav(base: string, home: string, research: NavItem[], links: { parl
     { title: "Proof", items: [
       { to: links.how, label: "How it works", icon: BookOpen },
       { to: links.record, label: "Track record", icon: BarChart3 },
-      { to: "/report", label: "Daily report", icon: FileText },
     ] },
     { title: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
   ];

@@ -1,15 +1,15 @@
-/* The daily model report: what the models said, how it went, what was cross-checked before the games, what the
-   post-game reviews found, and what changed in the models. Built by scripts/lab-report.ts on every site refresh from
-   the files the pages already publish; the 4 am Central refresh is the first one each day. Pure: no file access here. */
+/* The daily model report, posted to Andrew each morning: how the picks and the models did on yesterday's games (every
+   lean the model made, not only the picks), where the predictions were off and why (post-game re-runs), and what the
+   models changed in themselves (refits, corrections tested and adopted or rejected). Built by scripts/lab-report.ts on
+   every site refresh from the files the pages already publish; the 4 am Central refresh is the first one each day.
+   Pure: no file access here. */
 import { SPORTS, SPORT_LABEL, playDate, tally, type DailyPick, type LabPick, type LabRecord, type LabState, type Sport } from "./lab";
-import type { NbaRecord, NbaStatus } from "./nba";
-import type { CfbRecord } from "./cfb";
+import type { NbaPrevious, NbaRecord, NbaStatus } from "./nba";
+import type { CfbPrevious, CfbRecord } from "./cfb";
 import type { LiveRecord } from "@/components/LiveRecord";
 
 /** rank: the pick's top 10 rank when it was on the list at kickoff. */
 export type ReportPick = Pick<LabPick, "id" | "sport" | "bet" | "matchup" | "kickoff" | "chance" | "result" | "actual" | "rank"> & { potd?: boolean; date: string };
-/** ok: true checked out, false needs a look, null for information. */
-export type Check = { ok: boolean | null; text: string };
 export type SportReport = {
   sport: Sport;
   /** Season to date, and on the results day alone. */
@@ -21,37 +21,31 @@ export type SportReport = {
   pending: ReportPick[];
   /** Picks of the day locked for the report date. */
   today: ReportPick[];
+  /** The picks: hits, misses (predicted vs actual), voids. */
   findings: string[];
-  checks: Check[];
+  /** Every lean the model made on the day's games, graded: how the model did beyond the picks. */
+  model: string[];
+  /** Where the predictions were off and why (post-game re-runs with what really happened). */
   postgame: string[];
+  /** What the models changed in themselves: refits, corrections tested and adopted or rejected. */
   improving: string[];
 };
-export type Change = { title: string; url: string; at: string };
 export type DailyReport = {
   /** The morning the report is for (Central time); results are from the day before. */
   date: string; results_date: string; generated_at: string;
-  headline: string; sports: SportReport[]; changes: Change[];
+  headline: string; sports: SportReport[];
   /** Ids graded as of this report, so the next one can list late grades. */
   graded_ids: string[];
   /** Written by hand (the reports before this ran); refreshes leave it as it is. */
   manual?: boolean;
 };
-export type ReportIndex = { latest: string | null; reports: { date: string; results_date: string; headline: string }[] };
 
 export type ReportInputs = {
   state: LabState;
   nfl?: LiveRecord | null;
-  nba?: { record?: NbaRecord | null; status?: NbaStatus | null; collect?: CollectStatus | null };
-  cfb?: { record?: CfbRecord | null; collect?: CollectStatus | null };
-  changes?: Change[];
+  nba?: { record?: NbaRecord | null; status?: NbaStatus | null; previous?: NbaPrevious | null };
+  cfb?: { record?: CfbRecord | null; previous?: CfbPrevious | null };
   previous?: DailyReport | null;
-};
-/** The collect workflows' own status files (nba-data / cfb-data branches). */
-export type CollectStatus = {
-  date?: string; box_scores?: { last_game_date?: string | null };
-  espn?: { injuries?: { items?: number }; scoreboard?: { items?: number } };
-  official_injuries?: { players?: number; error?: string; skipped?: string; report?: string };
-  odds?: { credits_remaining?: number | null; game_lines?: number; props?: number };
 };
 
 const DAY_MS = 864e5;
@@ -109,86 +103,91 @@ const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /* ------------------------------------------------------------------ per sport */
 
-function nbaSections(i: ReportInputs, results_date: string, pendingN: number) {
-  const checks: Check[] = [], postgame: string[] = [], improving: string[] = [];
-  const st = i.nba?.status, rec = i.nba?.record, col = i.nba?.collect;
-  const through = col?.box_scores?.last_game_date ?? st?.history.last_game_date ?? null;
-  if (through) {
-    checks.push(through >= results_date
-      ? { ok: true, text: `Box scores are in through ${shortDay(through)}, so every finished game is graded.` }
-      : { ok: false, text: `Box scores were only posted through ${shortDay(through)} at refresh time${pendingN ? `; ${pendingN} pick${pendingN === 1 ? "" : "s"} from ${shortDay(results_date)} will be graded on the next refresh` : ""}. The free box-score feed usually catches up by midday.` });
+type Graded = { chance: number; won: boolean };
+/** Hit rate of every graded lean, overall and by how sure the model was. */
+function byConfidence(label: string, xs: Graded[]): string | null {
+  if (!xs.length) return null;
+  const rate = (ys: Graded[]) => (ys.length ? `${pc(ys.filter((y) => y.won).length / ys.length)} of ${ys.length}` : null);
+  const bands = [["70%+", 0.7, 2], ["60-70%", 0.6, 0.7], ["under 60%", 0, 0.6]] as const;
+  const parts = bands.map(([n, lo, hi]) => { const r = rate(xs.filter((x) => x.chance >= lo && x.chance < hi)); return r ? `${n} hit ${r}` : null; }).filter(Boolean);
+  const won = xs.filter((x) => x.won).length;
+  return `${label}: ${won}-${xs.length - won} (${pc(won / xs.length)}). By confidence: ${parts.join(", ")}.`;
+}
+
+function nbaSections(i: ReportInputs, results_date: string) {
+  const model: string[] = [], postgame: string[] = [], improving: string[] = [];
+  const st = i.nba?.status, rec = i.nba?.record;
+  const day = i.nba?.previous?.days.find((d) => d.date === results_date);
+  if (day) {
+    const leans = day.games.flatMap((g) => g.picks);
+    const line = byConfidence(`Every lean the model made on ${day.games.length} game${day.games.length === 1 ? "" : "s"}`, leans.map((l) => ({ chance: l[6], won: !!l[9] })));
+    if (line) model.push(line);
+    const unders = leans.filter((l) => l[4] === "under"), overs = leans.filter((l) => l[4] === "over");
+    if (unders.length && overs.length) model.push(`Unders ${pc(unders.filter((l) => l[9]).length / unders.length)} (${unders.length}), overs ${pc(overs.filter((l) => l[9]).length / overs.length)} (${overs.length}).`);
+    const worst = leans.filter((l) => !l[9] && l[6] >= 0.75 && l[7] != null).sort((a, b) => Math.abs(b[8] - b[7]!) - Math.abs(a[8] - a[7]!)).slice(0, 3);
+    if (worst.length) model.push(`Furthest off among confident leans: ${worst.map((l) => `${l[1]} ${l[3]} (projected ${r1(l[7]!)}, had ${l[8]}, line ${l[5]})`).join("; ")}.`);
   }
-  const oi = col?.official_injuries;
-  if (oi) {
-    checks.push(oi.players != null ? { ok: true, text: `Official NBA injury report read: ${oi.players} players listed (${oi.report ?? "latest report"}).` }
-      : oi.skipped ? { ok: null, text: `Official NBA injury report: ${oi.skipped}; the ESPN injury list was used.` }
-      : { ok: false, text: `The official NBA injury report could not be read (${oi.error ?? "unknown"}); the ESPN injury list (${col?.espn?.injuries?.items ?? "?"} teams) was used instead.` });
-  }
-  if (st?.injuries_as_of) checks.push({ ok: null, text: `Injury list as of ${new Date(st.injuries_as_of).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Central; ${st.slate_games} games and ${st.projected_players} players projected for ${st.slate_date ? shortDay(st.slate_date) : "the next slate"}.` });
-  if (col?.odds) checks.push({ ok: (col.odds.props ?? 0) > 0 ? true : null, text: (col.odds.props ?? 0) > 0 ? `${col.odds.props} posted prop prices saved.` : "No posted NBA prop lines on the free odds plan, so picks use DraftKings-posted stars or the player's usual line." });
   const pg = rec?.post_game;
   if (pg?.n) {
-    if (pg.minutes) postgame.push(`Minutes: players averaged ${sgn(pg.minutes.bias)} minutes vs the projection (typical miss ${pg.minutes.avg_miss}) over ${pg.minutes.players} player-games.`);
-    if (pg.lost) postgame.push(`Re-run with the minutes they really played, ${pg.lost_minutes_explain} of ${pg.lost} losing leans would have been right: minutes, not production, drove ${pc((pg.lost_minutes_explain ?? 0) / pg.lost)} of the misses.`);
-    if (pg.team_rotation) postgame.push(`Team scoring: projected rotations ran ${sgn(-pg.team_rotation.bias)} points per team vs what they scored (typical miss ${pg.team_rotation.avg_miss}, ${pg.team_rotation.games} games).`);
-    if (pg.injury_listed?.n) postgame.push(`Injury-listed players: ${pg.injury_listed.n} leans hit ${pc(pg.injury_listed.hit)}, minutes ${sgn(pg.injury_listed.minutes_bias ?? 0)} vs projection.`);
+    if (pg.lost) postgame.push(`Re-run with the minutes players really got, ${pg.lost_minutes_explain} of ${pg.lost} losing leans would have been right, so minutes caused ${pc((pg.lost_minutes_explain ?? 0) / pg.lost)} of the misses and production the rest (last 2 weeks).`);
+    if (pg.minutes) postgame.push(`Minutes ran ${sgn(pg.minutes.bias)} per player vs the projection (typical miss ${pg.minutes.avg_miss}).`);
+    if (pg.team_rotation) postgame.push(`Team scoring: rotations scored ${sgn(pg.team_rotation.bias)} points per team vs projected (typical miss ${pg.team_rotation.avg_miss}).`);
   }
   const limit: Record<string, number> = { points: 1, pra: 1.5, rebounds: 0.5, assists: 0.5, threes: 0.3 };
   for (const m of rec?.projection_check ?? [])
     if (m.last7_n >= 30 && Math.abs(m.last7_bias) >= (limit[m.market] ?? 1))
-      postgame.push(`${m.label} ran ${m.last7_bias > 0 ? "above" : "below"} the projections over the last 7 days (${sgn(m.last7_bias, 2)} per player, ${m.last7_n} players). Watching it; the models refit on these games every day.`);
-  const strong = rec?.tiers?.find((t) => t.tier === "Strong");
-  if (strong?.n) postgame.push(`Live leans at 65%+ have hit ${pc(strong.rate)} (${strong.hits} of ${strong.n}) since the record started.`);
-  if (st?.validated_markets?.length) improving.push(`Every NBA model refit on the newest box scores this morning; ${st.validated_markets.length} markets passed the walk-forward gate (${st.validated_markets.join(", ")}).`);
+      postgame.push(`${m.label} has run ${m.last7_bias > 0 ? "above" : "below"} the projections for 7 days (${sgn(m.last7_bias, 2)} per player). If it holds, that's a skewed input to correct.`);
+  if (st?.validated_markets?.length) improving.push(`Refit this morning on every box score through ${st.history.last_game_date}; ${st.validated_markets.length} of 5 markets passed the test on unseen games (${st.validated_markets.join(", ")}).`);
   const tc = st?.team_check;
-  if (tc?.plain && tc.adjusted) improving.push(`Team scoring check ${tc.use ? "stays on" : "is off"}: tested on unseen seasons, 65%+ leans hit ${pc(tc.adjusted.strong_hit)} with it vs ${pc(tc.plain.strong_hit)} without.`);
-  return { checks, postgame, improving };
+  if (tc?.plain && tc.adjusted) improving.push(`Team scoring correction ${tc.use ? "kept" : "turned off"}: 65%+ leans hit ${pc(tc.adjusted.strong_hit)} with it vs ${pc(tc.plain.strong_hit)} without on unseen seasons.`);
+  return { model, postgame, improving };
 }
 
-function nflSections(i: ReportInputs) {
-  const checks: Check[] = [], postgame: string[] = [], improving: string[] = [];
+function nflSections(i: ReportInputs, results_date: string) {
+  const model: string[] = [], postgame: string[] = [], improving: string[] = [];
   const live = i.nfl;
+  const games = (live?.previous_weeks ?? []).flatMap((w) => w.games).filter((g) => g.kickoff && playDate(g.kickoff) === results_date);
+  const leans = games.flatMap((g) => g.picks).filter((p) => p[9] != null);
+  const line = byConfidence(`Every graded prop and TD lean on ${games.length} game${games.length === 1 ? "" : "s"}`, leans.map((p) => ({ chance: p[6], won: p[9] === 1 })));
+  if (line) model.push(line);
+  if (live?.featured?.n) model.push(`Featured picks this season: ${live.featured.hits} of ${live.featured.n} (${pc(live.featured.rate)}).`);
+  for (const d of live?.drift ?? []) model.push(`Off calibration: ${d}.`);
   const sr = live?.sim_report;
-  const wk = live?.weeks?.at(-1);
-  if (wk) checks.push(wk.pending ? { ok: null, text: `Week ${wk.week}: ${wk.picks} picks saved, ${wk.pending} waiting on games or box scores.` }
-    : { ok: true, text: `Week ${wk.week}: all ${wk.graded} picks graded (${wk.void} void).` });
-  if (sr?.available && sr.pending) checks.push({ ok: null, text: `${sr.pending} frozen game simulations are waiting on box scores before their post-game re-run.` });
-  if (sr?.available) {
-    postgame.push(`Post-game re-sims: ${sr.games} games re-run with what really happened (Week ${sr.last_week?.week} latest).`);
+  if (sr?.available && games.length) {
     postgame.push(...(sr.notes ?? []));
     const m = sr.biggest_misses?.slice(0, 3) ?? [];
-    if (m.length) postgame.push(`Biggest misses: ${m.map((x) => `${x.player} ${x.market.replace(/_/g, " ")} (sim ${r1(x.pre)}, actual ${x.actual}, ${x.cause})`).join("; ")}.`);
+    if (m.length) postgame.push(`Biggest misses: ${m.map((x) => `${x.player} ${x.market.replace(/_/g, " ")} (sim ${r1(x.pre)}, had ${x.actual}; ${x.cause})`).join("; ")}.`);
   }
-  for (const d of live?.drift ?? []) postgame.push(`Drift flag: ${d}.`);
-  if (live?.featured?.n) postgame.push(`Featured picks have hit ${pc(live.featured.rate)} (${live.featured.hits} of ${live.featured.n}) since picks were first frozen.`);
-  const tests = sr?.corrections?.tests ?? {};
   const names: Record<string, string> = { catch_adj: "catch rate", ypt_adj: "yards per target", ypc_adj: "yards per carry" };
-  const t = Object.entries(tests);
-  if (t.length) {
-    const adopted = t.filter(([, v]) => v.adopt).map(([k]) => names[k] ?? k);
-    const rejected = t.filter(([, v]) => !v.adopt).map(([k, v]) => `${names[k] ?? k} (${sgn(v.gain, 4)})`);
-    if (adopted.length) improving.push(`Adopted after testing on recent weeks: ${adopted.join(", ")} corrections.`);
-    if (rejected.length) improving.push(`Tested and not adopted (no reliable gain on recent weeks): ${rejected.join(", ")}.`);
-  }
+  const t = Object.entries(sr?.corrections?.tests ?? {});
+  const adopted = t.filter(([, v]) => v.adopt).map(([k]) => names[k] ?? k);
+  const rejected = t.filter(([, v]) => !v.adopt).map(([k, v]) => `${names[k] ?? k} (${sgn(v.gain, 4)})`);
+  if (adopted.length) improving.push(`Adopted: ${adopted.join(", ")} correction${adopted.length === 1 ? "" : "s"}, which tested better on recent weeks.`);
+  if (rejected.length) improving.push(`Tested and rejected (no reliable gain on recent weeks): ${rejected.join(", ")}.`);
   const use = sr?.corrections?.in_use ?? {};
-  if (use.pass_adj != null || use.rush_adj != null) improving.push(`Team volume in this week's sims: passes x${use.pass_adj ?? 1}, runs x${use.rush_adj ?? 1}, learned from the post-game reviews.`);
-  improving.push("NFL models refit on every new box score at each refresh; simulation blend weights are retested each run.");
-  return { checks, postgame, improving };
+  if (use.pass_adj != null || use.rush_adj != null) improving.push(`Team volume learned from the re-sims: passes x${use.pass_adj ?? 1}, runs x${use.rush_adj ?? 1}.`);
+  return { model, postgame, improving };
 }
 
-function cfbSections(i: ReportInputs, pending: ReportPick[], now: Date) {
-  const checks: Check[] = [], postgame: string[] = [], improving: string[] = [];
-  const rec = i.cfb?.record, col = i.cfb?.collect;
-  const late = pending.filter((p) => now.getTime() - new Date(p.kickoff).getTime() > 6 * 3600e3);
-  if (late.length) checks.push({ ok: false, text: `${late.length} finished game${late.length === 1 ? " is" : "s are"} still waiting on a final score (the college score feed runs about a day behind for late games): ${late.map((p) => p.matchup).join(", ")}.` });
-  if (col?.odds) checks.push({ ok: (col.odds.game_lines ?? 0) > 0, text: `${col.odds.game_lines ?? 0} college game-line prices saved on the last collect${col.odds.credits_remaining != null ? `; ${col.odds.credits_remaining} odds credits left this month` : ""}.` });
-  if (rec?.suggested?.n) postgame.push(`Suggested college bets (proven tiers) are ${rec.suggested.hits}-${rec.suggested.n - rec.suggested.hits} (${pc(rec.suggested.rate)}) live.`);
+function cfbSections(i: ReportInputs, results_date: string) {
+  const model: string[] = [], postgame: string[] = [], improving: string[] = [];
+  const rec = i.cfb?.record;
+  const games = (i.cfb?.previous?.games ?? []).filter((g) => g.date.slice(0, 10) === results_date || playDate(g.date) === results_date);
+  const NAMES: Record<string, string> = { spread: "Spreads", total: "Totals", moneyline: "Winners", team_total: "Team totals" };
+  for (const mk of ["moneyline", "spread", "total"]) {
+    const xs = games.flatMap((g) => g.markets).filter((m) => m.market === mk && m.result !== "push").map((m) => ({ chance: m.p, won: m.result === "won" }));
+    const l = byConfidence(`${NAMES[mk]} (${games.length} game${games.length === 1 ? "" : "s"})`, xs);
+    if (l) model.push(l);
+  }
+  const off = games.filter((g) => g.model && g.line.total != null)
+    .map((g) => ({ g, miss: g.score[0] + g.score[1] - (g.model!.home + g.model!.away) })).sort((a, b) => Math.abs(b.miss) - Math.abs(a.miss)).slice(0, 2);
+  if (off.length) model.push(`Furthest off: ${off.map(({ g, miss }) => `${g.away} at ${g.home} (projected ${r1(g.model!.home + g.model!.away)} total, scored ${g.score[0] + g.score[1]}, ${sgn(miss)})`).join("; ")}.`);
+  if (rec?.suggested?.n) model.push(`Suggested college bets this season: ${rec.suggested.hits}-${rec.suggested.n - rec.suggested.hits} (${pc(rec.suggested.rate)}).`);
   const card = rec?.report_card;
-  if (card?.total?.line_mae != null) postgame.push(`Totals: the model's typical miss was ${r1(card.total.model_mae)} points vs ${r1(card.total.line_mae)} for the closing line over ${card.games} games.`);
-  if (card?.resim?.games) postgame.push(`Post-game re-sims (${card.resim.games} games): with the real plays, yards per play and turnovers, the total's miss falls from ${r1(card.resim.total_input_miss + card.resim.total_rest_miss)} to ${r1(card.resim.total_rest_miss)}.`);
-  for (const x of (card?.inputs ?? []).filter((x) => x.n >= 20).slice(0, 3)) postgame.push(`${x.input}: ran ${sgn(x.bias, 2)} vs the pregame input (typical miss ${r1(x.mae)}, ${x.n} team-games).`);
-  improving.push("College ratings and totals refit every morning on the newest finals; candidate inputs are tested walk-forward in the Monday review and shipped only when they test better.");
-  return { checks, postgame, improving };
+  if (card?.resim?.games) postgame.push(`Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from ${r1(card.resim.total_input_miss + card.resim.total_rest_miss)} to ${r1(card.resim.total_rest_miss)} points (${card.resim.games} games), so most of the miss was the inputs, not chance.`);
+  for (const x of (card?.inputs ?? []).filter((x) => x.n >= 20).slice(0, 3)) postgame.push(`${x.input} ran ${sgn(x.bias, 2)} vs the pregame input (typical miss ${r1(x.mae)}).`);
+  if (card?.total?.line_mae != null) improving.push(`Totals: typical miss ${r1(card.total.model_mae)} points vs ${r1(card.total.line_mae)} for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.`);
+  return { model, postgame, improving };
 }
 
 /* ------------------------------------------------------------------ the report */
@@ -208,8 +207,7 @@ export function buildReport(i: ReportInputs, now: Date): DailyReport {
     const pending = rows.filter((p) => !p.result && p.date <= results_date);
     const today = (i.state.daily ?? []).filter((d) => d.sport === sport && d.date === date && !d.withdrawn).map((d) => toRow(d, true));
     const asLab = (xs: ReportPick[]) => xs as unknown as LabPick[];
-    const sec = sport === "nba" ? nbaSections(i, results_date, pending.filter((p) => p.date === results_date).length)
-      : sport === "nfl" ? nflSections(i) : cfbSections(i, pending, now);
+    const sec = sport === "nba" ? nbaSections(i, results_date) : sport === "nfl" ? nflSections(i, results_date) : cfbSections(i, results_date);
     const findings = findingsFor(sport, results);
     if (late.length) findings.push(`Graded since the last report: ${late.map((p) => `${p.bet} ${p.result === "won" ? "✓" : p.result === "lost" ? "✗" : "(void)"}`).join("; ")}.`);
     return {
@@ -229,30 +227,23 @@ export function buildReport(i: ReportInputs, now: Date): DailyReport {
       }).join(", ") + "."
     : `${shortDay(results_date)}: no picks were played.`;
   return {
-    date, results_date, generated_at: now.toISOString(), headline, sports, changes: i.changes ?? [],
+    date, results_date, generated_at: now.toISOString(), headline, sports,
     graded_ids: sports.flatMap((s) => rowsFor(i.state, s.sport).filter((p) => p.result).map((p) => p.id)),
   };
 }
 
-export function addToIndex(idx: ReportIndex, r: DailyReport, keep = 60): ReportIndex {
-  const reports = [{ date: r.date, results_date: r.results_date, headline: r.headline }, ...idx.reports.filter((x) => x.date !== r.date)]
-    .sort((a, b) => b.date.localeCompare(a.date)).slice(0, keep);
-  return { latest: reports[0]?.date ?? null, reports };
-}
-
 /** The report as plain text, for posting or a message. */
-export function reportText(r: DailyReport, siteUrl?: string): string {
+export function reportText(r: DailyReport): string {
   const lines = [`The Lab daily report, ${longDay(r.date)} (results from ${longDay(r.results_date)})`, ""];
   lines.push("Records (top 10 / picks of the day, season):");
   for (const s of r.sports) lines.push(`  ${SPORT_LABEL[s.sport]}: ${recText(s.record.top10)} / ${recText(s.record.potd)}`);
   for (const s of r.sports) {
     lines.push("", `${SPORT_LABEL[s.sport]}`);
-    for (const f of s.findings) lines.push(`  - ${f}`);
-    for (const c of s.checks) lines.push(`  ${c.ok === false ? "!" : "-"} ${c.text}`);
-    for (const p of s.postgame) lines.push(`  - ${p}`);
-    for (const p of s.improving) lines.push(`  - ${p}`);
+    const part = (title: string, xs: string[]) => { if (xs.length) lines.push(`  ${title}`, ...xs.map((x) => `    - ${x}`)); };
+    part("Picks", s.findings);
+    part("How the model did", s.model);
+    part("Where it was off and why", s.postgame);
+    part("Model changes", s.improving);
   }
-  if (r.changes.length) lines.push("", "Shipped:", ...r.changes.map((c) => `  - ${c.title}`));
-  if (siteUrl) lines.push("", `${siteUrl}report?date=${r.date}`);
   return lines.join("\n");
 }
