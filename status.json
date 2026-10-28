@@ -1,6 +1,6 @@
 {
   "date": "2026-10-28",
-  "ran_at": "2026-10-28T16:37:11+00:00",
+  "ran_at": "2026-10-28T23:01:28+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -63,8 +63,8 @@
   },
   "official_injuries": {
     "saved": "2026-10-28.json",
-    "players": 95,
-    "report": "Injury-Report_2026-10-28_12_30PM.pdf"
+    "players": 116,
+    "report": "Injury-Report_2026-10-28_06_45PM.pdf"
   },
   "rosters": {
     "teams": 30,
