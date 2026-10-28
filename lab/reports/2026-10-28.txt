@@ -1,0 +1,41 @@
+The Lab daily report, Wednesday, Oct 28 (results from Tuesday, Oct 27)
+
+Records (top 10 / picks of the day, season):
+  NFL: 10-2 / 3-1
+  CFB: 15-3 / 3-0
+  NBA: 12-1 / 7-1
+
+NFL
+  Picks
+    - No NFL games Tuesday. Week 8 starts Thursday.
+  How the model did
+    - Season to date: top 10 10-2 (83%), picks of the day 3-1.
+  Where it was off and why
+    - The Week 7 skews (carry share above input, running back target share too low) are being checked again on Week 8 before any correction.
+  Model changes
+    - Week 8 sims already use the pass-volume correction learned from the re-sims (x1.029). Efficiency corrections are retested every update and used only once they test better.
+
+CFB
+  Picks
+    - Missouri State to win (71%) vs Sam Houston is waiting on the final score.
+    - Delaware to win (51%) was pulled before kickoff because the model flipped to the other side on fresh prices. Wednesday's Middle Tennessee (59%) and Jacksonville State (53%) were pulled for falling under 60%. None of them count.
+  How the model did
+    - Season to date: top 10 15-3 (83%), picks of the day 3-0.
+    - Weeknight MAC/C-USA games are mostly near coin flips for the model, so few reach 60%. Thursday's pick is North Texas to win (83%).
+  Model changes
+    - No college model change today. The next tests (locking totals at the earliest posted line) run in Monday's review.
+
+NBA
+  Picks
+    - 3-0. Duncan Robinson over 1.5 assists (71%) had 2. Day'Ron Sharpe under 8.5 rebounds (71%) had 6. Egor Demin under 3.5 rebounds (63%) had 1.
+  How the model did
+    - Every lean the model made on 4 games: 199-116 (63%). By confidence: 70%+ hit 77% of 61, 65-70% hit 81% of 53, 60-65% hit 70% of 56, and under 60% hit 48% of 145.
+    - Picks only come from the 60%+ tiers, so the coin flips that went under 50% never reach the board.
+    - Furthest off among confident leans: Robert Williams III points (projected 6.1, scored 14), Michael Porter Jr. points (projected 18.8, scored 27 in 40 minutes vs 30 projected) and Luka Doncic points (projected 28.8, scored 41).
+  Where it was off and why
+    - Re-run with real minutes, 57 of the 116 losses would have been right, so about half the misses were minutes (MPJ +10, De'Andre Hunter +9) and half production.
+    - Points ran +0.7 per player above projections and rebounds −0.4. Monday leaned the other way, so it's not a skewed input yet. We'll correct it only if it holds for a week.
+  Model changes
+    - Refit this morning on every box score; all 5 stat models passed again on 139k unseen player-games.
+    - Team scoring correction applied to today's 12 games: rotations that added up too high from long injury lists were scaled down (PHI x0.90, MIL x0.92) and thin ones scaled up (LAC x1.09, OKC x1.06).
+    - New rule from Monday's coin flips: a pick of the day now needs a 60%+ chance, and a locked pick is withdrawn if the model drops under that or flips sides before tip.
