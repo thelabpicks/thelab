@@ -126,3 +126,21 @@ def test_props_are_bought_only_once_books_post_them():
     assert not pipeline.props_posted(datetime(2026, 10, 27, 9, 0, tzinfo=timezone.utc))   # 5 am ET
     assert pipeline.props_posted(datetime(2026, 10, 27, 16, 0, tzinfo=timezone.utc))      # noon ET
     assert pipeline.props_posted(datetime(2026, 10, 27, 0, 30, tzinfo=timezone.utc))      # 8:30 pm ET the day before
+
+
+def test_espn_draftkings_props_keep_the_main_line():
+    def item(aid, name, line, dec):
+        return {"athlete": {"$ref": f"http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2027/athletes/{aid}?lang=en"},
+                "type": {"id": "1", "name": name}, "odds": {"decimal": {"value": str(dec)}}, "current": {"target": {"value": line}}}
+    items = [item(6475, "Total Points", 8.5, 1.75), item(6475, "Total Points", 8.5, 2.03),
+             # an alternate line priced far from even loses to the main one
+             item(6475, "Total Points", 12.5, 1.2), item(6475, "Total Points", 12.5, 4.5),
+             item(6475, "Total 3-Point Field Goals", 1.5, 1.9), item(6475, "Total 3-Point Field Goals", 1.5, 1.9),
+             item(6475, "Total Steals", 0.5, 1.9), item(6475, "Total Steals", 0.5, 1.9),
+             # half a pair is not a posted line
+             item(99, "Total Rebounds", 6.5, 1.9)]
+    got = sorted((r["player_id"], r["market"], r["line"]) for r in collect.parse_espn_props(items))
+    assert got == [("6475", "points", 8.5), ("6475", "threes", 1.5)]
+    assert collect.espn_prop_market("Total Points, Rebounds and Assists") == "pra"
+    assert collect.espn_prop_market("Total Assists") == "assists"
+    assert collect.espn_prop_market("Total Steals") is None

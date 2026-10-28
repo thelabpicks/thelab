@@ -155,6 +155,87 @@ def espn_lines(scoreboard: dict | None) -> dict:
     return out
 
 
+# --------------------------------------------------------------------------- DraftKings player props via ESPN (free)
+ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
+DK_PROVIDER = 100   # ESPN's odds provider id for DraftKings
+
+
+def espn_prop_market(type_name: str) -> str | None:
+    """Our market for an ESPN prop type name ('Total Points', 'Total 3-Point Field Goals', ...); None for the rest."""
+    t = type_name.lower()
+    if "point" in t and "rebound" in t and "assist" in t:
+        return "pra"
+    if "3-point" in t or "three" in t:
+        return "threes"
+    if any(w in t for w in ("steal", "block", "turnover", "double", "first", "made", "attempt")) or t.count(",") or " and " in t:
+        return None
+    for word, m in (("points", "points"), ("rebounds", "rebounds"), ("assists", "assists")):
+        if word in t:
+            return m
+    return None
+
+
+def parse_espn_props(items: list[dict]) -> list[dict]:
+    """DraftKings' main line per player and market from ESPN's propBets items. Each line comes as a pair (over and
+    under, unlabeled), so only the line is kept; with several lines (alternates) the most even-priced pair wins."""
+    import re  # noqa: PLC0415
+    pairs: dict = {}
+    for it in items:
+        m = espn_prop_market((it.get("type") or {}).get("name", ""))
+        aid = re.search(r"/athletes/(\d+)", (it.get("athlete") or {}).get("$ref", ""))
+        line = ((it.get("current") or {}).get("target") or {}).get("value")
+        if not m or not aid or line is None:
+            continue
+        try:
+            dec = float(((it.get("odds") or {}).get("decimal") or {}).get("value"))
+        except (TypeError, ValueError):
+            dec = None
+        pairs.setdefault((aid.group(1), m), {}).setdefault(float(line), []).append(dec)
+    out = []
+    for (pid, m), lines in pairs.items():
+        two = {ln: d for ln, d in lines.items() if len(d) == 2}
+        if not two:
+            continue
+        gap = lambda d: abs(d[0] - d[1]) if None not in d else 9.0  # noqa: E731
+        out.append({"player_id": pid, "market": m, "line": min(two, key=lambda ln: (gap(two[ln]), ln))})
+    return out
+
+
+def save_espn_props(day: str, log=print) -> dict:
+    """DraftKings' player prop lines for each of today's games, from ESPN (free, every game and market)."""
+    sb = sources.archive_dir() / "scoreboard" / f"{day}.json"
+    if not sb.exists():
+        return {"skipped": "no scoreboard"}
+    events = [e["id"] for e in json.loads(sb.read_text())["data"].get("events", [])]
+    rows, errors = [], {}
+    for eid in events:
+        try:
+            items, page = [], 1
+            while True:
+                data, _ = _get_json(f"{ESPN_CORE}/events/{eid}/competitions/{eid}/odds/{DK_PROVIDER}/propBets",
+                                    {"lang": "en", "region": "us", "limit": 1000, "page": page})
+                items += data.get("items", [])  # type: ignore[union-attr]
+                if page >= int(data.get("pageCount") or 1):  # type: ignore[union-attr]
+                    break
+                page += 1
+            rows += [r | {"event_id": eid} for r in parse_espn_props(items)]
+        except Exception as ex:  # noqa: BLE001 - a game without props keeps its usual lines
+            errors[eid] = str(ex)
+    dest = sources.archive_dir() / "espn_props" / f"{day}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps({"fetched_at": utcnow(), "source": f"{ESPN_CORE}/events/{{id}}/competitions/{{id}}/odds/{DK_PROVIDER}/propBets",
+                                "book": "draftkings", "lines": rows, "errors": errors}))
+    log(f"nba: saved {len(rows)} DraftKings prop lines from ESPN for {len(events) - len(errors)} of {len(events)} games"
+        + (f" ({len(errors)} failed)" if errors else ""))
+    return {"saved": dest.name, "lines": len(rows), "errors": errors}
+
+
+def load_espn_props(day: str) -> dict[tuple[str, str], float]:
+    """{(player_id, market): DraftKings line} saved for `day` ({} when none)."""
+    f = sources.archive_dir() / "espn_props" / f"{day}.json"
+    return {(r["player_id"], r["market"]): r["line"] for r in json.loads(f.read_text()).get("lines", [])} if f.exists() else {}
+
+
 def load_espn_lines(day: str) -> dict:
     f = sources.archive_dir() / "scoreboard" / f"{day}.json"
     return espn_lines(json.loads(f.read_text())) if f.exists() else {}
@@ -442,7 +523,7 @@ def run(log=print, force_odds: bool = False, force_files: bool = False) -> dict:
     day = today_et()
     files = download_files(log=log, force=force_files)
     status = {"date": day, "ran_at": utcnow(), "files": files, "box_scores": summarize_box(),
-              "espn": save_espn(day, log), "official_injuries": save_official_injuries(day, log), "rosters": save_rosters(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
+              "espn": save_espn(day, log), "official_injuries": save_official_injuries(day, log), "rosters": save_rosters(day, log), "espn_props": save_espn_props(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
     arch = sources.archive_dir()
     arch.mkdir(parents=True, exist_ok=True)
     (arch / "status.json").write_text(json.dumps(status, indent=2))
