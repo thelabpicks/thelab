@@ -9,7 +9,7 @@ import type { CfbPrevious, CfbRecord } from "./cfb";
 import type { LiveRecord } from "@/components/LiveRecord";
 
 /** rank: the pick's top 10 rank when it was on the list at kickoff. */
-export type ReportPick = Pick<LabPick, "id" | "sport" | "bet" | "matchup" | "kickoff" | "chance" | "result" | "actual" | "rank"> & { potd?: boolean; date: string };
+export type ReportPick = Pick<LabPick, "id" | "sport" | "bet" | "matchup" | "kickoff" | "chance" | "result" | "actual" | "rank" | "line_source" | "price"> & { potd?: boolean; date: string };
 export type SportReport = {
   sport: Sport;
   /** Season to date, and on the results day alone. */
@@ -53,6 +53,8 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 const pc = (v: number | null | undefined) => (v == null ? "–" : `${Math.round(v * 100)}%`);
 const sgn = (v: number, d = 1) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(d)}`;
 export const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "0-0");
+/** "+5.67u" for a record's units, empty with no priced picks. */
+export const unitsText = (r: LabRecord) => (r.priced ? `${r.units >= 0 ? "+" : "−"}${Math.abs(r.units).toFixed(2)}u` : "");
 export const longDay = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 const shortDay = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 const pickDate = (p: LabPick | DailyPick) => ("date" in p && p.date ? p.date : playDate(p.kickoff));
@@ -61,7 +63,7 @@ const potdKey = (p: LabPick) => `${p.game_id}|${p.bet}`;
 function toRow(p: LabPick | DailyPick, potd: boolean): ReportPick {
   // a pick of the day keeps the board rank it was chosen with, but only picks frozen on the top 10 count as top 10 picks
   return { id: p.id, sport: p.sport, bet: p.bet, matchup: p.matchup, kickoff: p.kickoff, chance: p.chance, result: p.result, actual: p.actual,
-    rank: potd ? undefined : p.rank, potd, date: pickDate(p) };
+    line_source: p.line_source, price: p.price, rank: potd ? undefined : p.rank, potd, date: pickDate(p) };
 }
 
 /** Every top 10 pick frozen at kickoff and every pick of the day, one row per bet (a pick of the day that was also on the
@@ -236,7 +238,9 @@ export function buildReport(i: ReportInputs, now: Date): DailyReport {
 export function reportText(r: DailyReport): string {
   const lines = [`The Lab daily report, ${longDay(r.date)} (results from ${longDay(r.results_date)})`, ""];
   lines.push("Records (top 10 / picks of the day, season):");
-  for (const s of r.sports) lines.push(`  ${SPORT_LABEL[s.sport]}: ${recText(s.record.top10)} / ${recText(s.record.potd)}`);
+  const withUnits = (x: LabRecord) => [recText(x), unitsText(x)].filter(Boolean).join(" ");
+  lines.push("Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.");
+  for (const s of r.sports) lines.push(`  ${SPORT_LABEL[s.sport]}: ${withUnits(s.record.top10)} / ${withUnits(s.record.potd)}`);
   for (const s of r.sports) {
     lines.push("", `${SPORT_LABEL[s.sport]}`);
     const part = (title: string, xs: string[]) => { if (xs.length) lines.push(`  ${title}`, ...xs.map((x) => `    - ${x}`)); };

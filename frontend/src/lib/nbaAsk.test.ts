@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { answer } from "./nbaAsk";
-import type { NbaRow, Slate } from "./nba";
+import { starsOf, type NbaRow, type Slate } from "./nba";
 
 const cdf = (mu: number) => Array.from({ length: 80 }, (_, k) => {
   // Poisson CDF, good enough for routing tests
@@ -45,6 +45,11 @@ describe("nba ask", () => {
     expect(best).not.toContain("2");
     expect(best).not.toContain("8");
     expect(answer("Deep Bench points", s2).title).toContain("Deep Bench");
+  });
+  it("calls a starter a star only when he projects for 15+ points", () => {
+    const stars = starsOf(slate.rows);
+    expect(stars.has("1")).toBe(true);
+    expect(stars.has("6")).toBe(false);   // a starter projected for 8
   });
   it("counts DraftKings' line from ESPN as a DraftKings line when no prices were bought", () => {
     const s2: Slate = { ...slate, rows: slate.rows.map((r) => ({ ...r, offers: [], dk_line: r.line })) };

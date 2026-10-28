@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, cfbCandidates, chooseDaily, grade, nbaCandidates, publish, rankBoard, type LabPick } from "./lab";
+import { advance, cfbCandidates, chooseDaily, grade, nbaCandidates, publish, rankBoard, tally, type LabPick } from "./lab";
 import type { AltLine, CfbGame } from "./cfb";
 import type { NbaConfidence, NbaRow, Slate } from "./nba";
 
@@ -161,8 +161,8 @@ describe("cfbCandidates", () => {
 describe("picks of the day", () => {
   const now = new Date("2026-10-24T17:00:00Z");   // Saturday noon in Chicago
   const at = (i: number, o: Partial<LabPick> = {}) => pick({ id: `p${i}`, game_id: String(i), player_id: String(i), kickoff: "2026-10-25T00:00:00Z", chance: 0.9 - i / 100, ...o });
-  it("locks each sport's 3 likeliest picks per Central-time day, priced -1000 or longer, and never swaps them", () => {
-    const cands = [at(1, { price: -1500 }), at(2), at(3), at(4), at(5),
+  it("locks each sport's 3 likeliest picks per Central-time day, priced -300 or longer at a book line, and never swaps them", () => {
+    const cands = [at(1, { price: -350 }), at(0, { line_source: "usual" }), at(2), at(3), at(4), at(5),
       at(6, { kickoff: "2026-10-24T16:00:00Z" }),                    // already started
       at(7, { kickoff: "2026-10-26T00:00:00Z", chance: 0.99 }),      // Sunday evening in Chicago: tomorrow's list
       at(8, { kickoff: "2026-10-28T00:00:00Z", chance: 0.99 })];     // later in the week: not yet
@@ -193,6 +193,11 @@ describe("picks of the day", () => {
     expect(s.daily!.find((x) => x.id === "p5")!.withdrawn).toBe(true);
     expect(s.daily!.find((x) => x.id === "p6")!.withdrawn).toBeUndefined();
   });
+  it("withdraws a locked pick priced shorter than the -300 cap before kickoff", () => {
+    const old = { ...at(5, { price: -490 }), date: "2026-10-24", slot: 1, chosen_at: "2026-10-23T12:00:00Z" };
+    const s = advance({ updated_at: null, board: [], frozen: [], daily: [old] }, [], {}, now);
+    expect(s.daily!.find((x) => x.id === "p5")!.withdrawn).toBe(true);
+  });
   it("grades picks of the day and keeps their own record", () => {
     const s = advance({ updated_at: null, board: [], frozen: [] }, [at(2, { game_id: "9", player_id: "5", side: "over", line: 20.5 })], {}, now);
     expect(s.daily?.length).toBe(1);
@@ -202,5 +207,27 @@ describe("picks of the day", () => {
     expect(b.daily.record.by_sport.nba.won).toBe(1);
     expect(b.daily.recent[0].result).toBe("won");
     expect(b.daily.today).toBe("2026-10-25");
+  });
+});
+
+describe("records", () => {
+  it("counts only book lines, and keeps units and ROI at the posted price", () => {
+    const r = tally([
+      pick({ id: "a", result: "won", price: -200 }), pick({ id: "b", result: "lost", price: -110 }),
+      pick({ id: "c", result: "won", price: 150 }), pick({ id: "d", result: "won", price: null }),
+      pick({ id: "e", result: "won", line_source: "usual" }), pick({ id: "f", result: "void" }),
+    ]);
+    expect([r.won, r.lost, r.void, r.unbooked, r.priced]).toEqual([3, 1, 1, 1, 3]);
+    expect(r.units).toBe(1);   // +0.5 - 1 + 1.5
+    expect(r.roi).toBeCloseTo(1 / 3);
+  });
+  it("keeps usual lines and prices shorter than -500 off the list", () => {
+    const now = new Date("2026-10-24T17:00:00Z");
+    const s = advance({ updated_at: null, board: [], frozen: [] }, [
+      pick({ id: "a", game_id: "1", player_id: "1", kickoff: "2026-10-25T00:00:00Z", line_source: "usual" }),
+      pick({ id: "b", game_id: "2", player_id: "2", kickoff: "2026-10-25T00:00:00Z", price: -900 }),
+      pick({ id: "c", game_id: "3", player_id: "3", kickoff: "2026-10-25T00:00:00Z", price: -450 }),
+    ], {}, now);
+    expect(s.board.map((p) => p.id)).toEqual(["c"]);
   });
 });

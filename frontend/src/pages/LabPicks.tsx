@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BOARD_MIN_PRICE, DAILY_MIN_PRICE, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -19,6 +19,8 @@ async function getBoard(): Promise<LabBoard> {
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago", timeZoneName: "short" });
 const price = (p: number | null) => (p == null ? "" : p > 0 ? `+${p}` : String(p));
+/** The board is rebuilt several times a day; older than 30 hours means a refresh failed. */
+const stale = (iso: string) => Date.now() - new Date(iso).getTime() > 30 * 3600_000;
 
 /** Each sport's best plays, ranked 1 to 10 by chance to hit, each with its full write-up. */
 export default function LabPicks() {
@@ -34,12 +36,11 @@ export default function LabPicks() {
     <div className="space-y-5">
       <PageTitle kicker={b ? `Updated ${chicago(b.generated_at)}` : "Every sport"} title={`The Lab's top 10: ${SPORT_LABEL[sport]}`} />
       <p className="-mt-3 max-w-3xl text-sm text-muted">
-        Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the surest. Picks at 70%+
-        are marked sure plays. Tap a pick for the full write-up.
+        Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the likeliest. Picks at 70%+
+        are marked top confidence. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer. Tap a pick for the full write-up.
       </p>
-      <Notice tone="info" title="Live lines coming soon">
-        Live sportsbook lines aren't pulling in for now, so some picks use a player's usual line. Check your book's line before betting. Live lines are coming soon.
-      </Notice>
+      {b && stale(b.generated_at) && <Notice tone="warn" title="These picks haven't refreshed in over a day">
+        The last refresh was {chicago(b.generated_at)}. Check injury news and your book's line before betting; the list updates on the next refresh.</Notice>}
       {b?.daily && <DailyCard b={b} />}
 
       <Segmented label="Sport" value={sport} onChange={(v) => setSp({ sport: v }, { replace: true })}
@@ -61,11 +62,13 @@ export default function LabPicks() {
 
       <Card><CardBody className="space-y-1.5 text-xs text-muted">
         <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws only on the picks that sport already features: NFL and NBA props from confidence tiers that hit 50%+ on unseen games (NBA only at prop lines a book really posts),
-          and in college, each game's favorite to win outright plus bets rated 7+. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
-          picks really did), highest first, and 70%+ picks are marked sure plays. Ties go to a real sportsbook line, then to the tier's tested record. One pick per game and per player.
+          and in college, each game's favorite to win outright plus bets rated 7+. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer (picks of the day {DAILY_MIN_PRICE} or longer):
+          a heavier favorite risks too much to win too little. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
+          picks really did), highest first, and 70%+ picks are marked top confidence. Ties go to the tier's tested record. One pick per game and per player.
           When the books' feed carries alternate lines (a paid odds plan), they count too: only lines a book posts, priced -500 or longer, that the sims give a better chance than the price implies.
-          College spreads and totals are set near 50/50, so they top out around 55%; the surest college picks are big favorites to win, which pay little. Even a 90% pick loses 1 time in 10: the "tested" figure on each pick is how often its tier actually hit on games the models never saw.</p>
+          College spreads and totals are set near 50/50, so they top out around 55%; the likeliest college picks are favorites to win outright. Even a 90% pick loses 1 time in 10: the "tested" figure on each pick is how often its tier actually hit on games the models never saw.</p>
         <p>The list refreshes with each sport's data (latest box scores, injury reports and lines). A pick on the list when its game starts is frozen exactly as shown and graded after the final.
+          Records count only picks at a line a sportsbook posted. Units assume 1 unit risked on every pick at the price shown when it locked, so a -300 win earns 0.33 units and every loss costs 1.
           Research, not betting advice. No pick is guaranteed.</p>
       </CardBody></Card>
     </div>
@@ -88,7 +91,7 @@ function PickRow({ p, open, onToggle }: { p: LabPick; open: boolean; onToggle: (
         </div>
         <div className="shrink-0 text-right">
           <div><span className="font-display text-xl font-bold">{pct(p.chance, 0)}</span> <span className="text-xs text-muted">to hit</span></div>
-          {p.chance >= SURE && !p.result && <div className="text-[11px] font-semibold text-accent">Sure play</div>}
+          {p.chance >= SURE && !p.result && <div className="text-[11px] font-semibold text-accent">Top confidence</div>}
           {p.price != null && <div className="text-xs text-muted">{price(p.price)}{p.book ? ` ${p.book}` : ""}</div>}
           {p.result ? <ResultBadge p={p} /> : p.tier && <div className="text-[11px] text-muted">{p.tier}{p.tier_rate != null ? ` · ${pct(p.tier_rate, 0)} tested` : ""}</div>}
         </div>
@@ -120,8 +123,9 @@ const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("
 
 /** The text of one sport's picks of the day, ready to post. */
 function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
-  const lines = ps.map((p) => `${p.slot}. ${p.bet} (${p.matchup}): ${pct(p.chance, 0)} to hit`);
-  return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines, r.n ? `Picks of the day: ${recText(r)} (${pct(r.rate ?? 0, 0)})` : ""].filter(Boolean).join("\n");
+  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit`);
+  return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines,
+    r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }
 
 /** Each sport's 3 likeliest picks for today (and tomorrow, once chosen), locked when chosen and tracked separately. */
@@ -136,7 +140,7 @@ function DailyCard({ b }: { b: LabBoard }) {
   return (
     <Card>
       <CardHeader title="Picks of the day" icon={<Trophy className="h-4 w-4 text-accent" />}
-        subtitle={`Each sport's 3 likeliest picks for the day, locked when chosen and graded after the final. Record: ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}`} />
+        subtitle={`Each sport's 3 likeliest picks for the day, locked when chosen and graded after the final. Record: ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}${unitsText(rec) ? `, ${unitsText(rec)}` : ""}`} />
       {!groups.size && <CardBody><p className="text-sm text-muted">Today's picks post once the sport's games have lines; they stay put once chosen.</p></CardBody>}
       {[...groups.entries()].map(([key, ps]) => {
         const sport = ps[0].sport, date = ps[0].date;
@@ -156,7 +160,10 @@ function DailyCard({ b }: { b: LabBoard }) {
                     <div className="font-medium leading-snug">{p.bet}</div>
                     <div className="text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
                   </div>
-                  <span className="text-sm font-semibold">{pct(p.chance, 0)}</span>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">{pct(p.chance, 0)}</div>
+                    {p.price != null && <div className="text-[11px] text-muted">{price(p.price)}</div>}
+                  </div>
                   {p.result && <ResultBadge p={p} />}
                 </li>
               ))}
@@ -169,6 +176,19 @@ function DailyCard({ b }: { b: LabBoard }) {
 }
 
 const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "–");
+const unitsText = (r: LabRecord) => (r.priced ? `${r.units >= 0 ? "+" : "−"}${Math.abs(r.units).toFixed(1)}u` : "");
+
+/** A record as the results card shows it: W-L, hit rate, then units and ROI at the posted prices. */
+function RecordStat({ label, r }: { label: string; r: LabRecord }) {
+  return (
+    <div>
+      <div className="label">{label}</div>
+      <div className="font-display text-xl font-bold">{recText(r)}{r.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(r.rate, 0)}</span>}</div>
+      {r.priced > 0 && <div className={cn("text-xs font-semibold", r.units >= 0 ? "text-ok" : "text-danger")}>
+        {unitsText(r)} · {r.roi! >= 0 ? "+" : "−"}{Math.abs(r.roi! * 100).toFixed(1)}% ROI{r.priced < r.n ? ` on ${r.priced} priced picks` : ""}</div>}
+    </div>
+  );
+}
 
 /** Every pick that was on the list at kickoff (and every pick of the day), graded after the final: hit or miss, by day. */
 function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
@@ -196,9 +216,11 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
         <Segmented size="sm" label="Results for" value={sport} onChange={(v) => setSport(v as Sport)}
           options={SPORTS.map((s) => ({ value: s, label: `${SPORT_LABEL[s]} · ${recText(b.record.by_sport[s])}` }))} />
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <div><div className="label">Top 10</div><div className="font-display text-xl font-bold">{recText(r)}{r.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(r.rate, 0)}</span>}</div></div>
-          {dr && <div><div className="label">Picks of the day</div><div className="font-display text-xl font-bold">{recText(dr)}{dr.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(dr.rate, 0)}</span>}</div></div>}
+          <RecordStat label="Top 10" r={r} />
+          {dr && <RecordStat label="Picks of the day" r={dr} />}
         </div>
+        {(r.unbooked > 0 || (dr?.unbooked ?? 0) > 0) && <p className="text-xs text-muted">
+          Picks graded at a player's usual line (before sportsbook lines were loaded) are listed below but not counted in the record.</p>}
         {!rows.length && <p className="text-sm text-muted">Results show here once the first games on the list are played.</p>}
         {pending > 0 && <p className="text-xs text-muted">{pending} {pending === 1 ? "pick is" : "picks are"} waiting on a final score.</p>}
       </CardBody>
@@ -207,7 +229,7 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
         return (
           <div key={d} className="border-t border-line">
             <div className="flex items-center justify-between bg-raised/40 px-4 py-1.5 text-xs font-semibold sm:px-5">
-              <span>{day(d)}</span><span className="text-muted">{t.n ? `${recText(t)} that day` : "Pending"}</span>
+              <span>{day(d)}</span><span className="text-muted">{t.n ? `${recText(t)} that day` : ps.some((p) => !p.result) ? "Pending" : t.unbooked ? "Not counted" : "Void"}</span>
             </div>
             <ul className="divide-y divide-line/60">
               {ps.map((p) => {
@@ -219,7 +241,7 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
                       <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent">Pick of the day</span>}</div>
                       <div className="truncate text-xs text-muted">{p.matchup} · {when(p.kickoff)}{(daily?.actual ?? p.actual) ? ` · ${daily?.actual ?? p.actual}` : ""}</div>
                     </div>
-                    <span className="text-xs text-muted">{pct(p.chance, 0)}</span>
+                    <div className="text-right text-xs text-muted"><div>{pct(p.chance, 0)}</div>{p.price != null && <div>{price(p.price)}</div>}</div>
                   </li>
                 );
               })}
@@ -233,6 +255,8 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
 
 /** A big hit / miss mark for the results list. */
 function ResultMark({ p }: { p: LabPick }) {
+  if (p.result && p.line_source !== "book") return <span title="Not counted: no sportsbook line" aria-label="Not counted: no sportsbook line"
+    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-raised text-[10px] font-semibold text-muted">NC</span>;
   const r = p.result;
   const [txt, cls] = r === "won" ? ["✓", "bg-ok/15 text-ok"] : r === "lost" ? ["✗", "bg-danger/15 text-danger"]
     : r === "push" ? ["P", "bg-raised text-muted"] : r === "void" ? ["–", "bg-raised text-muted"] : ["…", "bg-raised text-muted"];
