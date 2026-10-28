@@ -37,6 +37,7 @@ import CfbParlay from "./pages/cfb/CfbParlay";
 import CfbGames from "./pages/cfb/CfbGames";
 import HitRates from "./pages/HitRates";
 import LabPicks from "./pages/LabPicks";
+import Report from "./pages/Report";
 import Previous from "./pages/Previous";
 import NbaPrevious from "./pages/nba/NbaPrevious";
 import CfbPrevious from "./pages/cfb/CfbPrevious";
@@ -74,6 +75,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="data" element={<DataSync />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="top10" element={<LabPicks />} />
+              <Route path="report" element={<Report />} />
               <Route path="previous" element={<Previous />} />
               <Route path="nba" element={<NbaHome />} />
               <Route path="nba/props" element={<NbaProps />} />
