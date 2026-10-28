@@ -137,6 +137,8 @@ function playersIn(q: string, rows: NbaRow[]): Player[] {
 
 // ---------------------------------------------------------------------------- helpers over the slate
 const usable = (r: NbaRow) => !r.out && r.dist != null && r.line >= MIN_LINE;
+/** The rows a suggestion may use: each team's top scorers at a line DraftKings posts (nba.ts suggestable). */
+const stars = (rows: NbaRow[]) => { const s = starsOf(rows); return rows.filter((r) => suggestable(r, s)); };
 const item = (r: NbaRow, side: "over" | "under", line: number, p: number, note?: string): AskItem => ({ row: r, side, line, p, note });
 const leanItem = (r: NbaRow, note?: string): AskItem | null => { const l = leanOf(r); return l ? item(r, l.side, r.line, l.p, note ?? `projects ${fmt(r.mean)}`) : null; };
 const recentNote = (r: NbaRow, n = 5) => (r.recent.length ? `last ${Math.min(n, r.recent.length)}: ${r.recent.slice(0, n).map((v) => fmt(v, 0)).join(", ")}` : "no games yet");
@@ -592,7 +594,7 @@ function parlayAnswer(q: string, slate: Slate, rows: NbaRow[], who: Player[], te
     return best;
   }).filter((x): x is AskItem => !!x);
   if (legsFromPlayers.length >= 2 || (who.length && legsFromPlayers.length)) {
-    const extra = legsFromPlayers.length < 2 ? strongest(rows.filter((r) => !who.some((p) => p.id === r.player_id)), 2 - legsFromPlayers.length, true, wantUnder, wantOver) : [];
+    const extra = legsFromPlayers.length < 2 ? strongest(stars(rows).filter((r) => !who.some((p) => p.id === r.player_id)), 2 - legsFromPlayers.length, true, wantUnder, wantOver) : [];
     const legs = [...legsFromPlayers, ...extra];
     const sim = simulate(legsOf(legs), buckets, useCor);
     return { title: `Parlay: ${legs.map((x) => x.row.player_name).join(" + ")}`, items: legs,
@@ -602,7 +604,8 @@ function parlayAnswer(q: string, slate: Slate, rows: NbaRow[], who: Player[], te
   const n = countOf(q, /\b(safe|safest|lock)\b/.test(q) ? 2 : 3);
   const game = slate.games.find((g) => teams.length && teams.every((t) => t === g.home || t === g.away));
   const sameGame = /\b(same[- ]game|sgp)\b/.test(q) || !!game;
-  let pool = rows.filter((r) => (!markets.length || markets.includes(r.market)) && r.evidence.minutes_long >= 24);
+  // legs it picks itself are stars at lines DraftKings posts, as every suggestion on the site; players asked for by name stay
+  let pool = stars(rows).filter((r) => !markets.length || markets.includes(r.market));
   if (game) pool = pool.filter((r) => r.game_id === game.game_id);
   else if (teams.length) pool = pool.filter((r) => teams.includes(r.team));
   const longshot = /\b(long ?shot|lotto|big payout|longer|plus money|\+\d{3,})\b/.test(q);
@@ -614,11 +617,11 @@ function parlayAnswer(q: string, slate: Slate, rows: NbaRow[], who: Player[], te
   } else {
     legs = strongest(pool, n, !sameGame, wantUnder, wantOver);
   }
-  if (!legs.length) return { title: "Not enough legs for that parlay", items: [], text: "Try fewer legs or drop a filter.", suggestions: ["2-leg parlay", "3-leg parlay"] };
+  if (!legs.length) return { title: "Not enough legs for that parlay", items: [], text: "Try fewer legs or drop a filter. Legs come only from stars with a DraftKings line, posted about 10 AM Eastern.", suggestions: ["2-leg parlay", "3-leg parlay"] };
   const sim = simulate(legsOf(legs), buckets, useCor);
   const fair = 1 / Math.max(sim.joint, 1e-6);
   return { title: `${legs.length}-leg ${sameGame ? "same-game " : ""}parlay${game ? ` (${game.away} @ ${game.home})` : ""}`, items: legs,
-    text: `${sameGame ? "Strongest validated leans from one game" : legs.length > slate.games.length ? `Strongest validated leans (only ${slate.games.length} game${slate.games.length === 1 ? "" : "s"} tonight, so some legs share a game)` : "Strongest validated leans, one per game"}${markets.length ? `, ${markets.map((m) => marketLabel(m).toLowerCase()).join("/")} only` : ""}; players averaging 24+ minutes.${longshot ? " Every added leg lowers the chance; the model can't find long-shot value without book prices." : ""}`,
+    text: `${sameGame ? "Strongest validated leans from one game" : legs.length > slate.games.length ? `Strongest validated leans (only ${slate.games.length} game${slate.games.length === 1 ? "" : "s"} tonight, so some legs share a game)` : "Strongest validated leans, one per game"}${markets.length ? `, ${markets.map((m) => marketLabel(m).toLowerCase()).join("/")} only` : ""}; stars only, at lines DraftKings posts.${longshot ? " Every added leg lowers the chance; the model can't find long-shot value without book prices." : ""}`,
     bullets: [`All hit in ${pctS(sim.joint)} of ${sim.draws.toLocaleString()} simulated games (fair odds ${fair >= 2 ? `+${Math.round((fair - 1) * 100)}` : Math.round(-100 / (fair - 1))}). Multiplying the chances gives ${pctS(sim.independent)}.`,
       useCor ? "Legs in the same game move together the way they have in past games." : "Legs are treated as independent: same-game links did not pass their check."],
     parlay: { joint: sim.joint, independent: sim.independent, draws: sim.draws } };

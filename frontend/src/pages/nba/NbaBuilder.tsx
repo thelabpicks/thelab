@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link } from "react-router-dom";
 import { Dices, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { cn, num, pct } from "@/lib/format";
-import { MIN_LINE, NBA_MARKETS, bestOffer, fmtPrice, leanOf, marketLabel, overAt, useNba, type NbaCorrelation, type NbaRow, type Slate } from "@/lib/nba";
+import { NBA_MARKETS, bestOffer, fmtPrice, leanOf, marketLabel, onDraftKings, overAt, starsOf, suggestable, useNba, type NbaCorrelation, type NbaRow, type Slate } from "@/lib/nba";
 import { simulate, toAmerican, toDecimal, type SimLeg } from "@/lib/sim";
 import { PageTitle } from "@/components/Layout";
 import { Button, Card, CardBody, CardHeader, Input, LoadingBlock, Notice, Select, TeamBadge } from "@/components/ui";
@@ -28,6 +28,7 @@ export default function NbaBuilder() {
   const [search, setSearch] = React.useState("");
   const [market, setMarket] = React.useState("points");
   const [odds, setOdds] = React.useState("");
+  const [note, setNote] = React.useState<string | null>(null);
   const date = slate.data?.date ?? undefined;
   // A slip from an earlier slate is cleared: its games are over.
   const items = slip.date === date ? slip.items : [];
@@ -41,11 +42,14 @@ export default function NbaBuilder() {
   const add = (r: NbaRow, side: "over" | "under") => set([...items.filter((i) => !(i.player_id === r.player_id && i.market === r.market)), { player_id: r.player_id, market: r.market, side, line: r.line }]);
   const dec = toDecimal(odds);
 
-  const choices = rows.filter((r) => r.market === market && !r.out && r.dist && (!search || r.player_name.toLowerCase().includes(search.toLowerCase())))
+  // Stars at lines DraftKings posts, as everywhere the site suggests picks (nba.ts suggestable); a search still finds anyone.
+  const stars = React.useMemo(() => starsOf(rows), [rows]);
+  const choices = rows.filter((r) => r.market === market && !r.out && r.dist
+    && (search ? r.player_name.toLowerCase().includes(search.toLowerCase()) : suggestable(r, stars)))
     .map((r) => ({ r, lean: leanOf(r)! })).sort((a, b) => b.lean.p - a.lean.p).slice(0, search ? 30 : 12);
 
   const suggest = (n: number) => {
-    const pool = rows.filter((r) => !r.out && r.dist && r.evidence.minutes_long >= 24 && r.line >= MIN_LINE).map((r) => ({ r, lean: leanOf(r)! }))
+    const pool = rows.filter((r) => r.dist && suggestable(r, stars)).map((r) => ({ r, lean: leanOf(r)! }))
       .filter((x) => x.lean.p >= 0.6).sort((a, b) => b.lean.p - a.lean.p);
     const used = new Set<number>(); const pick: SlipItem[] = [];
     for (const x of pool) {
@@ -53,6 +57,9 @@ export default function NbaBuilder() {
       used.add(x.r.game_id); pick.push({ player_id: x.r.player_id, market: x.r.market, side: x.lean.side, line: x.r.line });
       if (pick.length === n) break;
     }
+    // never swap the slip for fewer legs than asked: say why instead
+    if (pick.length < n) { setNote(`Not enough stars with a DraftKings line and a 6.0+ lean in different games today for a ${n}-leg parlay.`); return; }
+    setNote(null);
     set(pick);
   };
 
@@ -66,9 +73,10 @@ export default function NbaBuilder() {
           <Button variant="outline" size="sm" onClick={() => suggest(3)}><Sparkles className="h-4 w-4" />Best 3-leg</Button>
         </div>
       </PageTitle>
+      {note && <Notice tone="info">{note}</Notice>}
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
         <Card>
-          <CardHeader title="Add legs" subtitle="Strongest leans first; tap a side to add it" />
+          <CardHeader title="Add legs" subtitle={search ? "Every player matching your search; tap a side to add it" : "Stars at DraftKings lines, strongest leans first; search to add anyone"} />
           <div className="flex flex-wrap gap-2 border-b border-line p-3">
             <Select aria-label="Market" value={market} onChange={(e) => setMarket(e.target.value)} className="w-44">
               {NBA_MARKETS.map((m) => <option key={m.market} value={m.market}>{m.label}</option>)}
@@ -82,7 +90,7 @@ export default function NbaBuilder() {
             {choices.map(({ r, lean }) => (
               <div key={r.player_id} className="flex items-center gap-2 px-4 py-2 text-sm">
                 <TeamBadge team={r.team} />
-                <div className="min-w-0 flex-1"><div className="truncate font-medium">{r.player_name}</div><div className="text-xs text-muted">{r.home ? "vs" : "@"} {r.opp} · proj {num(r.mean, 1)}</div></div>
+                <div className="min-w-0 flex-1"><div className="truncate font-medium">{r.player_name}</div><div className="text-xs text-muted">{r.home ? "vs" : "@"} {r.opp} · proj {num(r.mean, 1)}{onDraftKings(r) ? "" : " · no DraftKings line"}</div></div>
                 {(["over", "under"] as const).map((s) => {
                   const p = s === "over" ? lean.over : 1 - lean.over;
                   return (
@@ -94,7 +102,9 @@ export default function NbaBuilder() {
                 })}
               </div>
             ))}
-            {!choices.length && <p className="p-4 text-sm text-muted">No validated players match.</p>}
+            {!choices.length && <p className="p-4 text-sm text-muted">{search ? "No validated players match." : slate.data.odds.props_priced
+              ? "No star has a DraftKings line in this market today. Try another market or search for a player."
+              : "Star legs appear once DraftKings posts player props, about 10 AM Eastern. Search to add a player now."}</p>}
           </div>
         </Card>
         <div className="space-y-4">
@@ -103,11 +113,12 @@ export default function NbaBuilder() {
             <div className="divide-y divide-line/60">
               {legs.map((l, i) => {
                 const offer = bestOffer(l.row, l.side as "over" | "under", l.line);
+                const dk = l.row.offers.find((o) => o.book === "draftkings" && o.side === l.side && o.line === l.line);
                 return (
                   <div key={l.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                     <div className="min-w-0 flex-1">
                       <Link to={`/nba/players/${l.player_id}`} className="font-medium hover:text-accent">{l.name}</Link>
-                      <div className="text-xs text-muted">{l.side === "over" ? "Over" : "Under"} {l.line} {l.label}{offer ? ` · ${fmtPrice(offer.price)}` : ""}</div>
+                      <div className="text-xs text-muted">{l.side === "over" ? "Over" : "Under"} {l.line} {l.label}{dk ? ` · DraftKings ${fmtPrice(dk.price)}` : offer ? ` · ${fmtPrice(offer.price)}` : " · no book line"}</div>
                     </div>
                     <span className="tabular-nums">{pct(l.p, 0)}</span>
                     <button aria-label="Remove" onClick={() => set(items.filter((_, j) => j !== i))} className="rounded p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" /></button>
