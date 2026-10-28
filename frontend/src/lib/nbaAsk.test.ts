@@ -46,6 +46,15 @@ describe("nba ask", () => {
     expect(best).not.toContain("8");
     expect(answer("Deep Bench points", s2).title).toContain("Deep Bench");
   });
+  it("builds its own parlays from stars with a DraftKings line only", () => {
+    const noDk = { offers: [{ book: "bovada", side: "under" as const, line: 30.5, price: -110 }] };
+    const s2: Slate = { ...slate, rows: slate.rows.map((r) => (r.player_id === "2" ? { ...r, ...noDk } : r)).concat([
+      row("8", "Deep Bench", "NY", 1, "points", 3, 9.5, { evidence: { ...slate.rows[0].evidence, start_rate: 0.05 } })]) };
+    const legs = answer("2-leg parlay", s2).items.map((x) => x.row.player_id);
+    expect(legs.length).toBe(2);
+    expect(legs).not.toContain("2");
+    expect(legs).not.toContain("8");
+  });
   it.skipIf(!process.env.PEEK)("peek", () => {
     const a = answer(process.env.PEEK as string, slate);
     console.log([a.title, a.text, ...(a.sections ?? []).map((s) => `## ${s.title}\n${s.lines.map((l) => `- ${l}`).join("\n")}`), ...(a.bullets ?? [])].join("\n"));
