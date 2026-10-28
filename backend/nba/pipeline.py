@@ -66,7 +66,7 @@ def book_odds(day: str) -> dict:
     f = sources.archive_dir() / "odds" / f"{day}.json"
     espn = collect.load_espn_lines(day)
     if not f.exists():
-        return {"games": espn, "props": {}, "fetched_at": None, "plan": None}
+        return {"games": espn, "props": {}, "dk": collect.load_espn_props(day), "fetched_at": None, "plan": None}
     s = json.loads(f.read_text())
     ev = {g["event_id"]: g for g in s.get("games", [])}
     games = {}
@@ -87,7 +87,9 @@ def book_odds(day: str) -> dict:
     for p in s.get("props", []):
         pr.setdefault((_norm(p["player"]), p["market"]), []).append(
             {"book": p["book"], "side": p["side"], "line": p["line"], "price": p["price"]})
-    return {"games": games, "props": pr, "fetched_at": s.get("fetched_at"), "plan": (s.get("budget") or {}).get("plan")}
+    # DraftKings' lines for every game and market, free from ESPN: the line when no prices were bought for it
+    return {"games": games, "props": pr, "dk": collect.load_espn_props(day), "fetched_at": s.get("fetched_at"),
+            "plan": (s.get("budget") or {}).get("plan")}
 
 
 def _consensus_line(offers: list[dict]) -> float | None:
@@ -155,7 +157,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     _write(out, "slate.json", {"date": slate_date, "generated_at": utcnow(), "games": games, "rows": rows,
                                "odds": {"fetched_at": odds["fetched_at"], "plan": odds["plan"],
-                                        "props_priced": bool(odds["props"])}})
+                                        "props_priced": bool(odds["props"] or odds.get("dk"))}})
     _write(out, "markets.json", {"markets": list(reports.values()),
                                  "note": "Each market must beat the player-average baseline on games it never saw before over/under chances are shown."})
     _write(out, "confidence.json", conf)
@@ -228,7 +230,10 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             continue
         m = r.market
         offers = odds["props"].get((_norm(r.player_name), m), [])
+        dk_line = odds.get("dk", {}).get((str(int(r.player_id)), m))
         book_line = _consensus_line(offers)
+        if book_line is None:
+            book_line = dk_line
         line = book_line if book_line is not None else (r.line if r.line == r.line else math.floor(r.mu) + 0.5)
         dist = r.dist
         validated = reports[m]["validated"]
@@ -238,7 +243,7 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "player_id": str(int(r.player_id)), "player_name": r.player_name, "team": r.team, "opp": r.opp, "pos": r.pos,
             "home": int(r.home), "headshot": r.headshot, "game_id": int(r.game_id), "injury": r.injury or None,
             "injury_note": r.injury_note or None, "out": bool(r.out), "market": m, "mean": r.mu, "q10": r.q10, "q90": r.q90,
-            "line": line, "line_source": "book" if book_line is not None else "usual", "usual_line": r.line,
+            "line": line, "line_source": "book" if book_line is not None else "usual", "usual_line": r.line, "dk_line": dk_line,
             "dist": dist if validated else None, "p_over": po,
             "offers": [o for o in offers if o["line"] == line] if book_line is not None else [],
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),

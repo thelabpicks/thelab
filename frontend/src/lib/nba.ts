@@ -23,7 +23,9 @@ export type Offer = { book: string; side: "over" | "under"; line: number; price:
 export type NbaRow = {
   player_id: string; player_name: string; team: string; opp: string; pos: string; home: number; headshot?: string; game_id: number;
   injury: string | null; injury_note: string | null; out: boolean; market: string; mean: number; q10: number; q90: number;
-  line: number; line_source: "book" | "usual"; usual_line: number | null; dist: PropDist | null; p_over: number | null; offers: Offer[];
+  line: number; line_source: "book" | "usual"; usual_line: number | null;
+  /** DraftKings' line for this player and market (free from ESPN, every game), absent in data published before it */
+  dk_line?: number | null; dist: PropDist | null; p_over: number | null; offers: Offer[];
   recent: number[]; recent_minutes: number[]; due: boolean;
   evidence: { minutes: number; minutes_long: number; per_min: number; opp_mult: number | null; pace: number | null; opp_pace: number | null; rest: number; start_rate: number;
     /** this season so far (absent in data published before they were added) */
@@ -119,7 +121,8 @@ export function starsOf(rows: NbaRow[]): Set<string> {
   for (const r of rows) if (r.market === "points" && surePlay(r) && regularStarter(r.evidence)) byTeam.set(r.team, [...(byTeam.get(r.team) ?? []), r]);
   return new Set([...byTeam.values()].flatMap((rs) => rs.sort((a, b) => b.mean - a.mean).slice(0, STARS_PER_TEAM).map((r) => r.player_id)));
 }
-export const onDraftKings = (r: NbaRow) => r.line_source === "book" && r.offers.some((o) => o.book === "draftkings" && o.line === r.line);
+export const onDraftKings = (r: NbaRow) => r.line_source === "book"
+  && (r.dk_line === r.line || r.offers.some((o) => o.book === "draftkings" && o.line === r.line));
 export const suggestable = (r: NbaRow, stars: Set<string>) => stars.has(r.player_id) && surePlay(r) && r.line >= MIN_LINE && onDraftKings(r);
 
 export const fmtPrice = (p: number) => (p > 0 ? `+${p}` : String(p));

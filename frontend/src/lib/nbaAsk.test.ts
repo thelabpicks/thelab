@@ -46,6 +46,10 @@ describe("nba ask", () => {
     expect(best).not.toContain("8");
     expect(answer("Deep Bench points", s2).title).toContain("Deep Bench");
   });
+  it("counts DraftKings' line from ESPN as a DraftKings line when no prices were bought", () => {
+    const s2: Slate = { ...slate, rows: slate.rows.map((r) => ({ ...r, offers: [], dk_line: r.line })) };
+    expect(answer("best bets tonight", s2).items.length).toBeGreaterThan(0);
+  });
   it("builds its own parlays from stars with a DraftKings line only", () => {
     const noDk = { offers: [{ book: "bovada", side: "under" as const, line: 30.5, price: -110 }] };
     const s2: Slate = { ...slate, rows: slate.rows.map((r) => (r.player_id === "2" ? { ...r, ...noDk } : r)).concat([
