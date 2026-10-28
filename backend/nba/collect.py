@@ -167,33 +167,28 @@ STATUSES = ("Out", "Doubtful", "Questionable", "Probable", "Available")
 
 def parse_injury_report(text: str, teams: dict[str, str] | None = None) -> list[dict]:
     """Players and statuses from the text of the league's injury report PDF. Rows read like
-    '10/26/2026 08:00 (ET) MEM@UTA Memphis Grizzlies Small, Javon Out Injury/Illness - Left Ankle; Sprain'; team names
-    are swapped for their abbreviation first so they can't run into the player's last name."""
+    '10/26/2026 08:00 (ET) MEM@UTA Memphis Grizzlies Small, Javon Out Injury/Illness - Left Ankle; Sprain', but the PDF
+    often extracts one word per line, so the text is read as one run of words: each 'Last, First Status' is a player,
+    his team is the last team name before him and his reason runs to the next player."""
     import re  # noqa: PLC0415
     teams = teams or sources.TEAMS
+    text = " ".join(text.split())
     for full in sorted(teams, key=len, reverse=True):
-        text = text.replace(full, f" @{teams[full]}@ ")
+        text = text.replace(full, f"@{teams[full]}@")
     word = r"[A-Z][A-Za-z'\-]+\.?"
-    pat = re.compile(rf"(?:@([A-Z]{{2,4}})@\s+)?((?:{word} ){{0,2}}{word}(?: (?:Jr\.|Sr\.|II|III|IV))?), "
-                     rf"({word}(?: {word})?) ({'|'.join(STATUSES)})\b(?: ([^\n]*))?")
-    # Some PDFs extract one table cell per line: put a team, a status and its reason back on the player's line.
-    status = rf"(?:{'|'.join(STATUSES)})"
-    lines: list[str] = []
-    for line in (x.strip() for x in text.splitlines()):
-        if not line:
-            continue
-        prev = lines[-1] if lines else ""
-        if prev.endswith("@") or (re.match(rf"{status}\b", line) and re.search(rf", {word}(?: {word})?$", prev)) \
-                or (re.search(rf" {status}$", prev) and "," not in line and "@" not in line and not re.match(r"\d", line)):
-            lines[-1] = f"{prev} {line}"
-        else:
-            lines.append(line)
-    out, team = [], None
-    for line in lines:
-        for m in pat.finditer(line):
-            team = m.group(1) or team
-            out.append({"name": f"{m.group(3)} {m.group(2)}", "team": team, "status": m.group(4),
-                        "reason": (m.group(5) or "").strip()})
+    # one-word last names (hyphens count as one word), a few two-word ones (De Anda, Van Vleet) and suffixes (Jr.)
+    last = rf"(?:(?:Da|De|Del|Di|La|Le|Van|Von|St\.) )?{word}(?: (?:Jr\.|Sr\.|II|III|IV))?"
+    pat = re.compile(rf"(?<![\w,])({last}), ({word}(?: {word})?) ({'|'.join(STATUSES)})\b")
+    marks = [(m.start(), m.group(1)) for m in re.finditer(r"@([A-Z]{2,4})@", text)]
+    noise = re.compile(r"@[A-Z]{2,4}@|Injury Report: \S+ \S+ [AP]M Page \d+ of \d+|\d{2}/\d{2}/\d{4}|\d{2}:\d{2} \(ET\)"
+                       r"|\b[A-Z]{2,4}@[A-Z]{2,4}\b|NOT YET SUBMITTED")
+    found = list(pat.finditer(text))
+    out = []
+    for i, m in enumerate(found):
+        team = next((t for pos, t in reversed(marks) if pos < m.start()), None)
+        reason = text[m.end():found[i + 1].start() if i + 1 < len(found) else len(text)]
+        out.append({"name": f"{m.group(2)} {m.group(1)}", "team": team, "status": m.group(3),
+                    "reason": " ".join(noise.sub(" ", reason).split())})
     return out
 
 
