@@ -69,6 +69,13 @@ GATE = {
 CANDIDATES = ["props-glm-1", "props-gbm-1"]
 BASELINES = ["baseline-player-avg", "baseline-position-avg"]
 PASS_ON = {"Out", "Doubtful"}
+# "Players like him vs this defense": how players of the same position and a similar role (thirds of their own pregame
+# volume) did against this defense compared with their own averages, this season's earlier weeks only, shrunk toward
+# 1. Walk-forward 2024-26 (2026-10-29): better passing yards (CRPS -0.9%, week-bootstrap 90% CI -0.3..-1.5%) and
+# receptions (-0.1%, CI 0.0..-0.2%); rushing (-0.3%, CI +0.1..-0.7%) and receiving yards (0.0%) did not prove out.
+SIMILAR_STATS = {"pass_yards": ("pass_yards", "attempts"), "receptions": ("receptions", "targets")}
+SIMILAR_VOLUME = {"QB": "attempts_pg", "RB": "touches_pg", "WR": "targets_pg", "TE": "targets_pg"}
+SIMILAR_SHRINK_GAMES = 4.0
 
 
 def _df(c, sql, params=()):
@@ -129,6 +136,8 @@ def build_frame(c: sqlite3.Connection, upcoming: pd.DataFrame | None = None) -> 
     t = t.join(feats)
     t = t.join(_team_volume(hist, t))
     t = t.join(_defense(hist, t))
+    t = t.join(_defense_similar(t))
+    t = t.join(_last_carries_share(hist, t))
     return t
 
 
@@ -228,6 +237,79 @@ def _defense(hist: pd.DataFrame, t: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame.from_dict(res, orient="index")
 
 
+def _role_tier(t: pd.DataFrame) -> pd.Series:
+    """0/1/2: bottom, middle or top third of the position by the player's own pregame volume. Cut points come from
+    earlier seasons."""
+    vol = pd.Series(np.nan, index=t.index)
+    for pos, col in SIMILAR_VOLUME.items():
+        if col in t:
+            vol[t.position == pos] = t.loc[t.position == pos, col]
+    tier = pd.Series(1, index=t.index)
+    ok = t.labelled.eq(1) & vol.notna()
+    for s in t.season.unique():
+        ref = t[ok & (t.season < s)]
+        if ref.empty:  # first season on file: everyone in the middle tier (no later games leak into the cut points)
+            continue
+        cut = vol[ref.index].groupby(ref.position).quantile([1 / 3, 2 / 3]).unstack()
+        cur = t.season == s
+        lo, hi = t.position[cur].map(cut[1 / 3]), t.position[cur].map(cut[2 / 3])
+        tier[cur] = np.where(vol[cur] >= hi, 2, np.where(vol[cur] >= lo, 1, 0))
+    return tier
+
+
+def _defense_similar(t: pd.DataFrame) -> pd.DataFrame:
+    """opp_sim_{stat}_mult: what players of the same position and role tier got against this defense, relative to their
+    own pregame averages ({stat}_pg), over the defense's earlier weeks this season. 1.0 = they did their usual."""
+    stats = sorted({x for v in SIMILAR_STATS.values() for x in v})
+    tier = _role_tier(t)
+    keys = ["opponent", "position", "tier"]
+    lab = t[t.labelled.eq(1) & t.has_history.eq(1)].assign(tier=tier)
+    agg_cols = {}
+    for st in stats:
+        lab[f"exp_{st}"] = lab[f"{st}_pg"].fillna(0.0)
+        agg_cols[st] = st
+    g = lab.groupby(["season", "week"] + keys)[stats + [f"exp_{x}" for x in stats]].sum().reset_index()
+    tt = t.assign(tier=tier)
+    res = {}
+    for (s, wk), rows in tt.groupby(["season", "week"]):
+        prior = g[(g.season == s) & (g.week < wk)]
+        if prior.empty:
+            continue
+        agg = prior.groupby(keys)[stats + [f"exp_{x}" for x in stats]].sum()
+        per_game = prior[[f"exp_{x}" for x in stats]].sum() / max(len(prior), 1)
+        for idx, key in zip(rows.index, rows[keys].itertuples(index=False, name=None)):
+            have = key in agg.index
+            f = {}
+            for st in stats:
+                prior_mass = SIMILAR_SHRINK_GAMES * float(per_game[f"exp_{st}"])
+                a = float(agg.loc[key, st]) if have else 0.0
+                e = float(agg.loc[key, f"exp_{st}"]) if have else 0.0
+                f[f"opp_sim_{st}_mult"] = (a + prior_mass) / (e + prior_mass) if e + prior_mass > 0 else 1.0
+            res[idx] = f
+    return pd.DataFrame.from_dict(res, orient="index")
+
+
+def _last_carries_share(hist: pd.DataFrame, t: pd.DataFrame) -> pd.DataFrame:
+    """last_carries_share: the player's share of his team's carries in the team's previous game, when he played in it
+    (the game simulation blends it into the window share; see gamesim.PARAMS["last_car_w"])."""
+    tg = hist.groupby(["season", "week", "team"]).carries.sum().rename("team_car").reset_index()
+    pc = hist.groupby(["season", "week", "team", "player_id"]).carries.sum().rename("car").reset_index()
+    order = tg.sort_values(["season", "week"])
+    by_team = {tm: list(zip(g.season, g.week, g.team_car)) for tm, g in order.groupby("team")}
+    car = {(r.season, r.week, r.team, r.player_id): r.car for r in pc.itertuples(index=False)}
+    out = {}
+    for idx, r in zip(t.index, t[["season", "week", "team", "player_id"]].itertuples(index=False)):
+        games = [x for x in by_team.get(r.team, []) if (x[0], x[1]) < (r.season, r.week)]
+        if not games:
+            continue
+        s_, w_, tot = games[-1]
+        n = car.get((s_, w_, r.team, r.player_id))
+        if n is not None and tot > 0:
+            out[idx] = {"last_carries_share": n / tot}
+    return pd.DataFrame.from_dict(out, orient="index", columns=["last_carries_share"]) if out else \
+        pd.DataFrame(index=t.index[:0], columns=["last_carries_share"])
+
+
 def population(t: pd.DataFrame, market: str) -> pd.Series:
     m = MARKETS[market]
     col, thr = VOLUME_RULES[m["volume"]]
@@ -248,9 +330,10 @@ def feature_list(market: str) -> tuple[list[str], list[str]]:
            "targets": ["targets_pg", "targets_share", "team_targets_pg", "ypt", "catch_rate", "opp_targets_mult"],
            "touches": ["carries_pg", "targets_pg", "carries_share", "targets_share", "ypc", "ypt", "opp_rush_yards_mult",
                        "opp_rec_yards_mult"]}[MARKETS[market]["volume"]]
+    sim = [f"opp_sim_{x}_mult" for x in SIMILAR_STATS.get(market, ())]
     glm = list(dict.fromkeys(base[:4] + vol[:3] + ctx[:2] + [f"opp_{st}_mult"]))
     full = list(dict.fromkeys(base + vol + ctx + ["targets_pg", "carries_pg", "receptions_pg", "rec_yards_pg", "rush_yards_pg",
-                                                  "attempts_pg", "pass_yards_pg", "targets_share", "carries_share"]))
+                                                  "attempts_pg", "pass_yards_pg", "targets_share", "carries_share"] + sim))
     return full, glm
 
 

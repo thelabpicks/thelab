@@ -40,6 +40,7 @@ def test_features_use_only_earlier_games():
     f2 = history.build_features(d2).sort_values(["player_id", "game_date"])
     early = f.game_id < 1039
     assert np.allclose(f[early].points_pm_l.fillna(-1).to_numpy(), f2[f2.game_id < 1039].points_pm_l.fillna(-1).to_numpy())
+    assert np.allclose(f[early].sim_points.fillna(-1).to_numpy(), f2[f2.game_id < 1039].sim_points.fillna(-1).to_numpy())
 
 
 def test_benched_games_count_as_zero_in_expected_minutes_only():

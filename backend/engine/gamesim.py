@@ -37,11 +37,15 @@ LEAGUE = {"catch_rate": 0.65, "ypr": 10.8, "ypc": 4.3, "int_rate": 0.023, "td_ra
 # share goes to the players who are playing instead of to "other". Found in the 2026 W7 NE-CHI review (Swift got 22 of 30
 # carries with Monangai out; the sim gave him 12). Better simulated log loss for carries, rushing and receiving in every
 # season 2021-2026, and a larger blend gain.
+# last_car_w: weight on each rusher's share of the team's carries in its previous game (when he played in it), blended
+# into his last-8-games share. Found when Jacobs returned (2026 W8 GB: shares summed to 149%); tuned on 2021 (0.3 beat
+# 0.2, 0.5 and 1.0), then on 2022-26 carries log loss -0.0068 (week-bootstrap 90% CI -0.0037..-0.0098), rushing yards
+# -0.0021 (CI +0.0002..-0.0047); 65%+ carries picks 72.6% -> 73.5%.
 # catch_adj / ypt_adj / ypc_adj: league-wide efficiency correction (catch rate, yards per target, yards per carry) learned
 # from recent finished weeks (efficiency_factor); used only where run() found it beat the uncorrected simulation.
 PARAMS = {"alpha_tgt": 12.0, "alpha_car": 10.0, "k_rec": 0.6, "k_rush": 0.5, "vol_sd": 0.2, "pass_slope": 0.0, "rush_slope": 0.0,
           "script_sd": 0.0, "other_min_tgt": 0.02, "other_min_car": 0.04, "pass_adj": 1.0, "rush_adj": 1.0,
-          "fill_car": 1.0, "fill_tgt": 1.0, "catch_adj": 1.0, "ypt_adj": 1.0, "ypc_adj": 1.0}
+          "fill_car": 1.0, "fill_tgt": 1.0, "catch_adj": 1.0, "ypt_adj": 1.0, "ypc_adj": 1.0, "last_car_w": 0.3}
 
 SIM_MARKETS = ["pass_yards", "pass_attempts", "completions", "pass_tds", "interceptions", "rush_yards", "carries",
                "rec_yards", "receptions", "rush_rec_yards"]
@@ -128,7 +132,11 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
 
     # Rushers: carries shared out among the backs and quarterback.
     rush_idx = np.where(np.isin(pos, ["QB", "RB"]))[0]
-    car_share = _num(rows.carries_share.iloc[rush_idx]) * _num(rows.opp_carries_mult.iloc[rush_idx], 1.0)
+    car_share = _num(rows.carries_share.iloc[rush_idx])
+    if P["last_car_w"] > 0 and "last_carries_share" in rows:
+        last = _num(rows.last_carries_share.iloc[rush_idx], np.nan)
+        car_share = np.where(np.isfinite(last), P["last_car_w"] * last + (1 - P["last_car_w"]) * car_share, car_share)
+    car_share = car_share * _num(rows.opp_carries_mult.iloc[rush_idx], 1.0)
     gap = 1.0 - P["other_min_car"] - car_share.sum()
     if P["fill_car"] > 0 and gap > 0 and car_share.sum() > 0:  # carries left by backs who are not playing go to those who are
         car_share = car_share * (1.0 + P["fill_car"] * gap / car_share.sum())
@@ -412,6 +420,7 @@ def _postgame_rows(rows: pd.DataFrame, level: str) -> pd.DataFrame:
     if level == "role":
         r["targets_share"] = (num("targets") / num("team_targets").replace(0, np.nan)).fillna(0.0)
         r["carries_share"] = (num("carries") / num("team_carries").replace(0, np.nan)).fillna(0.0)
+        r["last_carries_share"] = np.nan  # the real share replaces the pregame blend
         r["attempts_pg"] = num("attempts").fillna(num("attempts_pg"))
         r["opp_targets_mult"] = 1.0
         r["opp_carries_mult"] = 1.0
