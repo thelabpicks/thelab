@@ -128,7 +128,11 @@ export function starsOf(rows: NbaRow[]): Set<string> {
   for (const r of rows) if (r.market === "points" && r.mean >= STAR_MIN_POINTS && surePlay(r) && regularStarter(r.evidence)) byTeam.set(r.team, [...(byTeam.get(r.team) ?? []), r]);
   return new Set([...byTeam.values()].flatMap((rs) => rs.sort((a, b) => b.mean - a.mean).slice(0, STARS_PER_TEAM).map((r) => r.player_id)));
 }
-export const onDraftKings = (r: NbaRow) => r.line_source === "book"
+// A real main line sits near what the player normally does; Curry at 2 points or Castle at 45 is a milestone or in-game bet.
+export const plausibleLine = (line: number, mean: number) => Math.abs(line - mean) <= Math.max(3, 0.3 * mean);
+// ESPN's free DraftKings lines carry no prices, and whole numbers there are milestones: only priced book lines may be whole.
+export const onDraftKings = (r: NbaRow) => r.line_source === "book" && plausibleLine(r.line, r.mean)
+  && !(r.dk_line === r.line && Number.isInteger(r.line) && !r.offers.some((o) => o.line === r.line))
   && (r.dk_line === r.line || r.offers.some((o) => o.book === "draftkings" && o.line === r.line));
 export const suggestable = (r: NbaRow, stars: Set<string>) => stars.has(r.player_id) && surePlay(r) && r.line >= MIN_LINE && onDraftKings(r);
 

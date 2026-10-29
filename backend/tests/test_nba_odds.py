@@ -146,3 +146,10 @@ def test_espn_draftkings_props_keep_the_main_line():
     assert collect.espn_prop_market("Total Points, Rebounds and Assists") == "pra"
     assert collect.espn_prop_market("Total Assists") == "assists"
     assert collect.espn_prop_market("Total Steals") is None
+
+
+def test_espn_lines_far_from_the_player_are_not_his_main_line():
+    assert pipeline.plausible_line(26.5, 23.9)
+    assert pipeline.plausible_line(4.5, 3.8)
+    assert not pipeline.plausible_line(2.0, 23.9)    # Curry over 2 points
+    assert not pipeline.plausible_line(45.0, 17.7)   # Castle under 45

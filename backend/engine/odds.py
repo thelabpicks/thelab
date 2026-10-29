@@ -150,16 +150,25 @@ def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print) ->
     want_alt = mode == "always" or (mode == "auto" and allowance > PAID_PLAN_MIN)
     markets = {**MARKETS, **({f"{k}_alt": v for k, v in ALT_MARKETS.items()} if want_alt else {})}
     todo = []
+    # FG_ODDS_WITHIN_HOURS buys only games kicking off soon (Thursday's run: the Thursday night game, before Saturday's
+    # full pull), so a midweek game gets real lines without spending the week's credits twice.
+    within = float(os.environ.get("FG_ODDS_WITHIN_HOURS") or 0)
+    soon = datetime.now(timezone.utc) + timedelta(hours=within)
     for e in events:  # type: ignore[union-attr]
         h, a = TEAMS.get(e["home_team"]), TEAMS.get(e["away_team"])
-        if (h, a) in by_teams:
+        if (h, a) in by_teams and (not within or datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= soon):
             todo.append((e, by_teams[(h, a)]))
+    players = _players(c, season, week)
+    if not players:
+        # before the week's projections exist no name can be matched: buying now would save an empty snapshot (10/27)
+        raise RuntimeError(f"No {season} week {week} projections yet, so no player could be matched; keeping the credits.")
+    if not todo:
+        raise RuntimeError("No upcoming game in this run's window; keeping the credits.")
     cost = len(todo) * len(markets)
     log(f"odds: {len(todo)} upcoming games matched, about {cost} credits needed, {remaining} remaining"
         f"{'' if want_alt else ' (alternate lines skipped: free plan)'}")
     if remaining is not None and float(remaining) < cost:
         raise RuntimeError(f"Not enough Odds API credits left this month ({remaining} < {cost}); keeping the previous snapshot.")
-    players = _players(c, season, week)
     td_p, dists = _model_chances(c, season, week)
     rows, unmatched, errors = [], {}, []
     for e, g in todo:
@@ -201,11 +210,15 @@ def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print) ->
                     rows.append({"model_p": None if mp is None else round(float(mp), 4),"game_id": g["game_id"], "market": market, "player_id": hit[0], "player_name": hit[1], "team": team,
                                  "book": book, "side": side, "line": o.get("point"), "price": int(o["price"]),
                                  "updated": m.get("last_update") or b.get("last_update"), **({"alt": True} if alt else {})})
-    snap = {"season": season, "week": week, "fetched_at": utcnow(), "source": "The Odds API (the-odds-api.com), US books",
-            "games": len(todo), "alt_lines": want_alt, "rows": rows, "unmatched_names": len(unmatched), "errors": errors, "credits_remaining": remaining}
     if not rows and errors:
         raise RuntimeError("The odds feed returned errors for every game (player props may not be included on this plan): "
                            + "; ".join(errors[:3]))
+    # games not bought this time (already played, or outside the window) keep the prices saved for them earlier
+    fetched = {g["game_id"] for _, g in todo}
+    prev = load_snapshot(season, week)
+    rows += [r for r in (prev or {}).get("rows", []) if r["game_id"] not in fetched]
+    snap = {"season": season, "week": week, "fetched_at": utcnow(), "source": "The Odds API (the-odds-api.com), US books",
+            "games": len(todo), "alt_lines": want_alt, "rows": rows, "unmatched_names": len(unmatched), "errors": errors, "credits_remaining": remaining}
     odds_dir().mkdir(parents=True, exist_ok=True)
     snapshot_path(season, week).write_text(json.dumps(snap))
     log(f"odds: saved {len(rows)} prices from {len({r['book'] for r in rows})} books; {len(unmatched)} names unmatched; "
