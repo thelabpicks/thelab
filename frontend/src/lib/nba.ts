@@ -34,7 +34,11 @@ export type NbaRow = {
     minutes_expected?: number | null; career_games?: number };
 };
 export type NbaGame = { game_id: number; date: string; time: string; home: string; away: string; total?: number | null; home_spread?: number | null };
-export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
+/** Every projected player not ruled out (the game simulations' rotation): stats are his projections when he plays his
+ *  usual minutes; minutes_expected also counts coach's-decision DNPs as 0. */
+export type RotationRow = { player_id: string; player_name: string; team: string; minutes: number | null; minutes_expected: number | null;
+  pts: number | null; reb: number | null; ast: number | null; tpm: number | null };
+export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; rotation?: RotationRow[]; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
 export type MarketReport = {
   market: string; label: string; validated: boolean; failed_checks: string[]; test_rows: number; test_months: number; first_season: number;
   crps_gain_pct: number; mae: number; baseline_mae: number; over_brier: number; baseline_over_brier: number; coin_brier: number;

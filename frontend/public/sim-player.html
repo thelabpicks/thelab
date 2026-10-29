@@ -312,7 +312,9 @@ function setupNBA(){
   const hi=(NBA.book.total+NBA.book.spread)/2, lo=(NBA.book.total-NBA.book.spread)/2, tgt=NBA.book.fav?[lo,hi]:[hi,lo];
   NBA.teams.forEach((T,ti)=>{
     const rows=DATA.nba.players[T.abbr]; const tot=rows.reduce((s,r)=>s+r.min,0); const k=240/tot;
-    T.target=tgt[ti];
+    // the team scores what its own players project for, the same numbers the picks use; the book's line is shown beside
+    // it for comparison, never forced on the players
+    T.target=rows.reduce((s,r)=>s+r.pts,0); T.book=tgt[ti]; T.pa=0.6; T.pr=1;
     T.ps=rows.map(r=>({...r,short:r.bench?'Reserves':short(r.name),ini:r.bench?'RS':inits(r.name),m:r.min*k,
       w3:r.tpm/r.min+0.002, w2:Math.max(0.02,(r.pts-3*r.tpm)/r.min), wf:r.pts/r.min+0.01, wr:r.reb/r.min+0.01, wa:r.ast/r.min+0.005}));
     // rotation: 16 stints of 3 minutes; starters open each half and close the game
@@ -325,10 +327,25 @@ function setupNBA(){
     const t3=rows.reduce((s,r)=>s+r.tpm*k,0)*T.target/rows.reduce((s,r)=>s+r.pts*k,0);
     T.a3=clamp(t3/(100*0.79*0.36),0.25,0.55); T.p2=0.53;
   });
-  // calibrate 2-point make rate so each team's average lands on its target
-  for(let it=0;it<5;it++){
-    const sum=[0,0]; for(let s=0;s<300;s++){const g=simNBA(9000+s,false);sum[0]+=g.score[0];sum[1]+=g.score[1];}
-    NBA.teams.forEach((T,ti)=>{const mean=sum[ti]/300;T.p2=clamp(T.p2+(T.target-mean)/(2*100*0.79*(1-T.a3)*1.15),0.35,0.75)});
+  calibrateNBA();
+}
+// Tunes the engine until every player's average over the runs matches his projection: team rates (2-point makes, three
+// rate, assisted makes, rebounds credited to a player) set the team totals, and each player's shot, rebound and assist
+// weights set his share. The 5,000 runs then center on the same projections the picks are made from.
+function calibrateNBA(){
+  const T=NBA.teams, N=250, f=(want,got)=>Math.pow(Math.max(want,0.05)/Math.max(got,0.05),0.7);
+  for(let it=0;it<6;it++){
+    const box=T.map(t=>t.ps.map(()=>({pts:0,reb:0,ast:0,tpm:0}))), sc=[0,0];
+    for(let s=0;s<N;s++){const g=simNBA(9000+s,true);sc[0]+=g.score[0];sc[1]+=g.score[1];
+      for(const e of g.ev)for(const [ti,p,k,v] of e.bx)box[ti][p][k]+=v/N}
+    T.forEach((t,ti)=>{const b=box[ti], got=k=>b.reduce((s,x)=>s+x[k],0), want=k=>t.ps.reduce((s,p)=>s+p[k],0);
+      t.a3=clamp(t.a3*f(want('tpm'),got('tpm')),0.15,0.6);
+      t.p2=clamp(t.p2+(t.target-sc[ti]/N)/(2*100*0.79*(1-t.a3)*1.15),0.35,0.75);
+      t.pa=clamp(t.pa*f(want('ast'),got('ast')),0.3,0.85);
+      t.pr=clamp(t.pr*f(want('reb'),got('reb')),0.6,1);
+      t.ps.forEach((p,i)=>{const x=b[i], two=f(p.pts-3*p.tpm,x.pts-3*x.tpm);
+        p.w3*=f(p.tpm,x.tpm); p.w2*=two; p.wf*=two; p.wa*=f(p.ast,x.ast); p.wr*=f(p.reb,x.reb)});
+    });
   }
 }
 function nbaPeriod(t){return t<2880?Math.min(3,Math.floor(t/720)):4+Math.floor((t-2880)/300)}
@@ -357,14 +374,15 @@ function simNBA(seed,rec){
         const dist=spot?Math.round(Math.hypot(spot[0]-5.25,spot[1]-25)):0;
         if(r()<(three?0.36:o.p2)){
           const pts=three?3:2; score[off]+=pts; bump(off,q,pts);
-          let a=null; if(r()<0.6){const mates=on.filter(i=>i!==p);a=pick(r,mates,mates.map(i=>o.ps[i].wa))}
+          let a=null; if(r()<o.pa){const mates=on.filter(i=>i!==p);a=pick(r,mates,mates.map(i=>o.ps[i].wa))}
           const bx=[[off,p,'pts',pts]]; if(three)bx.push([off,p,'tpm',1]); if(a!=null)bx.push([off,a,'ast',1]);
           add({t:tt,off,type:'made',kind:pts,p,a,spot,dist,bx}); live=false;
         }else{
           add({t:tt,off,type:'miss',kind:three?3:2,p,spot,dist,bx:[]});
           tt+=1.5;
-          if(r()<0.24){const rb=pick(r,on,on.map(i=>o.ps[i].wr));add({t:tt,off,type:'reb',side:'off',p:rb,bx:[[off,rb,'reb',1]]});tt+=2+r()*6}
-          else{const rb=pick(r,dn,dn.map(i=>d.ps[i].wr));add({t:tt,off:1-off,type:'reb',side:'def',p:rb,bx:[[1-off,rb,'reb',1]]});live=false}
+          // a rebound no player is credited with (out of bounds, a tip) is a team rebound
+          if(r()<0.24){const rb=pick(r,on,on.map(i=>o.ps[i].wr)), cr=r()<o.pr;add({t:tt,off,type:'reb',side:'off',p:rb,team:!cr,bx:cr?[[off,rb,'reb',1]]:[]});tt+=2+r()*6}
+          else{const rb=pick(r,dn,dn.map(i=>d.ps[i].wr)), cr=r()<d.pr;add({t:tt,off:1-off,type:'reb',side:'def',p:rb,team:!cr,bx:cr?[[1-off,rb,'reb',1]]:[]});live=false}
         }
       }
     }
@@ -537,9 +555,9 @@ function statMiss(G,box){
   // a picked player also lands close to his projection, not just on the right side of the line
   for(const k of G.picks||[])if(k.proj!=null){const b=box[k.ti][k.pid]||{};miss(k.keys.reduce((s,x)=>s+(b[x]||0),0),k.proj,Math.max(1,0.15*k.proj))}
   G.teams.forEach((T,ti)=>{const tb=box[ti];
-    if(G.sport==='nba'){const k=T.target/T.ps.reduce((s,p)=>s+p.pts,0);
+    if(G.sport==='nba'){
       // every player's line, so no bench player has a night far off his projection
-      T.ps.forEach((p,i)=>{const b=tb[i]||{};miss(b.pts,p.pts*k,6);miss(b.reb,p.reb,3);miss(b.ast,p.ast,2.5);miss(b.tpm,p.tpm,1.5)});
+      T.ps.forEach((p,i)=>{const b=tb[i]||{};miss(b.pts,p.pts,6);miss(b.reb,p.reb,3);miss(b.ast,p.ast,2.5);miss(b.tpm,p.tpm,1.5)});
     }else{const g=id=>tb[id]||{},q=T.qb,b=g(q.id);
       miss(b.pyd,q.pass_yards,60);miss(b.ptd,q.pass_tds||0,0.9);miss(b.int,q.interceptions||0,0.8);
       [...T.rush].filter(p=>p!==q).sort((x,y)=>y.carries-x.carries).slice(0,1).forEach(p=>{miss(g(p.id).car,p.carries,4);miss(g(p.id).ruyd,p.rush_yards,30)});
@@ -841,6 +859,7 @@ function renderTicker(){
     p=T.ps[e.p]; const b=box[e.off][e.p]||{};
     if(e.type==='made'){tag=`MADE ${e.kind}`;cls='good';head=`${p.short.toUpperCase()} · ${b.pts||0} PTS`;txt=`${p.name} makes a ${e.dist}-foot ${e.kind===3?'three':e.dist<=4?'layup':'jump shot'}${e.a!=null?` · assist ${T.ps[e.a].short} (${(box[e.off][e.a]||{}).ast||0} AST)`:''}`}
     else if(e.type==='miss'){tag=`MISSED ${e.kind}`;cls='bad';head=p.short.toUpperCase();txt=`${p.name} misses a ${e.dist}-foot ${e.kind===3?'three':'shot'}`}
+    else if(e.type==='reb'&&e.team){tag='REBOUND';cls='neutral';head=`${T.abbr} TEAM REBOUND`;txt=`${e.side==='off'?'Offensive':'Defensive'} team rebound for ${T.name}`}
     else if(e.type==='reb'){tag='REBOUND';cls='neutral';head=`${p.short.toUpperCase()} · ${b.reb||0} REB`;txt=`${e.side==='off'?'Offensive':'Defensive'} rebound by ${p.name}`}
     else if(e.type==='ft'){tag=`FT ${e.made}/2`;cls=e.made?'good':'bad';head=`${p.short.toUpperCase()} · ${b.pts||0} PTS`;txt=`${p.name} goes to the line and makes ${e.made} of 2`}
     else {tag='TURNOVER';cls='bad';head=p.short.toUpperCase();txt=`${p.name} turns it over`}
@@ -934,7 +953,7 @@ function renderDist(){
 }
 function renderIntro(){
   const D=G.dist, A=G.teams[0], B=G.teams[1], el=document.getElementById('intro');
-  const proj=G.sport==='nba'?`PROJECTED ${A.abbr} ${A.target.toFixed(1)} · ${B.abbr} ${B.target.toFixed(1)} · TOTAL ${(A.target+B.target).toFixed(1)}`:`PROJECTED ${A.abbr} ${A.target.toFixed(1)} · ${B.abbr} ${B.target.toFixed(1)} · TOTAL ${(A.target+B.target).toFixed(1)}`;
+  const proj=G.sport==='nba'?`PROJECTED ${A.abbr} ${A.target.toFixed(1)} · ${B.abbr} ${B.target.toFixed(1)} · TOTAL ${(A.target+B.target).toFixed(1)} (BOOK ${G.book.total})`:`PROJECTED ${A.abbr} ${A.target.toFixed(1)} · ${B.abbr} ${B.target.toFixed(1)} · TOTAL ${(A.target+B.target).toFixed(1)}`;
   const disc=t=>`<div class="badge"><div class="disc" style="background:${t.color}">${t.abbr}</div><div class="nm">${t.name}</div></div>`;
   el.innerHTML=`<div class="ic"><div class="eyebrow">SIMULATED GAME</div><div class="match">${disc(A)}<span class="at">AT</span>${disc(B)}</div>
   <div class="venue">${G.venue}</div><div class="proj">${proj}</div><div class="when">${G.when}</div>
@@ -955,7 +974,7 @@ function renderMarks(){
 function renderHow(){
   const el=document.getElementById('how'), A=G.teams[0], B=G.teams[1];
   el.innerHTML=G.sport==='nba'
-  ?`<b>Where the numbers come from.</b> Each player's points, rebounds, assists, threes and minutes are The Lab's projections for today. Team scoring is pinned to the book total (${G.book.total}) and spread (${G.book.favAbbr} −${G.book.spread}), then split among players by our projections. Each run plays about 100 possessions per team, with substitutions following projected minutes. We ran it 5,000 times and replay the run closest to the middle of the results. Shot spots and player movement are drawn for the animation, not tracking data.`
+  ?`<b>Where the numbers come from.</b> Each player's points, rebounds, assists, threes and minutes are The Lab's projections for today. Each team scores what its players project for (${G.teams[0].abbr} ${G.teams[0].target.toFixed(1)}, ${G.teams[1].abbr} ${G.teams[1].target.toFixed(1)}; the book has ${G.book.total} total, ${G.book.favAbbr} −${G.book.spread}), and the engine is tuned so every player's average over the runs matches his projection, the same numbers our picks use. Each run plays about 100 possessions per team, with substitutions following projected minutes. We ran it 5,000 times and replay the run closest to the middle of the results. Shot spots and player movement are drawn for the animation, not tracking data.`
   :`<b>Where the numbers come from.</b> Each team's pass/run mix, completion rate, yards per carry, interception rate and every player's target and carry share come from The Lab's 5,000-run projections for this game. Scoring is tuned so each team's average lands on its implied total (${B.abbr} ${B.target}, ${A.abbr} ${A.target}). Each run plays down by down with punts, field goals, turnovers and the clock. We replay the run closest to the middle of the 5,000 results. The ball path is drawn for the animation, not tracking data.`;
 }
 function renderAll(){renderBug();renderTicker();if(G&&idx===G.game.ev.length-1&&phase>=1)renderBox();if(G&&G.sport==='nfl')paintDrives();const f=document.getElementById('fill');f.style.width=(G?100*Math.max(0,idx+Math.min(1,phase))/G.game.ev.length:0)+'%'}
@@ -1018,7 +1037,7 @@ const team=(sp,a)=>TEAMS[sp][a]||[a,'#8A949E',''];
 const tm=(sp,a)=>({abbr:a,name:team(sp,a)[0],color:team(sp,a)[1]});
 let GAMES={nba:[],nfl:[]};
 function makeGames(){GAMES={
-  nba:DATA.nba.games.map(g=>{const fav=g.fav===g.home?1:0, hi=(g.total+g.spread)/2, lo=(g.total-g.spread)/2, pts=fav?[lo,hi]:[hi,lo];
+  nba:DATA.nba.games.map(g=>{const own=a=>(DATA.nba.players[a]||[]).reduce((s,p)=>s+p.pts,0), pts=[own(g.away),own(g.home)];
     return {sport:'nba',key:`nba-${g.away}-${g.home}`.toLowerCase(),src:g,when:g.start,teams:[tm('nba',g.away),tm('nba',g.home)],venue:team('nba',g.home)[2],proj:pts}}),
   nfl:DATA.nfl.games.map(g=>({sport:'nfl',key:`nfl-${g.away}-${g.home}`.toLowerCase(),src:g,when:g.kickoff,teams:[tm('nfl',g.away),tm('nfl',g.home)],venue:team('nfl',g.home)[2],
     proj:[g.teams[g.away].implied,g.teams[g.home].implied]})),
@@ -1066,7 +1085,7 @@ function card(gm,big){
 function renderHub(){
   document.querySelectorAll('[data-sport]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.sport===hubSport)));
   const L=GAMES[hubSport], f=featured(hubSport), rest=L.filter(g=>g!==f);
-  if(!f){document.getElementById('hubbody').innerHTML=`<div class="empty">${hubSport==='nba'?'No NBA games with book lines on today\'s slate yet. Sims post once the slate and lines are in.':'No NFL sims for this week yet. They post with the week\'s projections, once rosters are out.'}</div>`;return}
+  if(!f){document.getElementById('hubbody').innerHTML=`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
   const groups={};rest.forEach(g=>{const d=ETday.format(new Date(g.when));(groups[d]=groups[d]||[]).push(g)});
   document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('');
   document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{const url=shareUrl(b.dataset.key);

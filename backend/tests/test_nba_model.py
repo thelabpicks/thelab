@@ -205,3 +205,14 @@ def test_model_rows_carry_this_season_evidence_for_the_site():
     assert {"season_games", "season_starts", "season_min"} <= set(rows.columns)
     last = rows[rows.player_id == 100].sort_values("game_date").iloc[-1]
     assert last.season_starts == last.season_games == 39
+
+
+def test_rotation_lists_every_player_not_ruled_out_for_the_game_sims():
+    rows = []
+    for pid, out in ((1, False), (2, True)):
+        for market, mu in (("points", 12.0), ("rebounds", 4.0), ("assists", 3.0), ("threes", 1.5), ("pra", 19.0)):
+            rows.append({"player_id": pid, "player_name": f"P{pid}", "team": "BOS", "out": out, "market": market, "mu": mu,
+                         "min_s": 20.0, "min_exp": 15.0})
+    rot = pipeline.rotation_json(pd.DataFrame(rows))
+    assert rot == [{"player_id": "1", "player_name": "P1", "team": "BOS", "minutes": 20.0, "minutes_expected": 15.0,
+                    "pts": 12.0, "reb": 4.0, "ast": 3.0, "tpm": 1.5}]
