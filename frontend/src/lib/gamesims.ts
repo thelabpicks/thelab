@@ -298,16 +298,19 @@ export type PostedSim = {
   sport: "nfl" | "nba"; key: string; start: string; posted_at: string;
   nfl?: NflSimGame; nba?: { game: NbaSimGame; players: Record<string, NbaSimPlayer[]> }; picks: SimPick[];
 };
-/** When a game's sim posts: 10 am Eastern on game day, or 3 hours before the start if that is earlier (an international
- *  NFL game at 9:30 am Eastern posts by 6:30). Every refresh before then re-simulates the game in the background with the
- *  latest lines, injuries and projections; the first refresh at or after this time posts it, and it is locked from then
- *  on. The "Refresh data and publish site" workflow runs at 12:00, 14:00 and 15:00 UTC daily for this. */
-export function postTime(start: string): number {
+/** When a game's sim posts. NFL: 10 am Eastern on game day. NBA: with the noon Eastern refresh (16:00 UTC), after the day's
+ *  prop lines and NBA picks are in, so a posted sim already agrees with the picks on its game. Either way, 3 hours
+ *  before the start if that is earlier (an international NFL game at 9:30 am Eastern posts by 6:30). Every refresh
+ *  before then re-simulates the game in the background with the latest lines, injuries and projections; the first
+ *  refresh at or after this time posts it, and it is locked from then on. The "Refresh data and publish site" workflow
+ *  runs at 12:00, 14:00 and 15:00 UTC daily for this, and after each NBA collect (16:00 UTC). */
+export function postTime(start: string, sport: "nfl" | "nba" = "nfl"): number {
   const day = etDay(start);
   // 10 am Eastern on that day: 14:00 UTC in summer time, 15:00 UTC in winter
   const ten = [14, 15].map((h) => Date.parse(`${day}T${String(h).padStart(2, "0")}:00:00Z`))
     .find((t) => new Date(t).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }) === "10")!;
-  return Math.min(ten, Date.parse(start) - 3 * 3600e3);
+  const at = sport === "nba" ? Date.parse(`${day}T16:00:00Z`) : ten;
+  return Math.min(at, Date.parse(start) - 3 * 3600e3);
 }
 const nbaKey = (g: NbaSimGame) => `${g.away} at ${g.home} ${g.start.slice(0, 10)}`;
 
@@ -317,7 +320,7 @@ export function postSims(sims: Pick<SimGames, "nfl" | "nba" | "picks">, posted: 
   const t = now.getTime(), H = 3600e3;
   for (const [k, p] of Object.entries(posted)) if (Date.parse(p.start) < t - 72 * H) delete posted[k];
   // posted from its post time until 3 days after its start
-  const due = (_: "nfl" | "nba", start: string) => postTime(start) <= t && Date.parse(start) >= t - 72 * H;
+  const due = (sport: "nfl" | "nba", start: string) => postTime(start, sport) <= t && Date.parse(start) >= t - 72 * H;
   const picksFor = (sport: string, game: string) => sims.picks.filter((p) => p.sport === sport && p.game === game);
   const lockedPicks: SimPick[] = [];
   sims.nfl.games = sims.nfl.games.flatMap((g) => {
