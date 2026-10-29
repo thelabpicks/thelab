@@ -93,8 +93,11 @@ function findingsFor(sport: Sport, results: ReportPick[]): string[] {
   }
   for (const p of results.filter((x) => x.result === "lost").sort((a, b) => b.chance - a.chance))
     out.push(`Miss: ${p.bet} at ${pc(p.chance)}${p.potd ? " (pick of the day)" : ""}. ${p.actual ?? ""}.`.replace(/\.\.$/, "."));
-  const dnp = results.filter((p) => p.result === "void" && !withdrawn(p));
+  const voids = results.filter((p) => p.result === "void" && !withdrawn(p));
+  const dnp = voids.filter((p) => !p.actual || p.actual === "Did not play");
   if (dnp.length) out.push(`${dnp.length === 1 ? "One pick was" : `${dnp.length} picks were`} void because the player did not play (${dnp.map((p) => p.bet.split(" ").slice(0, 2).join(" ")).join(", ")}). Void picks never count.`);
+  // other voids say why themselves (a misread line, for one)
+  for (const p of voids.filter((x) => !dnp.includes(x))) out.push(`${p.actual!.replace(/^Void: /, "Void: ").replace(/\.$/, "")}: ${p.bet}. Void picks never count.`);
   for (const p of results.filter(withdrawn)) out.push(`Withdrawn before kickoff: ${p.bet}. ${p.actual!.replace(/^Withdrawn before kickoff: (the )?/, "Reason: ")}. Withdrawn picks never count.`);
   const waiting = results.filter((p) => !p.result);
   if (waiting.length) out.push(`${waiting.length} ${waiting.length === 1 ? "pick is" : "picks are"} waiting on a final stat line: ${waiting.map((p) => p.bet).join("; ")}. ${waiting.length === 1 ? "It is" : "They are"} graded on the next refresh after the result posts.`);

@@ -24,6 +24,7 @@ describe("buildReport", () => {
       daily({ id: "a", rank: 1, result: "won", actual: "Finished with 2" }),                  // also on the top 10
       daily({ id: "d", rank: 4, result: "lost", actual: "Finished with 9", game_id: "2" }),   // pick of the day only
       daily({ id: "w", sport: "cfb", result: "void", actual: "Withdrawn before kickoff: under the 60% floor for a pick of the day", withdrawn: true }),
+      daily({ id: "v", game_id: "4", result: "void", actual: "Void: not a pregame DraftKings line" }),
       daily({ id: "t", date: "2026-10-28", kickoff: "2026-10-28T23:00:00Z", game_id: "3" }),
     ],
   };
@@ -34,7 +35,7 @@ describe("buildReport", () => {
 
   it("dates the report by the morning and grades the day before", () => {
     expect([r.date, r.results_date]).toEqual(["2026-10-28", "2026-10-27"]);
-    expect(nba.results.map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+    expect(nba.results.map((p) => p.id)).toEqual(["a", "b", "c", "d", "v"]);
   });
   it("counts top 10 and picks of the day separately; a pick of the day keeps no top 10 rank", () => {
     expect(nba.day.top10).toMatchObject({ won: 1, lost: 1 });
@@ -48,6 +49,8 @@ describe("buildReport", () => {
     expect(nba.late.map((p) => p.id)).toEqual(["old"]);
     expect(r.sports.find((s) => s.sport === "cfb")!.findings[0]).toMatch(/^Withdrawn before kickoff: w\. Reason: under the 60% floor/);
     expect(nba.today.map((p) => p.id)).toEqual(["t"]);
+    expect(nba.findings).toContain("Void: not a pregame DraftKings line: v. Void picks never count.");
+    expect(nba.findings.some((f) => f.includes("did not play"))).toBe(false);
   });
   it("sums up the day and remembers what is graded", () => {
     expect(r.headline).toBe("Tue, Oct 27: CFB 1 void, NBA 1-2 with 1 pending.");
