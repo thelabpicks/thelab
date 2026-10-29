@@ -220,6 +220,11 @@ def prop_targets(rows: list[dict], teams: dict) -> list[tuple[str, str, str]]:
     return [w for _, w in sorted(picks, key=lambda x: -x[0])]
 
 
+def plausible_line(line: float, mean: float) -> bool:
+    """A main prop line sits near what the player normally does; far off means a milestone or in-game bet."""
+    return abs(line - mean) <= max(3.0, 0.3 * mean)
+
+
 def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, odds: dict, due_markets: set[str]) -> list[dict]:
     played = f[f.played].sort_values("game_date")
     last = {m: played.groupby("player_id")[m].apply(lambda s: s.tail(10).tolist()[::-1]) for m in props.MARKETS}
@@ -231,6 +236,8 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
         m = r.market
         offers = odds["props"].get((_norm(r.player_name), m), [])
         dk_line = odds.get("dk", {}).get((str(int(r.player_id)), m))
+        if dk_line is not None and not plausible_line(dk_line, r.mu):
+            dk_line = None  # a milestone or in-game line slipped through: Curry at 2 points is never his main line
         book_line = _consensus_line(offers)
         if book_line is None:
             book_line = dk_line

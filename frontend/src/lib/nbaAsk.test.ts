@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { answer } from "./nbaAsk";
-import { starsOf, type NbaRow, type Slate } from "./nba";
+import { onDraftKings, starsOf, type NbaRow, type Slate } from "./nba";
 
 const cdf = (mu: number) => Array.from({ length: 80 }, (_, k) => {
   // Poisson CDF, good enough for routing tests
@@ -54,6 +54,18 @@ describe("nba ask", () => {
   it("counts DraftKings' line from ESPN as a DraftKings line when no prices were bought", () => {
     const s2: Slate = { ...slate, rows: slate.rows.map((r) => ({ ...r, offers: [], dk_line: r.line })) };
     expect(answer("best bets tonight", s2).items.length).toBeGreaterThan(0);
+  });
+  it("never treats a milestone or in-game line from ESPN as DraftKings' line", () => {
+    const r = slate.rows.find((x) => x.market === "points")!;
+    const dk = (line: number) => onDraftKings({ ...r, line, dk_line: line, offers: [], line_source: "book" });
+    expect(dk(Math.floor(r.mean) + 0.5)).toBe(true);
+    expect(dk(2)).toBe(false);             // Curry over 2 points
+    expect(dk(2.5)).toBe(false);           // far below what he does, even at .5
+    expect(dk(r.mean + 20.5)).toBe(false); // Castle under 45
+    expect(dk(Math.round(r.mean))).toBe(false);
+    // a whole-number line a book actually priced is fine
+    const whole = Math.round(r.mean);
+    expect(onDraftKings({ ...r, line: whole, dk_line: null, line_source: "book", offers: [{ book: "draftkings", side: "over", line: whole, price: -110 }] })).toBe(true);
   });
   it("builds its own parlays from stars with a DraftKings line only", () => {
     const noDk = { offers: [{ book: "bovada", side: "under" as const, line: 30.5, price: -110 }] };
