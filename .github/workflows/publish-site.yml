@@ -247,6 +247,16 @@ jobs:
           SIM_ARCHIVE: ${{ github.workspace }}/pick-archive/gamesims
         run: npx vite-node scripts/game-sims.ts || echo "::warning::Game simulation inputs were not written this run"
 
+      # Every NBA and NFL game sim is frozen at its start and graded against ESPN's final box score once the game is over
+      # (winner, each team's points, the total, every player's stats). The grades feed the daily report and the Sims
+      # page's track record; the archive is kept on the nfl-data branch. A failure leaves the last grades in place.
+      - name: Grade the game simulations
+        working-directory: frontend
+        env:
+          LAB_DATA: ${{ github.workspace }}/site-data
+          SIM_ARCHIVE: ${{ github.workspace }}/pick-archive/gamesims
+        run: npx vite-node scripts/sim-grades.ts || echo "::warning::Game simulations were not graded this run"
+
       # The daily model report posted to the "Daily model report" issue each morning (lab-ops.yml; not on the site): how the picks and every lean did on
       # yesterday's games, where the predictions were off and why, and what the models changed in themselves. Every run
       # rewrites today's report, so the 4 am Central run (after the 09:00 UTC NBA collect) writes the first one.

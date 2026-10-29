@@ -15,7 +15,7 @@ import type { LabState } from "../src/lib/lab";
 import type { NbaPrevious, NbaRecord, NbaStatus } from "../src/lib/nba";
 import type { CfbPrevious, CfbRecord } from "../src/lib/cfb";
 import type { LiveRecord } from "../src/components/LiveRecord";
-import { buildReport, reportText, type DailyReport } from "../src/lib/report";
+import { buildReport, reportText, type DailyReport, type SimGradesFile } from "../src/lib/report";
 
 const DATA = path.resolve(process.env.LAB_DATA || "../site-data");
 const ARCHIVE = path.resolve(process.env.LAB_ARCHIVE || "../data/lab");
@@ -45,6 +45,7 @@ if (!state) {
     nfl: data<LiveRecord>(staticKey("/backtest/live")),
     nba: { record: data<NbaRecord>("nba/record.json"), status: data<NbaStatus>("nba/status.json"), previous: data<NbaPrevious>("nba/previous.json") },
     cfb: { record: data<CfbRecord>("cfb/record.json"), previous: data<CfbPrevious>("cfb/previous.json") },
+    sims: data<SimGradesFile>("sims/grades.json"),
   }, now);
   fs.writeFileSync(path.join(DIR, `${report.date}.json`), JSON.stringify(report));
   fs.writeFileSync(path.join(DIR, `${report.date}.txt`), reportText(report));

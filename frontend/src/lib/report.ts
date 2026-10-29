@@ -3,6 +3,7 @@
    models changed in themselves (refits, corrections tested and adopted or rejected). Built by scripts/lab-report.ts on
    every site refresh from the files the pages already publish; the 4 am Central refresh is the first one each day.
    Pure: no file access here. */
+import { gradeLine, type SimGrade, type SimSummary } from "./simgrades";
 import { SPORTS, SPORT_LABEL, playDate, tally, type DailyPick, type LabPick, type LabRecord, type LabState, type Sport } from "./lab";
 import type { NbaPrevious, NbaRecord, NbaStatus } from "./nba";
 import type { CfbPrevious, CfbRecord } from "./cfb";
@@ -29,6 +30,8 @@ export type SportReport = {
   postgame: string[];
   /** What the models changed in themselves: refits, corrections tested and adopted or rejected. */
   improving: string[];
+  /** Each game simulation graded against the final (NBA and NFL), and how the sims are running over 30 days. */
+  sims?: string[];
 };
 export type DailyReport = {
   /** The morning the report is for (Central time); results are from the day before. */
@@ -46,7 +49,26 @@ export type ReportInputs = {
   nba?: { record?: NbaRecord | null; status?: NbaStatus | null; previous?: NbaPrevious | null };
   cfb?: { record?: CfbRecord | null; previous?: CfbPrevious | null };
   previous?: DailyReport | null;
+  sims?: SimGradesFile | null;
 };
+/** site-data/sims/grades.json (scripts/sim-grades.ts). */
+export type SimGradesFile = { last30: Partial<Record<"nba" | "nfl", SimSummary | null>>; games: SimGrade[] };
+
+/** The results day's graded game sims, and the 30-day picture: winners, points miss and lean (vs the book's miss), and
+ *  the player stat that ran furthest from its projections. */
+function simLines(f: SimGradesFile | null | undefined, sport: "nba" | "nfl", day: string): string[] {
+  if (!f) return [];
+  const out = f.games.filter((g) => g.sport === sport && playDate(g.start) === day).map(gradeLine);
+  const s = f.last30[sport];
+  if (s) {
+    const worst = [...s.stats].sort((a, b) => Math.abs(b.bias) / Math.max(b.miss, 0.1) - Math.abs(a.bias) / Math.max(a.miss, 0.1))[0];
+    const lean = (x: number) => `${x > 0 ? "+" : ""}${x}`;
+    out.push(`Last 30 days: ${s.games} games, winner right in ${s.winners} (${Math.round((100 * s.winners) / s.games)}%); each team's points missed by ${s.team_miss} on average`
+      + `${s.book_miss != null ? ` (the book's line by ${s.book_miss})` : ""}, running ${lean(s.team_bias)} vs projected.`
+      + (worst ? ` Furthest-leaning stat: ${worst.label}, ${lean(worst.bias)} per player vs projected.` : ""));
+  }
+  return out;
+}
 
 const DAY_MS = 864e5;
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -220,6 +242,7 @@ export function buildReport(i: ReportInputs, now: Date): DailyReport {
       record: { top10: tally(asLab(top(graded))), potd: tally(asLab(pot(graded))) },
       day: { top10: tally(asLab(top(results))), potd: tally(asLab(pot(results))) },
       results, late, pending, today, findings, ...sec,
+      ...(sport === "cfb" ? {} : { sims: simLines(i.sims, sport, results_date) }),
     };
   });
   const played = sports.filter((s) => s.results.length);
@@ -251,6 +274,7 @@ export function reportText(r: DailyReport): string {
     part("How the model did", s.model);
     part("Where it was off and why", s.postgame);
     part("Model changes", s.improving);
+    part("Game sims vs the final", s.sims ?? []);
   }
   return lines.join("\n");
 }

@@ -44,7 +44,7 @@ describe("game sim inputs", () => {
       games: [{ game_id: 1, date: "2026-10-29", time: "2026-10-30T00:00Z", home: "H", away: "V", total: 230.5, home_spread: 4.5 },
         { game_id: 2, date: "2026-10-29", time: "2026-10-30T00:00Z", home: "X", away: "Y", total: null, home_spread: null }] } as unknown as Slate;
     const out = nbaSimGames(slate);
-    expect(out.games).toEqual([{ away: "V", home: "H", start: "2026-10-30T00:00Z", total: 230.5, fav: "V", spread: 4.5 }]);
+    expect(out.games).toEqual([{ away: "V", home: "H", start: "2026-10-30T00:00Z", total: 230.5, fav: "V", spread: 4.5, espn_id: "1" }]);
     expect(out.players.H).toHaveLength(8);
     expect(out.players.H[0]).toMatchObject({ min: 37, pts: 19, reb: 5 });
   });
@@ -140,6 +140,8 @@ describe("game sim inputs", () => {
     expect(new Date(postTime("2026-10-25T17:00:00Z")).toISOString()).toBe("2026-10-25T14:00:00.000Z");   // 1 pm EDT: 10 am EDT
     expect(new Date(postTime("2026-10-26T13:30:00Z")).toISOString()).toBe("2026-10-26T10:30:00.000Z");   // London 9:30 am: 3 hours before
     expect(new Date(postTime("2026-10-30T00:15:00Z")).toISOString()).toBe("2026-10-29T14:00:00.000Z");   // Thursday night: Thursday 10 am
+    expect(new Date(postTime("2026-10-29T23:00:00Z", "nba")).toISOString()).toBe("2026-10-29T16:00:00.000Z");   // NBA 7 pm: after the noon picks
+    expect(new Date(postTime("2026-11-01T18:00:00Z", "nba")).toISOString()).toBe("2026-11-01T15:00:00.000Z");   // NBA 1 pm EST: 3 hours before
 
     const g = (id: string, kickoff: string, implied: number) => ({ id, away: "A", home: "B", kickoff, teams: { A: { implied, players: [] }, B: { implied, players: [] } } });
     const nbaGame = { away: "V", home: "H", start: "2026-10-29T23:00:00Z", total: 220, fav: "H", spread: 2 };
@@ -154,12 +156,15 @@ describe("game sim inputs", () => {
     postSims(early, posted, new Date("2026-10-29T13:00:00Z"));
     expect(early.nfl.games).toEqual([]);
     expect(early.nba.games).toEqual([]);
-    // 10 am: Thursday's games post
+    // 10 am: Thursday's NFL game posts; the NBA game waits for the noon picks refresh
     const ten = sims(21, 18);
     postSims(ten, posted, new Date("2026-10-29T14:05:00Z"));
     expect(ten.nfl.games.map((x) => x.id)).toEqual(["thu"]);
-    expect(ten.nba.games).toHaveLength(1);
-    expect(ten.picks).toHaveLength(1);
+    expect(ten.nba.games).toEqual([]);
+    const noon = sims(21, 18);
+    postSims(noon, posted, new Date("2026-10-29T16:10:00Z"));
+    expect(noon.nba.games).toHaveLength(1);
+    expect(noon.picks).toHaveLength(1);
     // a later refresh with new numbers and no picks: the posted versions stay exactly as posted
     const later = sims(27, 25);
     later.picks = [];
