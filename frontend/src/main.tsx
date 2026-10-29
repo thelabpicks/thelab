@@ -41,6 +41,7 @@ import Previous from "./pages/Previous";
 import NbaPrevious from "./pages/nba/NbaPrevious";
 import CfbPrevious from "./pages/cfb/CfbPrevious";
 import CfbPlayer from "./pages/cfb/CfbPlayer";
+import Sims from "./pages/Sims";
 import { EmptyState } from "./components/ui";
 import { STATIC } from "./lib/api";
 
@@ -75,6 +76,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="settings" element={<SettingsPage />} />
               <Route path="top10" element={<LabPicks />} />
               <Route path="previous" element={<Previous />} />
+              <Route path="sims" element={<Sims sport="nfl" />} />
+              <Route path="sims/:game" element={<Sims sport="nfl" />} />
               <Route path="nba" element={<NbaHome />} />
               <Route path="nba/props" element={<NbaProps />} />
               <Route path="nba/builder" element={<NbaBuilder />} />
@@ -83,6 +86,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="nba/record" element={<NbaRecord />} />
               <Route path="nba/how" element={<NbaHow />} />
               <Route path="nba/previous" element={<NbaPrevious />} />
+              <Route path="nba/sims" element={<Sims sport="nba" />} />
+              <Route path="nba/sims/:game" element={<Sims sport="nba" />} />
               <Route path="cfb" element={<CfbHome />} />
               <Route path="cfb/game/:id" element={<CfbGame />} />
               <Route path="cfb/ask" element={<CfbAsk />} />
@@ -94,6 +99,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="cfb/parlay" element={<CfbParlay />} />
               <Route path="cfb/games" element={<CfbGames />} />
               <Route path="cfb/previous" element={<CfbPrevious />} />
+              <Route path="cfb/sims" element={<Sims sport="cfb" />} />
               <Route path="cfb/players/:id" element={<CfbPlayer />} />
               <Route path="*" element={<EmptyState title="Page not found">That route does not exist.</EmptyState>} />
             </Route>

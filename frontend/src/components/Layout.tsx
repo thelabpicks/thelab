@@ -2,7 +2,7 @@ import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
+  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, MonitorPlay, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
@@ -16,7 +16,7 @@ type NavItem = { to: string; label: string; short?: string; icon: typeof LayoutD
 type NavSection = { title: string; items: NavItem[] };
 
 /** Every sport gets the NFL tab's menu: the same sections, the same items in the same order, and the same mobile bar
- *  (Home, Props, Ask, Parlay, More). Only the sport's own research pages differ. */
+ *  (Home, Sims, Ask, Parlay, More). Only the sport's own research pages differ. */
 function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavSection[] {
   return [
     { title: "Picks", items: [
@@ -24,6 +24,7 @@ function sportNav(base: string, home: string, research: NavItem[], links: { parl
       { to: `${base}/ask`, label: "Ask", icon: MessageCircleQuestion },
       { to: links.parlay, label: "Parlay builder", short: "Parlay", icon: Dices },
     ] },
+    { title: "Watch", items: [{ to: `${base}/sims`, label: "Game Simulations", short: "Sims", icon: MonitorPlay }] },
     { title: "Research", items: [{ to: `${base}/props`, label: "Player props", short: "Props", icon: SlidersHorizontal }, ...research] },
     { title: "Proof", items: [
       { to: links.how, label: "How it works", icon: BookOpen },
@@ -44,7 +45,7 @@ const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
   ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
   nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
 };
-// Mobile bar: Home, Player props, Ask, Parlay builder (then More), whatever the sport.
+// Mobile bar: Home, Game Simulations, Ask, Parlay builder (then More, which holds Player props), whatever the sport.
 const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];
 
 type Sport = "nfl" | "nba" | "cfb";

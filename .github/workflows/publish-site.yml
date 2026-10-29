@@ -204,6 +204,15 @@ jobs:
           npm ci
           npx vite-node scripts/lab-picks.ts || echo "::warning::The Lab's top 10 was not rebuilt this run"
 
+      # Game Simulations page inputs: the newest NFL week of pregame sims (nfl-data branch, sims/) and today's NBA slate.
+      # A failure leaves the page without games for this run; the site still publishes.
+      - name: Write the game simulation inputs
+        working-directory: frontend
+        env:
+          LAB_DATA: ${{ github.workspace }}/site-data
+          SIMS_DIR: ${{ github.workspace }}/pick-archive/sims
+        run: npx vite-node scripts/game-sims.ts || echo "::warning::Game simulation inputs were not written this run"
+
       # The daily model report posted to Andrew each morning (not on the site): how the picks and every lean did on
       # yesterday's games, where the predictions were off and why, and what the models changed in themselves. Every run
       # rewrites today's report, so the 4 am Central run (after the 09:00 UTC NBA collect) writes the first one.
