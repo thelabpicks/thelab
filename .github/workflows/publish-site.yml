@@ -36,6 +36,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Optional repository variables that pin a season; unset, each rolls over by date (engine/nba/cfb sources.py).
+      NFL_SEASON: ${{ vars.NFL_SEASON }}
+      NBA_SEASON: ${{ vars.NBA_SEASON }}
+      CFB_SEASON: ${{ vars.CFB_SEASON }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4

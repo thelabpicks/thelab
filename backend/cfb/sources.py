@@ -14,11 +14,14 @@ import os
 from pathlib import Path
 
 from engine import paths
+from engine.sources import season_for
 
 REPO = "https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/main"
 RELEASES = "https://github.com/sportsdataverse/sportsdataverse-data/releases/download"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
-CURRENT_SEASON = 2026
+# The new season takes over on September 1, after Week 0 and before Labor Day weekend; CFB_SEASON (a repository
+# variable) pins a season instead.
+CURRENT_SEASON = season_for(None, "CFB_SEASON", (9, 1))
 FIRST_SEASON = 2010       # ratings need a run-in; games are scored from 2014 on
 FIRST_TEST_SEASON = 2014
 PROP_SEASONS = 3          # player game logs: this season and the two before

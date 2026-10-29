@@ -21,7 +21,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import db, paths, status
+from . import db, paths, sources, status
 from .util import utcnow
 
 API = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
@@ -285,7 +285,7 @@ def maybe_fetch(c: sqlite3.Connection, season: int, log=print, force: bool = Fal
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--season", type=int, default=2026)
+    ap.add_argument("--season", type=int, default=sources.current_season())
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args(argv)
     c = db.connect(paths.db_path())

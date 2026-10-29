@@ -24,6 +24,10 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    env:
+      # Optional repository variable (Settings → Secrets and variables → Actions → Variables) that pins the season,
+      # e.g. 2028 for 2027-28. Unset, the season rolls over by date on October 25 (nba/sources.py).
+      NBA_SEASON: ${{ vars.NBA_SEASON }}
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
