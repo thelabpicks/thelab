@@ -37,7 +37,7 @@ from . import db, gamesim, paths, picklog, props
 from .util import utcnow
 
 INPUT_COLS = ["player_id", "player_name", "position", "team", "spread_for", "team_implied_total", "team_attempts_pg",
-              "team_carries_pg", "team_targets_pg", "targets_share", "carries_share", "catch_rate", "ypt", "ypc", "attempts_pg",
+              "team_carries_pg", "team_targets_pg", "targets_share", "carries_share", "last_carries_share", "catch_rate", "ypt", "ypc", "attempts_pg",
               "pass_tds_pg", "interceptions_pg", "opp_attempts_mult", "opp_carries_mult", "opp_targets_mult",
               "opp_receptions_mult", "opp_rec_yards_mult", "opp_rush_yards_mult", "opp_interceptions_mult", "opp_pass_tds_mult",
               "has_history", "snap_pct", "status", "report_status"]
@@ -162,7 +162,7 @@ def _layers(inputs: list[dict], box: pd.DataFrame, gid: str, vol: dict) -> dict[
     for r in vol_:
         a = actual(r["player_id"])
         roles.append(dict(r, targets_share=float(a.targets) / max(vol["targets"], 1.0), carries_share=float(a.carries) / max(vol["carries"], 1.0),
-                          attempts_pg=float(a.attempts), opp_targets_mult=1.0, opp_carries_mult=1.0))
+                          last_carries_share=None, attempts_pg=float(a.attempts), opp_targets_mult=1.0, opp_carries_mult=1.0))
     out["roles"] = roles
     eff = []
     for r in roles:
