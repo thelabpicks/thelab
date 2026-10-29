@@ -4,7 +4,7 @@ Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 10-2 +5.67u / 3-1 +1.29u
   CFB: 15-3 +0.64u / 3-0 +0.71u
-  NBA: 3-0 +1.84u / 2-0 +1.36u
+  NBA: 7-1 +3.98u / 5-0 +3.50u
 
 NFL
   Picks
@@ -31,13 +31,18 @@ CFB
 
 NBA
   Picks
+    - Surest hit: Austin Reaves under 7.5 assists (78%), finished with 1.
+    - Miss: Cooper Flagg under 6.5 assists at 78%. Finished with 8.
     - Void: not a pregame DraftKings line: Stephon Castle under 45 points. Void picks never count.
-    - 5 picks are waiting on a final stat line: Duncan Robinson under 3.5 threes made; CJ McCollum under 2.5 threes made; Trae Young under 2.5 threes made; Cooper Flagg under 6.5 assists; Austin Reaves under 7.5 assists. They are graded on the next refresh after the result posts.
     - Graded since the last report: Javon Small under 2.5 threes made (void).
+  How the model did
+    - Every lean the model made on 12 games: 539-343 (61%). By confidence: 70%+ hit 79% of 190, 60-70% hit 65% of 272, under 60% hit 50% of 420.
+    - Unders 63% (612), overs 57% (270).
+    - Furthest off among confident leans: Quentin Grimes pra (projected 13.6, had 31, line 20.5); Ajay Mitchell points (projected 14.7, had 29, line 22); Quentin Grimes points (projected 9, had 23, line 12.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 482 of 1098 losing leans would have been right, so minutes caused 44% of the misses and production the rest (last 2 weeks).
-    - Minutes ran −1.7 per player vs the projection (typical miss 5.9).
-    - Team scoring: rotations scored −0.3 points per team vs projected (typical miss 12.5).
+    - Re-run with the minutes players really got, 633 of 1444 losing leans would have been right, so minutes caused 44% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.5 per player vs the projection (typical miss 5.7).
+    - Team scoring: rotations scored −0.7 points per team vs projected (typical miss 12.1).
   Model changes
-    - Refit this morning on every box score through 2026-10-27; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Refit this morning on every box score through 2026-10-28; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
