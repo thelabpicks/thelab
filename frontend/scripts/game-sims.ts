@@ -19,14 +19,18 @@ function readJson<T>(file: string): T | null {
 // newest frozen week: file names are {season}-wNN.json, so the last one in sorted order
 const weekFile = fs.existsSync(SIMS) ? fs.readdirSync(SIMS).filter((f) => /^\d{4}-w\d{2}\.json$/.test(f)).sort().at(-1) : undefined;
 const held: SimGames["held"] = [];
+const fixed: SimGames["fixed"] = [];
 const out: SimGames = {
   generated_at: new Date().toISOString(),
   held,
-  nfl: nflSimGames(weekFile ? readJson<FrozenWeek>(path.join(SIMS, weekFile)) : null, held),
-  nba: nbaSimGames(readJson<Slate>(path.join(DATA, "nba", "slate.json")), held),
+  fixed,
+  nfl: nflSimGames(weekFile ? readJson<FrozenWeek>(path.join(SIMS, weekFile)) : null, held, fixed),
+  nba: nbaSimGames(readJson<Slate>(path.join(DATA, "nba", "slate.json")), held, fixed),
 };
 fs.mkdirSync(path.join(DATA, "sims"), { recursive: true });
 fs.writeFileSync(path.join(DATA, "sims", "games.json"), JSON.stringify(out));
-// games whose inputs failed a sanity check stay off the page until the next run fixes them
+// a game that failed a check was corrected and checked again; one that still fails stays off the page until a later
+// run's fresh data passes
+for (const f of fixed) console.log(`::notice::Game sim corrected (${f.sport} ${f.game}): ${f.fixes.join("; ")}`);
 for (const h of held) console.log(`::warning::Game sim held back (${h.sport} ${h.game}): ${h.reasons.join("; ")}`);
 console.log(`game sims: NFL ${out.nfl.season ?? "-"} week ${out.nfl.week ?? "-"} ${out.nfl.games.length} games, NBA ${out.nba.date ?? "-"} ${out.nba.games.length} games`);

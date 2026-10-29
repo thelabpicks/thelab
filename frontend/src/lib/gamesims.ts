@@ -20,11 +20,14 @@ export type NflSimPlayer = { id: string; name: string; pos: string } & Partial<R
 export type NflSimGame = { id: string; away: string; home: string; kickoff: string | null; teams: Record<string, { implied: number; players: NflSimPlayer[] }> };
 export type NbaSimPlayer = { name: string; min: number; pts: number; reb: number; ast: number; tpm: number; bench?: true };
 export type NbaSimGame = { away: string; home: string; start: string; total: number; fav: string; spread: number };
-/** A game left off the page because its inputs failed a sanity check (shown nowhere, logged by the publish run). */
+/** A game left off the page because its inputs failed a sanity check even after repairs (logged by the publish run). */
 export type HeldGame = { sport: "nfl" | "nba"; game: string; reasons: string[] };
+/** A game whose inputs failed a check and were corrected, then passed every check (logged by the publish run). */
+export type FixedGame = { sport: "nfl" | "nba"; game: string; fixes: string[] };
 export type SimGames = {
   generated_at: string;
   held: HeldGame[];
+  fixed: FixedGame[];
   nfl: { season: number | null; week: number | null; games: NflSimGame[] };
   nba: { date: string | null; games: NbaSimGame[]; players: Record<string, NbaSimPlayer[]> };
 };
@@ -117,7 +120,65 @@ export function nbaChecks(g: NbaSimGame, players: SimGames["nba"]["players"], pr
   return bad;
 }
 
-export function nflSimGames(week: FrozenWeek | null, held: HeldGame[] = []): SimGames["nfl"] {
+/** Scales a player's passing line to `k` times its volume (attempts, completions, yards, touchdowns, interceptions). */
+function scalePassing(p: NflSimPlayer, k: number) {
+  for (const s of ["attempts", "completions", "pass_yards", "pass_tds", "interceptions"] as const) if (p[s] != null) p[s] = r2(p[s]! * k);
+}
+
+/** Corrects what a failed check can be corrected from (the game is checked again after): a projection past the extreme
+ *  caps is cut to the cap, a quarterback's volume outside 20-50 attempts (but within 12-60) is pulled to the nearest
+ *  end with his yards in proportion, and receivers' yards are re-pinned to the quarterback's passing yards when the two
+ *  disagree by up to 2.5x. An implied total outside 10-40 is bad data and is not guessed at. Returns what was changed. */
+export function repairNfl(g: NflSimGame): string[] {
+  const fixes: string[] = [];
+  for (const [t, v] of Object.entries(g.teams)) {
+    for (const p of v.players) {
+      if ((p.pass_yards ?? 0) > 400) { fixes.push(`${t} ${p.name} passing yards ${p.pass_yards} capped at 400`); scalePassing(p, 400 / p.pass_yards!); }
+      for (const s of ["rush_yards", "rec_yards"] as const) {
+        if ((p[s] ?? 0) > 160) { fixes.push(`${t} ${p.name} ${s.replace("_", " ")} ${p[s]} capped at 160`); p[s] = 160; }
+      }
+    }
+    const qb = v.players.find((p) => (p.attempts ?? 0) > 5)!;
+    const att = qb.attempts ?? 0;
+    if ((att < 20 && att >= 12) || (att > 50 && att <= 60)) {
+      const to = att < 20 ? 20 : 50;
+      fixes.push(`${t} QB ${qb.name} attempts ${att} set to ${to}`);
+      scalePassing(qb, to / att);
+    }
+    const rec = v.players.reduce((s, p) => s + (p.rec_yards ?? 0), 0);
+    const k = qb.pass_yards && rec ? qb.pass_yards / rec : 1;
+    if (Math.abs(k - 1) > 0.3 && k >= 0.4 && k <= 2.5) {
+      fixes.push(`${t} receiving yards ${Math.round(rec)} re-pinned to ${Math.round(qb.pass_yards!)} passing yards`);
+      for (const p of v.players) if (p.rec_yards) p.rec_yards = r2(Math.min(160, p.rec_yards * k));
+    }
+  }
+  return fixes;
+}
+
+/** Corrects a failed NBA game's inputs (checked again after): a player past 44 minutes is cut to 44 with his stats in
+ *  proportion, and a team whose players' points miss the book's number by 15% or more (but less than half again) has
+ *  every player's points and threes scaled to it, keeping each one's share. Returns what was changed. */
+export function repairNba(g: NbaSimGame, players: SimGames["nba"]["players"]): string[] {
+  const fixes: string[] = [];
+  const target = nbaTargets(g);
+  [g.away, g.home].forEach((t, i) => {
+    let ps = players[t].map((p) => {
+      if (p.min <= 44) return p;
+      const k = 44 / p.min;
+      fixes.push(`${t} ${p.name} minutes ${p.min} cut to 44`);
+      return { ...p, min: 44, pts: r2(p.pts * k), reb: r2(p.reb * k), ast: r2(p.ast * k), tpm: r2(p.tpm * k) };
+    });
+    const pts = ps.reduce((s, p) => s + p.pts, 0), k = target[i] / pts;
+    if ((k < 1 / 1.15 || k > 1 / 0.85) && k >= 0.65 && k <= 1.5) {
+      fixes.push(`${t} points ${Math.round(pts)} scaled to the book's ${target[i].toFixed(1)}`);
+      ps = ps.map((p) => ({ ...p, pts: r2(p.pts * k), tpm: r2(p.tpm * k) }));
+    }
+    players[t] = ps;
+  });
+  return fixes;
+}
+
+export function nflSimGames(week: FrozenWeek | null, held: HeldGame[] = [], fixed: FixedGame[] = []): SimGames["nfl"] {
   if (!week) return { season: null, week: null, games: [] };
   const games: NflSimGame[] = [];
   for (const [id, g] of Object.entries(week.games)) {
@@ -126,15 +187,21 @@ export function nflSimGames(week: FrozenWeek | null, held: HeldGame[] = []): Sim
     const a = nflTeam(g.teams[away]), h = nflTeam(g.teams[home]);
     if (!a || !h) { held.push({ sport: "nfl", game: id, reasons: ["missing a passer, ball carriers, targets or implied total"] }); continue; }
     const game: NflSimGame = { id, away, home, kickoff: g.kickoff, teams: { [away]: a, [home]: h } };
-    const bad = nflChecks(game);
-    if (bad.length) held.push({ sport: "nfl", game: id, reasons: bad });
-    else games.push(game);
+    let bad = nflChecks(game);
+    if (bad.length) {
+      // a failed check is corrected and checked again; only a game that still fails is held back
+      const fixes = repairNfl(game);
+      bad = nflChecks(game);
+      if (bad.length) { held.push({ sport: "nfl", game: id, reasons: fixes.length ? [...bad, `still failing after: ${fixes.join("; ")}`] : bad }); continue; }
+      fixed.push({ sport: "nfl", game: id, fixes });
+    }
+    games.push(game);
   }
   games.sort((x, y) => (x.kickoff ?? "").localeCompare(y.kickoff ?? "") || x.id.localeCompare(y.id));
   return { season: week.season, week: week.week, games };
 }
 
-export function nbaSimGames(slate: Slate | null, held: HeldGame[] = []): SimGames["nba"] {
+export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: FixedGame[] = []): SimGames["nba"] {
   if (!slate) return { date: null, games: [], players: {} };
   const by = new Map<string, Map<string, NbaSimPlayer>>();
   for (const r of slate.rows) {
@@ -162,9 +229,14 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = []): SimGame
     if (!players[g.home] || !players[g.away]) { held.push({ sport: "nba", game: key, reasons: ["fewer than 7 projected players on a team"] }); continue; }
     // home_spread is the home side's line: negative when the home team is favored
     const game: NbaSimGame = { away: g.away, home: g.home, start: g.time, total: g.total, fav: g.home_spread <= 0 ? g.home : g.away, spread: Math.abs(g.home_spread) };
-    const bad = nbaChecks(game, players, projected);
-    if (bad.length) held.push({ sport: "nba", game: key, reasons: bad });
-    else games.push(game);
+    let bad = nbaChecks(game, players, projected);
+    if (bad.length) {
+      const fixes = repairNba(game, players);
+      bad = nbaChecks(game, players, projected);
+      if (bad.length) { held.push({ sport: "nba", game: key, reasons: fixes.length ? [...bad, `still failing after: ${fixes.join("; ")}`] : bad }); continue; }
+      fixed.push({ sport: "nba", game: key, fixes });
+    }
+    games.push(game);
   }
   games.sort((x, y) => x.start.localeCompare(y.start) || x.home.localeCompare(y.home));
   const playing = new Set(games.flatMap((g) => [g.home, g.away]));
