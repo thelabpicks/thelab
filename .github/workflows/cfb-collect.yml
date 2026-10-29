@@ -21,6 +21,9 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    env:
+      # Optional repository variable that pins the season; unset, it rolls over on September 1 (cfb/sources.py).
+      CFB_SEASON: ${{ vars.CFB_SEASON }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

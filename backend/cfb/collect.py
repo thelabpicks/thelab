@@ -183,6 +183,51 @@ def save_espn(day: str, log=print) -> dict:
     return out
 
 
+FINALS_DAYS = 4
+
+
+def save_finals(day: str, log=print) -> dict:
+    """Final scores from ESPN's scoreboard for the FINALS_DAYS days before `day`. cfbfastR posts weeknight finals about
+    a day late; these let the pipeline grade frozen picks the next morning anyway (see pipeline.with_espn_finals)."""
+    end = datetime.fromisoformat(day) - timedelta(days=1)
+    start = end - timedelta(days=FINALS_DAYS - 1)
+    url = f"{sources.ESPN}/scoreboard"
+    events: dict = {}
+    try:
+        data, _ = _get_json(url, {"dates": f"{start:%Y%m%d}-{end:%Y%m%d}", "groups": "80", "limit": "500"})
+        events = {e.get("id"): e for e in data.get("events", [])}  # type: ignore[union-attr]
+    except Exception as ex:  # noqa: BLE001 - fall back to one call per day
+        log(f"cfb: finals range refused ({ex}); asking day by day")
+        for i in range(FINALS_DAYS):
+            try:
+                data, _ = _get_json(url, {"dates": f"{start + timedelta(days=i):%Y%m%d}", "groups": "80"})
+                events.update({e.get("id"): e for e in data.get("events", [])})  # type: ignore[union-attr]
+            except Exception as ex2:  # noqa: BLE001 - a missing day is recorded, not fatal
+                log(f"cfb: finals for {start + timedelta(days=i):%Y-%m-%d} not saved ({ex2})")
+    finals = parse_finals({"events": list(events.values())})
+    if not finals:
+        return {"games": 0}
+    dest = sources.archive_dir() / "finals" / f"{day}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps({"fetched_at": utcnow(), "from": f"{start:%Y-%m-%d}", "to": f"{end:%Y-%m-%d}", "finals": finals}))
+    log(f"cfb: saved {len(finals)} ESPN finals for {start:%Y-%m-%d}..{end:%Y-%m-%d}")
+    return {"games": len(finals), "saved": dest.name}
+
+
+def parse_finals(data: dict) -> dict[str, list[float]]:
+    """{game id: [home points, away points]} for every completed game on an ESPN scoreboard."""
+    out = {}
+    for e in data.get("events", []):
+        try:
+            if not e["status"]["type"]["completed"]:
+                continue
+            teams = {t["homeAway"]: t for t in e["competitions"][0]["competitors"]}
+            out[str(int(e["id"]))] = [float(teams["home"]["score"]), float(teams["away"]["score"])]
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+    return out
+
+
 def parse_scoreboard(snap: dict) -> list[dict]:
     """One row per game: ESPN ids, kickoff, AP ranks, TV, and ESPN's posted home spread, total and moneylines."""
     rows = []
@@ -471,6 +516,7 @@ def run(log=print, force_odds: bool = False, force_files: bool = False) -> dict:
     day = today_et()
     files = download_files(log=log, force=force_files)
     espn = save_espn(day, log)
+    espn["finals"] = save_finals(day, log)
     status = {"date": day, "ran_at": utcnow(), "files": files, "espn": espn, "odds": save_odds(day, log, force_odds),
               "license": sources.LICENSE_NOTE}
     arch = sources.archive_dir()

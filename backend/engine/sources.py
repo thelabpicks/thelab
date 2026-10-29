@@ -7,7 +7,9 @@ gracefully (with visible flags) when they are missing.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from datetime import date
 
 RELEASE_BASE = "https://github.com/nflverse/nflverse-data/releases/download"
 LICENSE_NOTE = (
@@ -51,6 +53,22 @@ KINDS: dict[str, SourceKind] = {
 # trained on every later season and tested week by week from TEST_SEASONS back.
 HISTORY_SEASONS = 8   # 2018 when the current season is 2026
 TEST_SEASONS = 5      # walk-forward test weeks: 2021 onward (plus the current season)
+
+
+def season_for(today: date | None, env: str, flip: tuple[int, int], offset: int = 0) -> int:
+    """The season the site works on: `offset` + this year from the (month, day) `flip` on, last year's before it. The
+    repository variable named `env` (passed to the workflows) pins a season instead."""
+    pinned = (os.environ.get(env) or "").strip()
+    if pinned.isdigit():
+        return int(pinned)
+    today = today or date.today()
+    return today.year + offset - (0 if (today.month, today.day) >= flip else 1)
+
+
+def current_season(today: date | None = None) -> int:
+    """NFL seasons are named by the year they start. The new one takes over on September 1 (Week 1 kicks off the
+    Thursday after Labor Day); until its files are posted, engine.cli keeps running the season before."""
+    return season_for(today, "NFL_SEASON", (9, 1))
 
 
 def history_start(season: int) -> int:

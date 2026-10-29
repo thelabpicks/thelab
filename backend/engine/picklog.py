@@ -344,5 +344,6 @@ def latest() -> dict:
 
 if __name__ == "__main__":
     con = db.connect(paths.db_path())
-    rep = run(con, 2026)
+    from .sources import current_season  # noqa: PLC0415
+    rep = run(con, current_season())
     print(json.dumps({k: rep.get(k) for k in ("available", "graded", "overall", "drift")}, indent=2, default=float))

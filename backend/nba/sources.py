@@ -11,10 +11,13 @@ import os
 from pathlib import Path
 
 from engine import paths
+from engine.sources import season_for
 
 RELEASE_BASE = "https://github.com/sportsdataverse/sportsdataverse-data/releases/download"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
-CURRENT_SEASON = 2027   # 2026-27
+# Seasons are named by the year they end; the new one takes over on October 25, a few days after opening night, once
+# its box score file is posted. The NBA_SEASON repository variable pins a season instead.
+CURRENT_SEASON = season_for(None, "NBA_SEASON", (10, 25), offset=1)
 HISTORY_SEASONS = 8     # 2018-19 onward; older seasons seed form only and are weighted far less
 LICENSE_NOTE = ("NBA box scores and schedules: sportsdataverse / hoopR (ESPN data), "
                 "https://github.com/sportsdataverse/sportsdataverse-data. Injuries and scoreboard: ESPN public site feed.")

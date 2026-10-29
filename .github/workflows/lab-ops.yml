@@ -1,0 +1,42 @@
+# The Lab's daily upkeep, so the site runs without anyone watching it (.github/scripts/lab_ops.py):
+#   * posts the morning's daily model report as a comment on the "Daily model report" issue (GitHub emails it and
+#     pushes it to the GitHub app),
+#   * checks every data workflow, The Lab's picks, the report, the odds key and the site itself, and keeps one
+#     "The Lab needs attention" issue open with what is wrong (closed with an all-clear once fixed),
+#   * switches every scheduled workflow on again, because GitHub turns schedules off after 60 days without activity.
+# Runs after the 4 am Central refresh has published (09:00 UTC NBA collect, then the site, done by about 10:00 UTC).
+name: Daily report and health check
+
+on:
+  schedule:
+    - cron: "40 11 * * *"   # 11:40 UTC (6:40 am Central in summer time, 5:40 am in winter)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: write     # turns the scheduled workflows back on
+  pages: read
+
+concurrency:
+  group: lab-ops
+  cancel-in-progress: false
+
+jobs:
+  upkeep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the pick log and NBA snapshots
+        run: git fetch --depth 1 origin nfl-data nba-data
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Post the daily report and check the site's health
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/lab_ops.py

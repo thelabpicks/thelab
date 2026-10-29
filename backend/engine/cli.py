@@ -11,13 +11,13 @@ import argparse
 import json
 import sys
 
-from . import db, paths, pipeline, status
+from . import db, paths, pipeline, sources, status
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="engine.cli")
     ap.add_argument("command", choices=["all", "sync", "build", "backtest", "predict", "props", "correlation", "status", "smoke-test"])
-    ap.add_argument("--season", type=int, default=2026)
+    ap.add_argument("--season", type=int, help="default: the current season by date (engine.sources.current_season)")
     ap.add_argument("--week", type=int, help="predict a single week (default: all weeks of the season)")
     ap.add_argument("--download", action="store_true", help="download missing nflverse CSVs into data/raw")
     ap.add_argument("--force", action="store_true", help="re-download / re-import even if unchanged")
@@ -31,11 +31,21 @@ def main(argv=None) -> int:
         smoke()
         print("PASS: parser invariants (scoring, end-zone proxy, exclusions, embargo)")
         return 0
+    auto = a.season is None
+    a.season = a.season or sources.current_season()
     if a.command == "all":
         try:
             pipeline.run_all(a.season, a.download, a.force, log=log)
             return 0
-        except Exception:  # noqa: BLE001 - message already logged and written to build_status.json
+        except Exception as ex:  # noqa: BLE001 - message already logged and written to build_status.json
+            if not (auto and new_season_not_posted(ex, a.season)):
+                return 2
+        # September, before the new season's files are posted: keep last season's pages up to date instead
+        log(f"Season {a.season} is not posted yet; running {a.season - 1}")
+        try:
+            pipeline.run_all(a.season - 1, a.download, a.force, log=log)
+            return 0
+        except Exception:  # noqa: BLE001
             return 2
     c = db.connect(paths.db_path())
     try:
@@ -66,6 +76,13 @@ def main(argv=None) -> int:
         return 2
     finally:
         c.close()
+
+
+def new_season_not_posted(ex: Exception, season: int) -> bool:
+    """True when the run stopped only because this season's required nflverse files are not out yet."""
+    msg = str(ex)
+    return msg.startswith("Required source files missing") and all(
+        part.strip().split(" ")[1] == str(season) for part in msg.split(":", 1)[1].split(","))
 
 
 if __name__ == "__main__":

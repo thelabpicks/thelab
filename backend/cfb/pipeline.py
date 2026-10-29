@@ -448,6 +448,32 @@ def record(g: pd.DataFrame, summary: dict) -> dict:
             "finals": recent_finals(fin)}
 
 
+def espn_finals(days: int = 10) -> dict[int, list[float]]:
+    """Final scores saved from ESPN's scoreboard by the collector (finals/ in the archive), newest file winning."""
+    d = sources.archive_dir() / "finals"
+    out: dict[int, list[float]] = {}
+    for fp in sorted(d.glob("*.json"))[-days:] if d.exists() else []:
+        try:
+            out.update({int(k): v for k, v in json.loads(fp.read_text()).get("finals", {}).items()})
+        except (ValueError, OSError):
+            continue
+    return out
+
+
+def with_espn_finals(g: pd.DataFrame, finals: dict[int, list[float]]) -> pd.DataFrame:
+    """Games cfbfastR has not marked final yet take ESPN's final score, for grading only (the models train on cfbfastR's
+    finals with their box scores). cfbfastR posts weeknight finals about a day late."""
+    miss = ~g.final & g.game_id.isin(list(finals))
+    if not miss.any():
+        return g
+    g = g.copy()
+    pts = g.loc[miss, "game_id"].map(finals)
+    g.loc[miss, "home_points"] = pts.map(lambda x: x[0]).astype(float)
+    g.loc[miss, "away_points"] = pts.map(lambda x: x[1]).astype(float)
+    g.loc[miss, "final"] = True
+    return g
+
+
 def recent_finals(fin: pd.DataFrame, days: int = 21) -> dict:
     """Final scores of every game in the last three weeks, so other pages (The Lab's picks) grade at their own line,
     including games the site's own record never froze a pick on."""
@@ -928,7 +954,8 @@ def run(out: Path, log=print, today: str | None = None, now: datetime | None = N
         except Exception as ex:  # noqa: BLE001 - props are a side dish; the game lines still publish
             log(f"cfb props: skipped ({ex})")
     frozen = freeze(rows, now, props_rows)
-    rec = record(g, summary)
+    graded = with_espn_finals(g, espn_finals())
+    rec = record(graded, summary)
     pg_now = props.load_player_games(sources.CURRENT_SEASON)
     card = report_card(g, pg_now, model.fit_box(g, nowts), model.miss_pool(oos, nowts))
     checks = cross_checks(g, lines, rows, upcoming)
@@ -957,7 +984,7 @@ def run(out: Path, log=print, today: str | None = None, now: datetime | None = N
     except Exception as ex:  # noqa: BLE001 - same as props: never block the game lines
         log(f"cfb player pages: skipped ({ex})")
     prev_rater = rating.fit(legs[legs.season < sources.CURRENT_SEASON]) if (legs.season < sources.CURRENT_SEASON).any() else rater
-    _write(out, "previous.json", previous_weeks(g, bt, summary, prev_rater, sources.CURRENT_SEASON))
+    _write(out, "previous.json", previous_weeks(graded, bt, summary, prev_rater, sources.CURRENT_SEASON))
     fin = g[g.final]
     status = {"generated_at": utcnow(), "seconds": (datetime.now(timezone.utc) - t0).total_seconds(),
               "season": sources.CURRENT_SEASON, "games_this_week": len(rows), "picks": len(picks),
