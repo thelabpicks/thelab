@@ -25,7 +25,10 @@ MARKETS = {
 }
 RECENCY_HALF_LIFE = 2.0       # seasons
 FIRST_TEST_SEASON = 2022      # 2021-22 onward is tested game by game; earlier seasons only train
-MIN_PRIOR_GAMES = 5
+# A player is projected from his second career game: rookies and newcomers count from the start of the season. In the
+# 2024-2026 walk-forward their first four games projected closer than their own averages on points, rebounds and PRA
+# (points miss 3.16 vs 3.19) with no change for everyone else; picks still wait for 5 games (pipeline.MIN_PICK_GAMES).
+MIN_PRIOR_GAMES = 1
 CAP = 120
 
 
@@ -105,7 +108,7 @@ def model_rows(p: pd.DataFrame, market: str) -> pd.DataFrame:
     r["y"] = r[market]
     r["base_mu"] = (r[f"{market}_pm_l"] * r["min_l"]).clip(lower=0.05)   # player average baseline (per-minute x minutes)
     return r.dropna(subset=["min_l"])[["game_id", "game_date", "season", "player_id", "player_name", "team", "opp", "pos",
-                                       "played", "y", "line", "base_mu", "season_starts"] + cols]
+                                       "played", "y", "line", "base_mu", "season_starts", "min_exp"] + cols]
 
 
 def _fit(train: pd.DataFrame, cols: list[str], test_season: int) -> HistGradientBoostingRegressor:

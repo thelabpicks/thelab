@@ -29,7 +29,9 @@ export type NbaRow = {
   recent: number[]; recent_minutes: number[]; due: boolean;
   evidence: { minutes: number; minutes_long: number; per_min: number; opp_mult: number | null; pace: number | null; opp_pace: number | null; rest: number; start_rate: number;
     /** this season so far (absent in data published before they were added) */
-    season_games?: number; season_starts?: number; season_min?: number | null };
+    season_games?: number; season_starts?: number; season_min?: number | null;
+    /** minutes counting coach's-decision DNPs as 0 (game simulations), and NBA games played before tonight */
+    minutes_expected?: number | null; career_games?: number };
 };
 export type NbaGame = { game_id: number; date: string; time: string; home: string; away: string; total?: number | null; home_spread?: number | null };
 export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
@@ -111,12 +113,14 @@ export function edgeOf(r: NbaRow, lean: Lean | null): NbaEdge | null {
 
 /** Suggestion lists (the NBA home's strongest leans, Ask's best picks, The Lab's top 10) name only stars with a line
  *  DraftKings has posted: each team's three highest-scoring regular starters (start 60%+ of games with 24+ minutes, this
- *  season once he has played in it, as nba/pipeline.py) projected for 15+ points, sure to play, at a book line DraftKings lists. */
+ *  season once he has played in it, 5+ NBA games, as nba/pipeline.py) projected for 15+ points, sure to play, at a book line DraftKings lists. */
 export const STARS_PER_TEAM = 3;
 /** A star also projects for 15+ points tonight: on thin or injury-hit rosters a team's top 3 starters can include role
  *  players (a 10-point shooter, a backup center starting), and followers don't read those as star picks. */
 export const STAR_MIN_POINTS = 15;
-const regularStarter = (e: NbaRow["evidence"]) => e.start_rate >= 0.6 && e.minutes >= 24
+/** Rookies are projected from their second game but picked from their sixth, as nba/pipeline.py MIN_PICK_GAMES. */
+export const MIN_PICK_GAMES = 5;
+const regularStarter = (e: NbaRow["evidence"]) => e.start_rate >= 0.6 && e.minutes >= 24 && (e.career_games ?? MIN_PICK_GAMES) >= MIN_PICK_GAMES
   && (e.season_games == null || (e.season_games > 0 && (e.season_starts ?? 0) / e.season_games >= 0.6 && (e.season_min ?? 0) >= 24));
 const surePlay = (r: NbaRow) => !r.out && (!r.injury || /probable/i.test(r.injury));
 export function starsOf(rows: NbaRow[]): Set<string> {

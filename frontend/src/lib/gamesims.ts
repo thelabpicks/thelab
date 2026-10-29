@@ -210,7 +210,8 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: F
     by.set(r.team, team);
     const p = team.get(r.player_id) ?? { name: r.player_name, min: 0, pts: 0, reb: 0, ast: 0, tpm: 0 };
     team.set(r.player_id, p);
-    p.min = Math.max(p.min, Math.round((r.evidence?.minutes ?? 0) * 10) / 10);
+    // expected minutes count the games he sat by the coach's decision (a benched player keeps none of last season's)
+    p.min = Math.max(p.min, Math.round((r.evidence?.minutes_expected ?? r.evidence?.minutes ?? 0) * 10) / 10);
     const k = ({ points: "pts", rebounds: "reb", assists: "ast", threes: "tpm" } as const)[r.market as "points"];
     if (k) p[k] = r2(r.mean);
   }

@@ -13,7 +13,7 @@ from . import sources
 STATS = {"points": "points", "rebounds": "rebounds", "assists": "assists", "threes": "three_point_field_goals_made"}
 COLS = ["game_id", "season", "season_type", "game_date", "game_date_time", "athlete_id", "athlete_display_name",
         "athlete_headshot_href", "athlete_position_abbreviation", "team_abbreviation", "opponent_team_abbreviation",
-        "home_away", "minutes", "starter", "did_not_play", "points", "rebounds", "offensive_rebounds", "assists",
+        "home_away", "minutes", "starter", "did_not_play", "reason", "points", "rebounds", "offensive_rebounds", "assists",
         "three_point_field_goals_made", "three_point_field_goals_attempted", "field_goals_attempted",
         "field_goals_made", "free_throws_attempted", "turnovers", "steals", "blocks", "team_score", "opponent_team_score"]
 POS = {"G": "G", "PG": "G", "SG": "G", "F": "F", "SF": "F", "PF": "F", "C": "C"}
@@ -39,6 +39,9 @@ def load_box(first: int | None = None, last: int = sources.CURRENT_SEASON) -> pd
     d["pos"] = d.athlete_position_abbreviation.map(POS).fillna("F")
     d["home"] = (d.home_away == "home").astype(int)
     d["played"] = (~d.did_not_play.fillna(False).astype(bool)) & (d.minutes.fillna(0) > 0)
+    # dressed but not used by the coach (not injured, resting or away from the team): a game of 0 minutes
+    reason = d["reason"].fillna("").astype(str).str.upper() if "reason" in d else pd.Series("", index=d.index)
+    d["benched"] = ~d.played & reason.str.contains("COACH")
     for c in ("minutes", "points", "rebounds", "assists", "threes", "threes_att", "fga", "fgm", "fta", "oreb", "turnovers",
               "steals", "blocks"):
         d[c] = pd.to_numeric(d[c], errors="coerce").fillna(0.0)
@@ -82,6 +85,14 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
             # per-minute rates as minutes-weighted ewm (sum of stat / sum of minutes)
             num = gp[m].transform(lambda s: s.shift(1).ewm(halflife=hl, min_periods=1).mean())
             p[f"{m}_pm_{tag}"] = num / p[f"min_{tag}"].clip(lower=1)
+    # Expected minutes counting the games a healthy player sat by the coach's decision as 0. min_s and min_l are his
+    # minutes when he plays, the right base for a prop (a prop on a player who sits is void), but a player benched
+    # all season keeps last season's minutes in them (Memphis's Jahmai Mashack projected for 31 minutes after four
+    # straight DNPs). Game simulations fill a rotation from this one. Not a model feature: the 2024-2026 walk-forward
+    # showed no gain from it on played games.
+    upcoming = d["upcoming"].fillna(False).astype(bool) if "upcoming" in d else False
+    benched = d["benched"].fillna(False).astype(bool) if "benched" in d else False
+    p["min_exp"] = _ewm_prior(d[d.played | upcoming | benched].groupby("player_id").minutes, 4).reindex(p.index)
     p["start_rate"] = _ewm_prior(gp.starter, 5)
     p["last_min"] = gp.minutes.shift(1)
     p["games_prior"] = gp.cumcount()

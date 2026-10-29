@@ -42,6 +42,28 @@ def test_features_use_only_earlier_games():
     assert np.allclose(f[early].points_pm_l.fillna(-1).to_numpy(), f2[f2.game_id < 1039].points_pm_l.fillna(-1).to_numpy())
 
 
+def test_benched_games_count_as_zero_in_expected_minutes_only():
+    d = _box(10)
+    # player 100 sits the last four games by the coach's decision
+    late = (d.player_id == 100) & (d.game_id >= 1006)
+    d.loc[late, ["played", "minutes"]] = [False, 0.0]
+    d["benched"] = late
+    f = history.build_features(d).sort_values(["player_id", "game_date"])
+    p = f[f.player_id == 100]
+    assert len(p) == 6                        # benched games are not rows to predict
+    nxt = history.build_features(pd.concat([d, pd.DataFrame([{**d[d.player_id == 100].iloc[-1].to_dict(), "game_id": 2000,
+        "game_date": pd.Timestamp("2025-12-01"), "played": False, "benched": False, "upcoming": True}])], ignore_index=True))
+    up = nxt[nxt.game_id == 2000].iloc[0]
+    assert up.min_l > 20                      # minutes when he plays: unchanged
+    assert up.min_exp < up.min_s / 2          # expected minutes: four games of 0 pull them down
+
+
+def test_rookies_are_projected_from_their_second_game():
+    f = history.build_features(_box(10))
+    rows = props.model_rows(f, "points")
+    assert rows.games_prior.min() == 1
+
+
 def test_usual_line_is_median_of_previous_ten_rounded_down_plus_half():
     p = pd.DataFrame({"player_id": [1] * 12, "points": [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 99]})
     line = props.usual_line(p, "points")
