@@ -1,6 +1,8 @@
 """Odds-feed parsing and the same-game correlation maths."""
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 from scipy.stats import multivariate_normal, norm
@@ -65,6 +67,41 @@ def test_odds_feed_matches_players_and_never_guesses(oddsdb, monkeypatch):
         ("DraftKings", "receptions", "p2", "over", -115), ("DraftKings", "receptions", "p2", "under", -105)}
     assert snap["unmatched_names"] == 1
     assert odds.load_snapshot(2026, 7)["rows"] == rows
+
+
+def test_thursday_buys_only_the_game_kicking_off_soon_and_keeps_earlier_prices(oddsdb, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    oddsdb.execute("INSERT INTO games(game_id, season, week, home_team, away_team) VALUES ('2026_07_GB_CAR', 2026, 7, 'GB', 'CAR')")
+    oddsdb.commit()
+    soon, later = (datetime.now(timezone.utc) + timedelta(hours=h) for h in (9, 75))
+    bought = []
+
+    def fake_get(url, params):
+        if url.endswith("/events"):
+            return [{"id": "tnf", "home_team": "Green Bay Packers", "away_team": "Carolina Panthers", "commence_time": soon.isoformat()},
+                    {"id": "sun", "home_team": "Chicago Bears", "away_team": "New England Patriots", "commence_time": later.isoformat()}], \
+                {"x-requests-remaining": "290"}
+        bought.append(url.split("/events/")[1].split("/")[0])
+        return {"bookmakers": []}, {}
+    odds.snapshot_path(2026, 7).parent.mkdir(parents=True, exist_ok=True)
+    kept = {"game_id": "2026_07_NE_CHI", "market": "td", "player_id": "p1", "book": "DraftKings", "side": "yes", "price": 120}
+    odds.snapshot_path(2026, 7).write_text(json.dumps({"rows": [kept]}))
+    monkeypatch.setattr(odds, "_get", fake_get)
+    monkeypatch.setenv("FG_ODDS_WITHIN_HOURS", "36")
+    snap = odds.fetch(oddsdb, 2026, 7, "k", log=lambda m: None)
+    assert bought == ["tnf"]
+    assert snap["rows"] == [kept]
+
+
+def test_odds_are_not_bought_before_the_week_has_projections(oddsdb, monkeypatch):
+    oddsdb.execute("DELETE FROM predictions")
+    oddsdb.execute("DELETE FROM prop_projections")
+    calls = []
+    monkeypatch.setattr(odds, "_get", lambda url, params: (calls.append(url), ([{"id": "e1", "home_team": "Chicago Bears",
+                                                           "away_team": "New England Patriots"}], {"x-requests-remaining": "300"}))[1])
+    with pytest.raises(RuntimeError, match="keeping the credits"):
+        odds.fetch(oddsdb, 2026, 7, "k", log=lambda m: None)
+    assert len(calls) == 1  # only the free events list
 
 
 def test_odds_skip_without_key(oddsdb, monkeypatch):

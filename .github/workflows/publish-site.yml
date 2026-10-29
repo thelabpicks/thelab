@@ -2,7 +2,8 @@
 # Runs Tuesday morning (after Monday night), Thursday morning (injury reports, before TNF),
 # Saturday morning, Sunday morning (final injury designations), Sunday evening (before the night game) and Monday
 # afternoon (Sunday's games graded, before Monday night), on every push to main,
-# and on demand from the Actions tab. Sportsbook prices are fetched on Saturday and manual runs.
+# and on demand from the Actions tab. Sportsbook prices are fetched on Saturday and manual runs, and on Thursday for
+# the Thursday night game only.
 # After the daily NBA and college football runs ("Collect NBA data", "Collect college football data") it republishes
 # with their fresh numbers and reuses the NFL pages from the last full run, so the NFL pipeline is not repeated daily.
 name: Refresh data and publish site
@@ -16,6 +17,11 @@ on:
     - cron: "30 21 * * 0"  # Sun 21:30 UTC, before Sunday night
     - cron: "0 20 * * 1"   # Mon 20:00 UTC, Sunday graded, before Monday night
   workflow_dispatch:
+    inputs:
+      odds_within_hours:
+        description: "Buy prices only for games kicking off within this many hours (empty: the whole week)"
+        required: false
+        default: ""
   push:
     branches: [main]
   workflow_run:
@@ -116,8 +122,10 @@ jobs:
         env:
           # Optional repository secret. Without it the site still builds and prices are typed in by hand.
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          # Fetch prices on the Saturday run and on manual runs only (free plan: 500 credits a month).
-          FG_ODDS_FETCH: ${{ github.event.schedule == '0 15 * * 6' || github.event_name == 'workflow_dispatch' }}
+          # Fetch prices on the Saturday run and on manual runs (free plan: 500 credits a month). Thursday's run buys only
+          # the games kicking off within 36 hours (the Thursday night game, about 6 credits) so it gets real lines too.
+          FG_ODDS_FETCH: ${{ github.event.schedule == '0 15 * * 6' || github.event.schedule == '0 15 * * 4' || github.event_name == 'workflow_dispatch' }}
+          FG_ODDS_WITHIN_HOURS: ${{ github.event.schedule == '0 15 * * 4' && '36' || inputs.odds_within_hours }}
           FG_PICKS_DIR: ${{ github.workspace }}/pick-archive/picks
         run: python -m engine.cli all --download
 
