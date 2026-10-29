@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyPins, fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
+import type { SimGames } from "./gamesims";
+import { applyPins, fitRotation, onGameDay, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -132,5 +133,17 @@ describe("game sim inputs", () => {
     const later = { season: 2026, week: 8, games: [game(24)] };
     expect(applyPins([pin], later, new Date("2026-10-31T01:00:00Z"))).toEqual([]);
     expect(later.games[0].teams.A.implied).toBe(24);
+  });
+
+  it("shows a game's sim only from its game day (Eastern), and a pinned replay always", () => {
+    const g = (id: string, kickoff: string) => ({ id, away: "A", home: "B", kickoff, teams: {} });
+    const nfl = { season: 2026, week: 8, games: [g("thu", "2026-10-30T00:15:00Z"), g("sun", "2026-11-01T17:00:00Z"), g("pinned", "2026-11-02T01:20:00Z"), g("tue", "2026-10-27T00:15:00Z")] } as never as SimGames["nfl"];
+    const nba = { date: "2026-10-30", games: [{ away: "V", home: "H", start: "2026-10-30T23:00Z", total: 220, fav: "H", spread: 2 }], players: { V: [], H: [], X: [] } };
+    const pin = { key: "k", sport: "nfl" as const, seed: 1, until: "2026-11-03T00:00:00Z", game: nfl.games[2] };
+    // Thursday 3 pm Eastern: tonight's 8:15 pm game (00:15 UTC Friday) is today's
+    onGameDay({ nfl, nba }, [pin], new Date("2026-10-29T19:00:00Z"));
+    expect(nfl.games.map((x) => x.id)).toEqual(["thu", "pinned", "tue"]);
+    expect(nba.games).toEqual([]);
+    expect(nba.players).toEqual({});
   });
 });

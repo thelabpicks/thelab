@@ -1085,7 +1085,7 @@ function card(gm,big){
 function renderHub(){
   document.querySelectorAll('[data-sport]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.sport===hubSport)));
   const L=GAMES[hubSport], f=featured(hubSport), rest=L.filter(g=>g!==f);
-  if(!f){document.getElementById('hubbody').innerHTML=`<div class="empty">${hubSport==='nba'?'No NBA games with book lines on today\'s slate yet. Sims post once the slate and lines are in.':'No NFL sims for this week yet. They post with the week\'s projections, once rosters are out.'}</div>`;return}
+  if(!f){document.getElementById('hubbody').innerHTML=`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
   const groups={};rest.forEach(g=>{const d=ETday.format(new Date(g.when));(groups[d]=groups[d]||[]).push(g)});
   document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('');
   document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{const url=shareUrl(b.dataset.key);

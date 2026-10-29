@@ -289,6 +289,20 @@ export function simPicks(board: Board | null, nfl: SimGames["nfl"], nba: SimGame
   return [...out.values()];
 }
 
+/** The calendar day of an instant in US Eastern time (YYYY-MM-DD), the day a game is "on". */
+export const etDay = (t: string | Date) => new Date(t).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+
+/** Game sims post on game day (Eastern): until then they keep re-running in the background with each refresh's lines,
+ *  injuries and projections, and only the game-day version is shown. Games already played stay up; a pinned replay
+ *  (posted on X) always shows. */
+export function onGameDay(sims: Pick<SimGames, "nfl" | "nba">, pins: SimPin[] = [], now = new Date()) {
+  const today = etDay(now), pinned = new Set(pins.map((p) => p.game.id));
+  sims.nfl.games = sims.nfl.games.filter((g) => pinned.has(g.id) || (g.kickoff != null && etDay(g.kickoff) <= today));
+  sims.nba.games = sims.nba.games.filter((g) => etDay(g.start) <= today);
+  const playing = new Set(sims.nba.games.flatMap((g) => [g.away, g.home]));
+  sims.nba.players = Object.fromEntries(Object.entries(sims.nba.players).filter(([t]) => playing.has(t)));
+}
+
 /** Puts each live pin's posted inputs in place of the game's refreshed ones; returns the pins still in force. */
 export function applyPins(pins: SimPin[], nfl: SimGames["nfl"], now = new Date()): SimPin[] {
   const live = pins.filter((p) => Date.parse(p.until) > now.getTime() && nfl.games.some((g) => g.id === p.game.id));
