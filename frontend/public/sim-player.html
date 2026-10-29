@@ -19,7 +19,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; } body { background: transparent; color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; } html { background: var(--bg); } body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 1120px; width: 100%; margin: 0 auto; padding: 0 0 8px; display: grid; gap: 16px; }
 .num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
@@ -289,6 +289,8 @@ canvas { display: block; width: 100%; max-width: 100%; }
 </main>
 
 <script>
+// if anything breaks, say so in the frame instead of leaving it empty
+addEventListener('error',e=>{const h=document.getElementById('hubbody');if(h&&!h.children.length)h.innerHTML='<div class="empty">The simulations could not load ('+String(e.message||'error').replace(/[<>&]/g,'')+'). Refresh the page to try again.</div>'});
 let DATA = null;
 
 /* ---------- shared helpers ---------- */
