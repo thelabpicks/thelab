@@ -27,8 +27,12 @@ export type FixedGame = { sport: "nfl" | "nba"; game: string; fixes: string[] };
 /** A pick The Lab has out on a simulated game (top 10 or pick of the day): the replay shown for that game must land on
  *  the pick's side, so a follower never sees the sim contradict the pick. game: the NFL game id or "AWAY at HOME". */
 export type SimPick = { sport: "nfl" | "nba"; game: string; who: string; player_id?: string; market: string; side: string; line: number | null };
+/** A replay already posted (a clip on X): its inputs and run stay fixed until `until`, so the site keeps playing the game
+ *  followers saw even when a later refresh re-freezes the projections. Kept in scripts/sim-pins.json. */
+export type SimPin = { key: string; sport: "nfl"; seed: number; until: string; note?: string; game: NflSimGame };
 export type SimGames = {
   generated_at: string;
+  pins?: SimPin[];
   picks: SimPick[];
   held: HeldGame[];
   fixed: FixedGame[];
@@ -267,4 +271,11 @@ export function simPicks(board: Board | null, nfl: SimGames["nfl"], nba: SimGame
     out.set(`${game}|${p.who}|${p.market}`, { sport: p.sport, game, who: p.who, player_id: p.player_id, market: p.market, side: p.side, line: p.line });
   }
   return [...out.values()];
+}
+
+/** Puts each live pin's posted inputs in place of the game's refreshed ones; returns the pins still in force. */
+export function applyPins(pins: SimPin[], nfl: SimGames["nfl"], now = new Date()): SimPin[] {
+  const live = pins.filter((p) => Date.parse(p.until) > now.getTime() && nfl.games.some((g) => g.id === p.game.id));
+  for (const p of live) nfl.games = nfl.games.map((g) => (g.id === p.game.id ? p.game : g));
+  return live;
 }

@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Slate } from "../src/lib/nba";
-import { nbaSimGames, nflSimGames, simPicks, type FrozenWeek, type SimGames } from "../src/lib/gamesims";
+import { applyPins, nbaSimGames, nflSimGames, simPicks, type FrozenWeek, type SimGames, type SimPin } from "../src/lib/gamesims";
 
 const DATA = path.resolve(process.env.LAB_DATA || "../site-data");
 const SIMS = path.resolve(process.env.SIMS_DIR || "../data/sims");
@@ -21,9 +21,11 @@ const weekFile = fs.existsSync(SIMS) ? fs.readdirSync(SIMS).filter((f) => /^\d{4
 const held: SimGames["held"] = [];
 const fixed: SimGames["fixed"] = [];
 const nfl = nflSimGames(weekFile ? readJson<FrozenWeek>(path.join(SIMS, weekFile)) : null, held, fixed);
+// replays already posted keep the inputs and run followers saw (scripts/sim-pins.json)
+const pins = applyPins(JSON.parse(fs.readFileSync(path.resolve("scripts/sim-pins.json"), "utf8")).pins as SimPin[], nfl);
 const nba = nbaSimGames(readJson<Slate>(path.join(DATA, "nba", "slate.json")), held, fixed);
 // The Lab's picks (written by scripts/lab-picks.ts earlier in the same run): each game's replay agrees with them
-const out: SimGames = { generated_at: new Date().toISOString(), held, fixed, picks: simPicks(readJson(path.join(DATA, "lab", "board.json")), nfl, nba), nfl, nba };
+const out: SimGames = { generated_at: new Date().toISOString(), held, fixed, picks: simPicks(readJson(path.join(DATA, "lab", "board.json")), nfl, nba), pins, nfl, nba };
 fs.mkdirSync(path.join(DATA, "sims"), { recursive: true });
 fs.writeFileSync(path.join(DATA, "sims", "games.json"), JSON.stringify(out));
 // a game that failed a check was corrected and checked again; one that still fails stays off the page until a later

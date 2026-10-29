@@ -1029,6 +1029,9 @@ function build(gm){
   else{NFL={sport:'nfl',runs:5000,key:gm.key,src:gm.src,teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when)};setupNFL();gm.G=NFL}
   gm.G.picks=gamePicks(gm,gm.G);
   runAll(gm.G,gm.sport==='nba'?simNBA:simNFL);
+  // a replay already posted (a clip on X) keeps the run followers saw
+  const pin=(DATA.pins||[]).find(p=>p.key===gm.key);
+  if(pin)gm.G.game=(gm.sport==='nba'?simNBA:simNFL)(pin.seed,true);
   gm.win=gm.G.dist.homeWins/gm.G.dist.n;
   if(G){if(G.sport==='nba')NBA=G;else NFL=G}
   return gm.G;
