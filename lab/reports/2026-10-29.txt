@@ -12,7 +12,7 @@ NFL
   How the model did
     - Featured picks this season: 46 of 76 (61%).
   Model changes
-    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0003), yards per target (−0.0004), yards per carry (+0.0005).
+    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0010), yards per target (−0.0009), yards per carry (−0.0003).
     - Team volume learned from the re-sims: passes x1.0522, runs x0.9853.
 
 CFB
