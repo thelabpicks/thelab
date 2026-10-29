@@ -37,10 +37,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 240
-    env:
-      NBA_ONLY: ${{ github.event_name == 'workflow_run' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # NBA_ONLY: reuse the NFL pages from the last full run instead of re-running the NFL model (~30 minutes). Used
+      # after the daily NBA and college runs, and for pushes that change only the website (frontend/), which need no
+      # new NFL numbers. Pushes that touch the backend, the workflows or anything else do the full run.
+      - name: Decide whether the NFL model needs to run
+        run: |
+          quick=false
+          if [ "${{ github.event_name }}" = workflow_run ]; then quick=true
+          elif [ "${{ github.event_name }}" = push ] && changed=$(git diff --name-only HEAD^1 HEAD) && [ -n "$changed" ] \
+               && ! echo "$changed" | grep -qv '^frontend/'; then
+            quick=true; echo "Website-only change: reusing the NFL pages from the last full run"
+          fi
+          echo "NBA_ONLY=$quick" >> "$GITHUB_ENV"
 
       # NBA-only runs reuse the NFL pages saved by the last full run; without them the full NFL run happens.
       - name: Restore NFL pages from the last full run
