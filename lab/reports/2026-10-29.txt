@@ -1,0 +1,43 @@
+The Lab daily report, Thursday, Oct 29 (results from Wednesday, Oct 28)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
+  NFL: 10-2 +5.67u / 3-1 +1.29u
+  CFB: 15-3 +0.64u / 3-0 +0.71u
+  NBA: 3-0 +1.84u / 2-0 +1.36u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 46 of 76 (61%).
+  Model changes
+    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0003), yards per target (−0.0004), yards per carry (+0.0005).
+    - Team volume learned from the re-sims: passes x1.0522, runs x0.9853.
+
+CFB
+  Picks
+    - Withdrawn before kickoff: Middle Tennessee to win (ML -154). Reason: under the 60% floor for a pick of the day. Withdrawn picks never count.
+    - Withdrawn before kickoff: Jacksonville State to win (ML -146). Reason: under the 60% floor for a pick of the day. Withdrawn picks never count.
+  How the model did
+    - Suggested college bets this season: 11-9 (55%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 19.1 to 7.1 points (44 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +1.43 vs the pregame input (typical miss 6.5).
+    - Yards per play ran −0.18 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.02 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 14.7 points vs 14.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - One pick was void because the player did not play (Stephon Castle). Void picks never count.
+    - 5 picks are waiting on a final stat line: Duncan Robinson under 3.5 threes made; CJ McCollum under 2.5 threes made; Trae Young under 2.5 threes made; Cooper Flagg under 6.5 assists; Austin Reaves under 7.5 assists. They are graded on the next refresh after the result posts.
+    - Graded since the last report: Javon Small under 2.5 threes made (void).
+  Where it was off and why
+    - Re-run with the minutes players really got, 482 of 1098 losing leans would have been right, so minutes caused 44% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.7 per player vs the projection (typical miss 5.9).
+    - Team scoring: rotations scored −0.3 points per team vs projected (typical miss 12.5).
+  Model changes
+    - Refit this morning on every box score through 2026-10-27; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
