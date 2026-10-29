@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
+import { applyPins, fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -108,5 +108,16 @@ describe("game sim inputs", () => {
       daily: { picks: [pick({}), pick({ who: "Withdrawn", withdrawn: true })] },
     }, nfl, nba);
     expect(out.map((p) => `${p.game} ${p.who}`)).toEqual(["MEM at POR Ty Jerome", "2026_08_A_B R B"]);
+  });
+
+  it("keeps a posted replay's inputs until its pin runs out", () => {
+    const game = (implied: number) => ({ id: "2026_08_A_B", away: "A", home: "B", kickoff: null, teams: { A: { implied, players: [] }, B: { implied, players: [] } } });
+    const nfl = { season: 2026, week: 8, games: [game(24)] };
+    const pin = { key: "nfl-a-b", sport: "nfl" as const, seed: 100105, until: "2026-10-31T00:00:00Z", game: game(21) };
+    expect(applyPins([pin], nfl, new Date("2026-10-29T19:00:00Z"))).toHaveLength(1);
+    expect(nfl.games[0].teams.A.implied).toBe(21);
+    const later = { season: 2026, week: 8, games: [game(24)] };
+    expect(applyPins([pin], later, new Date("2026-10-31T01:00:00Z"))).toEqual([]);
+    expect(later.games[0].teams.A.implied).toBe(24);
   });
 });
