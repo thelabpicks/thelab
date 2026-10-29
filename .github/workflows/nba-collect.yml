@@ -86,6 +86,15 @@ jobs:
           path: site-data/nba
           key: nba-site-${{ github.run_id }}
 
+      # A second copy outside the build cache: GitHub drops cache entries unused for 7 days or past 10 GB, and the site
+      # publish falls back to this copy so the NBA tab never goes up empty.
+      - name: Keep a copy of the NBA pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nba-site
+          path: site-data/nba
+          retention-days: 30
+
       - name: Save today's snapshots to the nba-data branch
         if: always()
         working-directory: nba-archive

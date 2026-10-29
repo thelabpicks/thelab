@@ -73,6 +73,15 @@ jobs:
           path: site-data/cfb
           key: cfb-site-${{ github.run_id }}
 
+      # A second copy outside the build cache: GitHub drops cache entries unused for 7 days or past 10 GB, and the site
+      # publish falls back to this copy so the college football tab never goes up empty.
+      - name: Keep a copy of the college football pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfb-site
+          path: site-data/cfb
+          retention-days: 30
+
       - name: Save today's snapshots to the cfb-data branch
         if: always()
         working-directory: cfb-archive

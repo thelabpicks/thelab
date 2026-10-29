@@ -303,6 +303,10 @@ export function Layout() {
         <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-5 sm:px-6 lg:pb-10">
           {!other && <NextWeekNote />}
           <Outlet />
+          <footer className="mt-10 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
+            21+ only. The Lab is sports research, not betting or financial advice; no pick is guaranteed and past results don't promise future ones.
+            Bet only what you can afford to lose and where sports betting is legal. Gambling problem? Call or text 1-800-GAMBLER.
+          </footer>
         </main>
       </div>
       {/* Mobile bottom nav */}

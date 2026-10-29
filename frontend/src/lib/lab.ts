@@ -33,10 +33,15 @@ export type LabPick = {
   rank?: number; frozen_at?: string; result?: LabResult; actual?: string;
 };
 
-/** Each sport lists its 10 likeliest picks; 70%+ is called out as a sure play. Picks are still limited to each
+/** Each sport lists its 10 likeliest picks; 70%+ is called out as top confidence. Picks are still limited to each
  *  sport's own pool (proven NFL and NBA tiers; college: favorites to win outright and bets rated 7+). */
 export const SURE = 0.7;
 export const BOARD_SIZE = 10;
+/** No pick shorter than this price: a -5000 favorite risks 50 to win 1, so one loss erases a month of wins and bettors
+ *  read it as a padded record. At -500 a pick needs 83% to break even, which the calibrated favorites clear. */
+export const BOARD_MIN_PRICE = -500;
+/** Only lines a sportsbook really posts make a list or count in a record (Andrew's rule: hit rates use posted lines only). */
+export const listable = (p: LabPick) => p.line_source === "book" && (p.price == null || p.price >= BOARD_MIN_PRICE);
 const RISKY = new Set(["Questionable", "Doubtful", "Out"]);
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -295,7 +300,11 @@ export function grade(p: LabPick, res: Results): { result: LabResult; actual: st
 /** A pick of the day: locked once chosen, graded after the final, never swapped. */
 export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string; withdrawn?: boolean };
 export type LabState = { updated_at: string | null; board: LabPick[]; frozen: LabPick[]; daily?: DailyPick[] };
-export type LabRecord = { n: number; won: number; lost: number; push: number; void: number; rate: number | null };
+/** n/won/lost count only picks at a line a book posted. units: profit risking 1 unit a pick at the price shown (priced
+ *  picks only; anytime-TD picks shown before Saturday's prices have none), roi = units / priced. unbooked: settled picks
+ *  at a usual (model-made) line from before book lines were loaded, shown in the results but never counted. */
+export type LabRecord = { n: number; won: number; lost: number; push: number; void: number; rate: number | null;
+  units: number; priced: number; roi: number | null; unbooked: number };
 export type LabBoard = {
   /** Every sport's top 10 together; rank is within the pick's sport. notes: why a sport's list is short. */
   generated_at: string; board: LabPick[]; notes: Record<Sport, string | null>;
@@ -308,9 +317,10 @@ export type LabBoard = {
 
 /** Picks of the day per sport. In testing the model's top 3 per NFL day hit about 85% (props at lines near the
  *  projection, 2021-2026) and its top 3 college favorites per Saturday hit about 88% when priced -1000 or longer
- *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing. */
+ *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing. Picks of the day are
+ *  posted publicly, so they are capped at -300 (75% to break even): a record built on -1000 favorites earns no units. */
 export const DAILY_SIZE = 3;
-export const DAILY_MIN_PRICE = -1000;
+export const DAILY_MIN_PRICE = -300;
 /** A pick of the day must be at least this likely: a 51% favorite is too close to a coin flip to post. */
 export const DAILY_MIN_CHANCE = 0.6;
 const DAILY_KEEP_DAYS = 90;
@@ -328,7 +338,7 @@ export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): Dail
       const have = out.filter((d) => d.sport === sp && d.date === date);
       if (have.length >= DAILY_SIZE) continue;
       const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
-      const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now
+      const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now && listable(p)
         && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
       rankBoard(pool, DAILY_SIZE - have.length).forEach((p, i) => {
         const { frozen_at: _f, ...rest } = p;
@@ -347,7 +357,7 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
   const frozen = [...prev.frozen, ...prev.board.filter((p) => started(p) && !known.has(p.id)).map((p) => ({ ...p, frozen_at: at }))]
     .map((p) => { if (p.result && p.result !== "void") return p; const g = grade(p, res); return g ? { ...p, ...g } : p; });
   const open = cands.filter((c) => !started(c));
-  const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp)));
+  const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp && listable(c))));
   const cutoff = playDate(new Date(now.getTime() - DAILY_KEEP_DAYS * 864e5));
   // a locked pick whose game has not started is withdrawn (and never counted) once the model backs the other side of it
   const flipped = (d: DailyPick) => !d.result && !started(d) && open.some((c) => c.sport === d.sport && c.game_id === d.game_id
@@ -357,14 +367,25 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
     // and so is one locked before the 60% floor existed that sits under it
     .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
+    // and one locked before the price cap that is priced shorter than it
+    .map((d) => !d.result && !started(d) && d.price != null && d.price < DAILY_MIN_PRICE
+      ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: priced shorter than ${DAILY_MIN_PRICE}, the cap for a pick of the day`, withdrawn: true } : d)
     .map((d) => { if (d.withdrawn || (d.result && d.result !== "void")) return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
   return { updated_at: now.toISOString(), board, frozen, daily };
 }
 
+/** What a 1-unit bet returns as profit at an American price. */
+export const winUnits = (price: number) => (price > 0 ? price / 100 : 100 / -price);
+
 export function tally(ps: LabPick[]): LabRecord {
-  const c = (r: LabResult) => ps.filter((p) => p.result === r).length;
+  const counted = ps.filter((p) => p.line_source === "book");
+  const c = (r: LabResult) => counted.filter((p) => p.result === r).length;
   const won = c("won"), lost = c("lost");
-  return { n: won + lost, won, lost, push: c("push"), void: c("void"), rate: won + lost ? won / (won + lost) : null };
+  const priced = counted.filter((p) => p.price != null && (p.result === "won" || p.result === "lost"));
+  const units = priced.reduce((a, p) => a + (p.result === "won" ? winUnits(p.price!) : -1), 0);
+  return { n: won + lost, won, lost, push: c("push"), void: c("void"), rate: won + lost ? won / (won + lost) : null,
+    units: Math.round(units * 100) / 100, priced: priced.length, roi: priced.length ? units / priced.length : null,
+    unbooked: ps.filter((p) => p.line_source !== "book" && p.result && p.result !== "void").length };
 }
 
 export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): LabBoard {

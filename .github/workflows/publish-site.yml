@@ -27,6 +27,7 @@ permissions:
 
   pages: write
   id-token: write
+  actions: read     # reads the saved NBA and college pages when the build cache has dropped them
 
 concurrency:
   group: pages
@@ -91,12 +92,19 @@ jobs:
 
       # Sportsbook price snapshots (The Odds API) are kept between runs so the weekly fetch is reused.
       - name: Restore sportsbook price snapshots
+        id: odds
         if: env.NBA_ONLY != 'true' || steps.nflsite.outputs.cache-matched-key == ''
         uses: actions/cache@v4
         with:
           path: data/odds
           key: odds-${{ github.run_id }}
           restore-keys: odds-
+
+      # The snapshots are also kept on the nfl-data branch (odds/), so the week's paid prices survive the cache dropping them.
+      - name: Fall back to the price snapshots on the nfl-data branch
+        if: (env.NBA_ONLY != 'true' || steps.nflsite.outputs.cache-matched-key == '') && steps.odds.outputs.cache-matched-key == ''
+        run: |
+          if [ -d pick-archive/odds ]; then mkdir -p data/odds && cp -r pick-archive/odds/. data/odds/ && echo "::warning::Price snapshots restored from the nfl-data branch"; fi
 
       - name: Install backend
         if: env.NBA_ONLY != 'true' || steps.nflsite.outputs.cache-matched-key == ''
@@ -117,6 +125,7 @@ jobs:
         if: env.NBA_ONLY != 'true' || steps.nflsite.outputs.cache-matched-key == ''
         working-directory: pick-archive
         run: |
+          if [ -d ../data/odds ]; then mkdir -p odds && cp -r ../data/odds/. odds/; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -144,19 +153,45 @@ jobs:
 
       # NBA numbers are computed by the "Collect NBA data" workflow and kept in the cache.
       - name: Restore NBA pages
+        id: nbasite
         uses: actions/cache/restore@v4
         with:
           path: site-data/nba
           key: nba-site-${{ github.run_id }}
           restore-keys: nba-site-
 
+      - name: Fall back to the last saved NBA pages
+        if: steps.nbasite.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow nba-collect.yml --status success -L 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$id" ] && gh run download "$id" -R "$GITHUB_REPOSITORY" -n nba-site -D site-data/nba; then
+            echo "::warning::NBA pages came from the saved copy of run $id (build cache was empty)"
+          else
+            echo "::error::No NBA pages in the build cache or a saved copy: the NBA tab publishes without data"
+          fi
+
       # College football numbers are computed by the "Collect college football data" workflow and kept in the cache.
       - name: Restore college football pages
+        id: cfbsite
         uses: actions/cache/restore@v4
         with:
           path: site-data/cfb
           key: cfb-site-${{ github.run_id }}
           restore-keys: cfb-site-
+
+      - name: Fall back to the last saved college football pages
+        if: steps.cfbsite.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow cfb-collect.yml --status success -L 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$id" ] && gh run download "$id" -R "$GITHUB_REPOSITORY" -n cfb-site -D site-data/cfb; then
+            echo "::warning::college football pages came from the saved copy of run $id (build cache was empty)"
+          else
+            echo "::error::No college football pages in the build cache or a saved copy: the college football tab publishes without data"
+          fi
 
       # The Lab's top 10 across NFL, college football and NBA: ranked from every sport's fresh numbers, frozen at each
       # game's start and graded after the final. A failure here leaves the page on its last board; the site still publishes.

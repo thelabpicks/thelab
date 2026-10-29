@@ -111,14 +111,17 @@ export function edgeOf(r: NbaRow, lean: Lean | null): NbaEdge | null {
 
 /** Suggestion lists (the NBA home's strongest leans, Ask's best picks, The Lab's top 10) name only stars with a line
  *  DraftKings has posted: each team's three highest-scoring regular starters (start 60%+ of games with 24+ minutes, this
- *  season once he has played in it, as nba/pipeline.py), sure to play, at a book line DraftKings lists. */
+ *  season once he has played in it, as nba/pipeline.py) projected for 15+ points, sure to play, at a book line DraftKings lists. */
 export const STARS_PER_TEAM = 3;
+/** A star also projects for 15+ points tonight: on thin or injury-hit rosters a team's top 3 starters can include role
+ *  players (a 10-point shooter, a backup center starting), and followers don't read those as star picks. */
+export const STAR_MIN_POINTS = 15;
 const regularStarter = (e: NbaRow["evidence"]) => e.start_rate >= 0.6 && e.minutes >= 24
   && (e.season_games == null || (e.season_games > 0 && (e.season_starts ?? 0) / e.season_games >= 0.6 && (e.season_min ?? 0) >= 24));
 const surePlay = (r: NbaRow) => !r.out && (!r.injury || /probable/i.test(r.injury));
 export function starsOf(rows: NbaRow[]): Set<string> {
   const byTeam = new Map<string, NbaRow[]>();
-  for (const r of rows) if (r.market === "points" && surePlay(r) && regularStarter(r.evidence)) byTeam.set(r.team, [...(byTeam.get(r.team) ?? []), r]);
+  for (const r of rows) if (r.market === "points" && r.mean >= STAR_MIN_POINTS && surePlay(r) && regularStarter(r.evidence)) byTeam.set(r.team, [...(byTeam.get(r.team) ?? []), r]);
   return new Set([...byTeam.values()].flatMap((rs) => rs.sort((a, b) => b.mean - a.mean).slice(0, STARS_PER_TEAM).map((r) => r.player_id)));
 }
 export const onDraftKings = (r: NbaRow) => r.line_source === "book"
