@@ -401,3 +401,27 @@ def test_stale_book_prices_are_never_quoted(tmp_path, monkeypatch):
         book("h2h", "home", 112), book("h2h", "away", -134), book("spreads", "home", -110, 2.5), book("totals", "over", -110, 55.5)]}))
     L = pipeline.live_lines("2026-10-26")[401871071]
     assert L["books_stale"] and L["spread"] == -1.5 and L["ml_home"] == -115 and L["ml_away"] == -105
+
+
+def test_espn_finals_grade_picks_cfbfastr_has_not_posted(tmp_path, monkeypatch):
+    monkeypatch.setenv("CFB_ARCHIVE_DIR", str(tmp_path))
+    board = {"events": [
+        {"id": "9", "status": {"type": {"completed": True}},
+         "competitions": [{"competitors": [{"homeAway": "home", "score": "24"}, {"homeAway": "away", "score": "21"}]}]},
+        {"id": "10", "status": {"type": {"completed": False}},
+         "competitions": [{"competitors": [{"homeAway": "home", "score": "7"}, {"homeAway": "away", "score": "0"}]}]}]}
+    finals = collect.parse_finals(board)
+    assert finals == {"9": [24.0, 21.0]}
+    (tmp_path / "finals").mkdir()
+    (tmp_path / "finals" / "2026-10-25.json").write_text(json.dumps({"finals": finals}))
+    (tmp_path / "picks").mkdir()
+    pick = {"game_id": 9, "date": "2026-10-24T19:30:00Z", "home": "Alabama", "away": "Auburn", "line": {},
+            "markets": [{"market": "total", "side": "under", "line": 51.5, "p": 0.56, "tier": "Strong", "proven": True}]}
+    (tmp_path / "picks" / "9.json").write_text(json.dumps(pick))
+    g = pd.DataFrame([{"game_id": 9, "final": False, "date": pd.Timestamp("2026-10-24T19:30:00Z"), "home_points": np.nan, "away_points": np.nan},
+                      {"game_id": 8, "final": True, "date": pd.Timestamp("2026-10-23T19:30:00Z"), "home_points": 10.0, "away_points": 3.0}])
+    assert pipeline.record(g, {})["picks"] == 0
+    graded = pipeline.with_espn_finals(g, pipeline.espn_finals())
+    rec = pipeline.record(graded, {})
+    assert rec["picks"] == 1 and rec["suggested"]["hits"] == 1 and rec["finals"]["9"] == [24.0, 21.0]
+    assert not g.final.iloc[0]   # the training frame is left alone

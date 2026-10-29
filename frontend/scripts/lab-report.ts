@@ -5,7 +5,7 @@
 
    Every run rewrites the report for today's date (Central time), so the 4 am refresh writes the first one of the day and
    later refreshes add late grades. Reports are kept in LAB_ARCHIVE/reports/ (the nfl-data branch) as JSON and plain
-   text; the daily post to Andrew in the project chat is written from them. They are not published on the site.
+   text; the "Daily report and health check" workflow posts the text to the "Daily model report" issue each morning. They are not published on the site.
    Reports written by hand before this ran (scripts/report-seed/) are copied in once and never rewritten. Nothing here
    stops the site from publishing. */
 import fs from "node:fs";

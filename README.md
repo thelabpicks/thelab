@@ -24,6 +24,14 @@ The same interface can run as a free, read-only website that rebuilds itself fro
 - On the website, filtering, sorting, paging and Top 3 exclude-and-replace run in the browser on the published numbers. Locked selections are saved in that browser only (append-only) and export to CSV. Data import is desktop-only. Player pages are published for the latest week.
 - Local preview: `cd backend && python -m engine.export_static && cd ../frontend && VITE_STATIC=1 npm run build && cp -r ../site-data dist/data && npx vite preview`.
 
+## Running on its own
+
+Everything runs on GitHub Actions with no one at the keyboard:
+
+- **Collect NBA data** (09:00, 16:00, 22:30 UTC), **Collect college football data** (15:00 UTC) and **Refresh data and publish site** (after each of those, plus the NFL schedule above) refresh the data, refit the models, freeze picks before each game, grade them after the final and publish.
+- **Daily report and health check** (`.github/workflows/lab-ops.yml`, 11:40 UTC) posts the morning's model report as a comment on the pinned **Daily model report** issue, so GitHub emails it and pushes it to the GitHub app. It also checks that every workflow succeeded in the last 30 hours, that The Lab's picks and the report were written, that the site answers and that the odds key works. Anything wrong goes on one **The Lab needs attention** issue, which closes itself once the next check passes. It also switches every schedule back on daily, since GitHub turns scheduled workflows off after 60 days without activity.
+- When a source is late the next run catches up: NBA box scores that are not posted by morning grade on the 16:00 run, college finals cfbfastR has not posted yet are taken from ESPN's scoreboard, and a failed run leaves the last good pages up.
+
 ## Quick start (developers)
 
 ```bash

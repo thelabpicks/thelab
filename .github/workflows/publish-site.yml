@@ -226,7 +226,7 @@ jobs:
           SIMS_DIR: ${{ github.workspace }}/pick-archive/sims
         run: npx vite-node scripts/game-sims.ts || echo "::warning::Game simulation inputs were not written this run"
 
-      # The daily model report posted to Andrew each morning (not on the site): how the picks and every lean did on
+      # The daily model report posted to the "Daily model report" issue each morning (lab-ops.yml; not on the site): how the picks and every lean did on
       # yesterday's games, where the predictions were off and why, and what the models changed in themselves. Every run
       # rewrites today's report, so the 4 am Central run (after the 09:00 UTC NBA collect) writes the first one.
       - name: Write the daily report
