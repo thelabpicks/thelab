@@ -17,8 +17,10 @@ export default function Sims({ sport }: { sport: "nfl" | "nba" | "cfb" }) {
   const src = React.useMemo(() => `${import.meta.env.BASE_URL}sim-player.html#${want}`, [sport]);
 
   React.useEffect(() => {
+    // Only once the player itself has loaded: setting the hash of the frame's initial blank page makes Safari drop
+    // the player's load and leaves an empty white frame (the player reads its first hash from src instead).
     const w = frame.current?.contentWindow;
-    try { if (w && w.location.hash.slice(1) !== want) w.location.hash = want; } catch { /* not loaded yet */ }
+    try { if (w && w.location.pathname.endsWith("sim-player.html") && w.location.hash.slice(1) !== want) w.location.hash = want; } catch { /* not loaded yet */ }
   }, [want]);
 
   React.useEffect(() => {
@@ -49,7 +51,7 @@ export default function Sims({ sport }: { sport: "nfl" | "nba" | "cfb" }) {
           <span className="max-w-md text-sm text-muted">Every game played 5,000 times with our projections. Watch the most typical one, start to finish.</span>
         </PageTitle>
       )}
-      <iframe ref={frame} key={sport} src={src} title="Game simulation" className="block w-full border-0" style={{ height }} />
+      <iframe ref={frame} key={sport} src={src} title="Game simulation" className="block w-full rounded-xl border-0 bg-[#0B1018]" style={{ height, colorScheme: "dark" }} />
     </div>
   );
 }
