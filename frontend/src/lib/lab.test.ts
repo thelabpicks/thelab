@@ -103,6 +103,15 @@ const nbaRow = (id: string, game: number, mu: number, line: number, extra: Parti
   due: false, evidence: { minutes: 34, minutes_long: 34, per_min: 0.7, opp_mult: 1, pace: 100, opp_pace: 100, rest: 2, start_rate: 1 }, ...extra,
 });
 
+describe("frozen NBA picks at whole-number lines", () => {
+  it("are voided, never graded as wins", () => {
+    const bad = pick({ id: "castle", player_id: "9", line: 45, side: "under", kickoff: "2026-10-29T01:00:00Z" });
+    const s = advance({ updated_at: null, board: [bad], frozen: [] }, [], { nba: { rows: [{ date: "2026-10-28", game_id: 1, player_id: "9", market: "points", actual: 20 }], through: "2026-10-28" } },
+      new Date("2026-10-29T12:00:00Z"));
+    expect(s.frozen[0].result).toBe("void");
+  });
+});
+
 describe("nbaCandidates", () => {
   it("keeps proven leans of stars sure to play at lines DraftKings posts, each with a write-up", () => {
     const dk = (line: number) => (["over", "under"] as const).map((side) => ({ book: "draftkings", side, line, price: -110 }));

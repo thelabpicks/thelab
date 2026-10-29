@@ -177,14 +177,15 @@ def espn_prop_market(type_name: str) -> str | None:
 
 def parse_espn_props(items: list[dict]) -> list[dict]:
     """DraftKings' main line per player and market from ESPN's propBets items. Each line comes as a pair (over and
-    under, unlabeled), so only the line is kept; with several lines (alternates) the most even-priced pair wins."""
+    under, unlabeled), so only the line is kept; with several lines (alternates) the most even-priced pair wins.
+    Main player lines always end in .5: whole numbers are milestones (25+ points) or in-game lines, never kept."""
     import re  # noqa: PLC0415
     pairs: dict = {}
     for it in items:
         m = espn_prop_market((it.get("type") or {}).get("name", ""))
         aid = re.search(r"/athletes/(\d+)", (it.get("athlete") or {}).get("$ref", ""))
         line = ((it.get("current") or {}).get("target") or {}).get("value")
-        if not m or not aid or line is None:
+        if not m or not aid or line is None or float(line) % 1 != 0.5:
             continue
         try:
             dec = float(((it.get("odds") or {}).get("decimal") or {}).get("value"))
@@ -206,7 +207,9 @@ def save_espn_props(day: str, log=print) -> dict:
     sb = sources.archive_dir() / "scoreboard" / f"{day}.json"
     if not sb.exists():
         return {"skipped": "no scoreboard"}
-    events = [e["id"] for e in json.loads(sb.read_text())["data"].get("events", [])]
+    # games not yet started only: once a game tips ESPN lists DraftKings' in-game lines, not the pregame ones
+    events = [e["id"] for e in json.loads(sb.read_text())["data"].get("events", [])
+              if ((e.get("status") or {}).get("type") or {}).get("state", "pre") == "pre"]
     rows, errors = [], {}
     for eid in events:
         try:
