@@ -44,6 +44,7 @@ ALT_MARKETS = {
     "rec_yards": "player_reception_yds_alternate",
     "receptions": "player_receptions_alternate",
 }
+SOON_HOURS = 36  # a game kicking off within this many hours with no saved prices is bought on any full run
 PAID_PLAN_MIN = 1000  # monthly allowance above this means a paid plan
 BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betmgm": "BetMGM", "williamhill_us": "Caesars", "espnbet": "ESPN BET",
          "fanatics": "Fanatics", "betrivers": "BetRivers", "ballybet": "Bally Bet", "hardrockbet": "Hard Rock", "betonlineag": "BetOnline",
@@ -138,7 +139,8 @@ def _model_chances(c: sqlite3.Connection, season: int, week: int) -> tuple[dict,
     return td, dist
 
 
-def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print) -> dict:
+def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print, within_hours: float | None = None,
+          unpriced_only: bool = False) -> dict:
     games = _week_games(c, season, week)
     if not games:
         raise RuntimeError(f"No games for {season} week {week}")
@@ -152,11 +154,15 @@ def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print) ->
     todo = []
     # FG_ODDS_WITHIN_HOURS buys only games kicking off soon (Thursday's run: the Thursday night game, before Saturday's
     # full pull), so a midweek game gets real lines without spending the week's credits twice.
-    within = float(os.environ.get("FG_ODDS_WITHIN_HOURS") or 0)
+    within = within_hours if within_hours is not None else float(os.environ.get("FG_ODDS_WITHIN_HOURS") or 0)
     soon = datetime.now(timezone.utc) + timedelta(hours=within)
+    # unpriced_only: games that already have saved prices are not bought again
+    prev = load_snapshot(season, week) or {}
+    priced = {r["game_id"] for r in prev.get("rows", [])} | set(prev.get("bought", [])) if unpriced_only else set()
     for e in events:  # type: ignore[union-attr]
         h, a = TEAMS.get(e["home_team"]), TEAMS.get(e["away_team"])
-        if (h, a) in by_teams and (not within or datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= soon):
+        if (h, a) in by_teams and by_teams[(h, a)]["game_id"] not in priced \
+                and (not within or datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= soon):
             todo.append((e, by_teams[(h, a)]))
     players = _players(c, season, week)
     if not players:
@@ -215,9 +221,8 @@ def fetch(c: sqlite3.Connection, season: int, week: int, key: str, log=print) ->
                            + "; ".join(errors[:3]))
     # games not bought this time (already played, or outside the window) keep the prices saved for them earlier
     fetched = {g["game_id"] for _, g in todo}
-    prev = load_snapshot(season, week)
-    rows += [r for r in (prev or {}).get("rows", []) if r["game_id"] not in fetched]
-    snap = {"season": season, "week": week, "fetched_at": utcnow(), "source": "The Odds API (the-odds-api.com), US books",
+    rows += [r for r in prev.get("rows", []) if r["game_id"] not in fetched]
+    snap = {"season": season, "week": week, "fetched_at": utcnow(), "bought": sorted(set(prev.get("bought", [])) | fetched), "source": "The Odds API (the-odds-api.com), US books",
             "games": len(todo), "alt_lines": want_alt, "rows": rows, "unmatched_names": len(unmatched), "errors": errors, "credits_remaining": remaining}
     odds_dir().mkdir(parents=True, exist_ok=True)
     snapshot_path(season, week).write_text(json.dumps(snap))
@@ -281,9 +286,15 @@ def maybe_fetch(c: sqlite3.Connection, season: int, log=print, force: bool = Fal
         return None
     snap = load_snapshot(season, week)
     if os.environ.get("FG_ODDS_FETCH", "true").lower() not in ("1", "true") and not force:
-        log("odds: fetching is off for this run (the hosted site fetches on Saturday); " +
-            (f"using snapshot from {snap['fetched_at']}" if snap else "no snapshot for this week yet"))
-        return snap
+        # Any other full run still buys a game kicking off within a day and a half that has no prices yet (about 6
+        # credits, once per game): a scheduled run can be cancelled by a newer queued run (Thursday 10/22 and 10/29),
+        # and a game must never go without real lines because of that.
+        try:
+            return fetch(c, season, week, key, log, within_hours=SOON_HOURS, unpriced_only=True)
+        except Exception as ex:  # noqa: BLE001 - odds are optional; the site still builds
+            log(f"odds: nothing bought this run ({ex}); " +
+                (f"using snapshot from {snap['fetched_at']}" if snap else "no snapshot for this week yet"))
+            return snap
     if snap and not force:
         age = datetime.now(timezone.utc) - datetime.fromisoformat(snap["fetched_at"])
         if age < timedelta(hours=max_age_hours):

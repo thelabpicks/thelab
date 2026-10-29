@@ -93,6 +93,27 @@ def test_thursday_buys_only_the_game_kicking_off_soon_and_keeps_earlier_prices(o
     assert snap["rows"] == [kept]
 
 
+def test_any_full_run_buys_a_game_kicking_off_soon_once(oddsdb, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    soon = (datetime.now(timezone.utc) + timedelta(hours=9)).isoformat()
+    bought = []
+
+    def fake_get(url, params):
+        if url.endswith("/events"):
+            return [{"id": "e1", "home_team": "Chicago Bears", "away_team": "New England Patriots", "commence_time": soon}], \
+                {"x-requests-remaining": "290"}
+        bought.append(url)
+        return {"bookmakers": []}, {}
+    monkeypatch.setattr(odds, "_get", fake_get)
+    monkeypatch.setenv("ODDS_API_KEY", "k")
+    monkeypatch.setenv("FG_ODDS_FETCH", "false")   # not the Thursday or Saturday run (cancelled by a newer queued run)
+    monkeypatch.setattr(odds.status, "current_week", lambda c, season: 7)
+    odds.maybe_fetch(oddsdb, 2026, log=lambda m: None)
+    odds.maybe_fetch(oddsdb, 2026, log=lambda m: None)
+    assert len(bought) == 1                         # bought once, even with no props posted
+    assert odds.load_snapshot(2026, 7)["bought"] == ["2026_07_NE_CHI"]
+
+
 def test_odds_are_not_bought_before_the_week_has_projections(oddsdb, monkeypatch):
     oddsdb.execute("DELETE FROM predictions")
     oddsdb.execute("DELETE FROM prop_projections")
