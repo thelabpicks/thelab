@@ -18,7 +18,7 @@ export type FrozenWeek = {
 const NFL_STATS = ["targets", "receptions", "rec_yards", "carries", "rush_yards", "attempts", "completions", "pass_yards", "pass_tds", "interceptions"] as const;
 export type NflSimPlayer = { id: string; name: string; pos: string } & Partial<Record<(typeof NFL_STATS)[number], number>>;
 export type NflSimGame = { id: string; away: string; home: string; kickoff: string | null; teams: Record<string, { implied: number; players: NflSimPlayer[] }> };
-export type NbaSimPlayer = { name: string; min: number; pts: number; reb: number; ast: number; tpm: number };
+export type NbaSimPlayer = { name: string; min: number; pts: number; reb: number; ast: number; tpm: number; bench?: true };
 export type NbaSimGame = { away: string; home: string; start: string; total: number; fav: string; spread: number };
 /** A game left off the page because its inputs failed a sanity check (shown nowhere, logged by the publish run). */
 export type HeldGame = { sport: "nfl" | "nba"; game: string; reasons: string[] };
@@ -74,15 +74,42 @@ export const nbaTargets = (g: NbaSimGame) => {
   return g.fav === g.home ? [lo, hi] : [hi, lo];
 };
 
-export function nbaChecks(g: NbaSimGame, players: SimGames["nba"]["players"]): string[] {
+/** The most minutes a reserves line may cover: past this the projections are missing real rotation players. */
+const MAX_RESERVE_MINUTES = 48;
+/** Per-minute production of a typical end-of-rotation player, for the minutes no projected player covers. */
+const BENCH_RATE = { pts: 0.42, reb: 0.18, ast: 0.09, tpm: 0.04 };
+
+/** Fits a team's projections into 240 minutes. Each player's projected minutes are his minutes when he plays, so a
+ *  team's sum usually runs past 240 (Memphis once summed to 329): the deep bench is who sits. Players keep their
+ *  projected minutes in order, most first, until 240 are used; the last one in gets what is left, and his counting
+ *  stats shrink with his minutes. Players left under 4 minutes are dropped. A team whose projected players come up
+ *  short (rookies and new signings have too little history to project) gets one "reserves" line for the rest, at a
+ *  typical bench player's rate, so no projected player is stretched past his own minutes to fill the gap. */
+export function fitRotation(list: NbaSimPlayer[], team = ""): NbaSimPlayer[] {
+  let left = 240;
+  const out: NbaSimPlayer[] = [];
+  for (const p of [...list].sort((a, b) => b.min - a.min)) {
+    const m = Math.min(p.min, left);
+    if (m < 4) break;
+    const k = m / p.min;
+    out.push({ name: p.name, min: r2(m), pts: r2(p.pts * k), reb: r2(p.reb * k), ast: r2(p.ast * k), tpm: r2(p.tpm * k) });
+    left -= m;
+  }
+  if (left >= 4 && left <= MAX_RESERVE_MINUTES) {
+    out.push({ name: `${team} reserves`.trim(), min: r2(left), pts: r2(left * BENCH_RATE.pts), reb: r2(left * BENCH_RATE.reb),
+      ast: r2(left * BENCH_RATE.ast), tpm: r2(left * BENCH_RATE.tpm), bench: true });
+  }
+  return out;
+}
+
+export function nbaChecks(g: NbaSimGame, players: SimGames["nba"]["players"], projectedMinutes: Record<string, number> = {}): string[] {
   const bad: string[] = [];
   const target = nbaTargets(g);
   [g.away, g.home].forEach((t, i) => {
     const ps = players[t];
-    const min = ps.reduce((s, p) => s + p.min, 0), pts = ps.reduce((s, p) => s + p.pts, 0);
-    // 240 team minutes (the replay scales to 240); a sum far above it means minutes for players who may not play
-    // (Memphis once summed to 329), far below means missing players
-    if (min < 210 || min > 290) bad.push(`${t} projected minutes add up to ${Math.round(min)} of 240`);
+    const min = projectedMinutes[t] ?? ps.reduce((s, p) => s + p.min, 0), pts = ps.reduce((s, p) => s + p.pts, 0);
+    // more than a reserves line can cover means rotation players are missing from the projections
+    if (min < 240 - MAX_RESERVE_MINUTES) bad.push(`${t} projected minutes add up to only ${Math.round(min)} of 240`);
     if (pts / target[i] < 0.85 || pts / target[i] > 1.15) bad.push(`${t} projected points add up to ${Math.round(pts)} vs ${target[i].toFixed(1)} from the book`);
     for (const p of ps) if (p.pts > 45 || p.reb > 20 || p.ast > 16 || p.min > 44) bad.push(`${t} ${p.name} has an extreme projection`);
   });
@@ -121,18 +148,21 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = []): SimGame
     if (k) p[k] = r2(r.mean);
   }
   const players: SimGames["nba"]["players"] = {};
+  const projected: Record<string, number> = {};
   for (const [team, m] of by) {
     const list = [...m.values()].filter((p) => p.min >= 4 && p.pts > 0).sort((a, b) => b.min - a.min);
-    if (list.length >= 8) players[team] = list;
+    const total = list.reduce((s, p) => s + p.min, 0);
+    const fit = fitRotation(list, team);
+    if (fit.filter((p) => !p.bench).length >= 7) { players[team] = fit; projected[team] = total; }
   }
   const games: NbaSimGame[] = [];
   for (const g of slate.games) {
     const key = `${g.away} at ${g.home}`;
     if (g.total == null || g.home_spread == null) { held.push({ sport: "nba", game: key, reasons: ["no book total and spread yet"] }); continue; }
-    if (!players[g.home] || !players[g.away]) { held.push({ sport: "nba", game: key, reasons: ["fewer than 8 projected players on a team"] }); continue; }
+    if (!players[g.home] || !players[g.away]) { held.push({ sport: "nba", game: key, reasons: ["fewer than 7 projected players on a team"] }); continue; }
     // home_spread is the home side's line: negative when the home team is favored
     const game: NbaSimGame = { away: g.away, home: g.home, start: g.time, total: g.total, fav: g.home_spread <= 0 ? g.home : g.away, spread: Math.abs(g.home_spread) };
-    const bad = nbaChecks(game, players);
+    const bad = nbaChecks(game, players, projected);
     if (bad.length) held.push({ sport: "nba", game: key, reasons: bad });
     else games.push(game);
   }

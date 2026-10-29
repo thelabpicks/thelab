@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nbaChecks, nbaSimGames, nflSimGames, type FrozenWeek, type HeldGame } from "./gamesims";
+import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -46,10 +46,28 @@ describe("game sim inputs", () => {
     expect(out.players.H[0]).toMatchObject({ min: 37, pts: 19, reb: 5 });
   });
 
-  it("holds back an NBA game whose minutes add up far past 240", () => {
-    const team = (min: number) => Array.from({ length: 9 }, () => ({ name: "P", min, pts: 115 / 9, reb: 4, ast: 3, tpm: 1 }));
+  it("fits a rotation whose minutes run past 240: the deep bench sits, the last one in gets what is left", () => {
+    const list = [36, 34, 32, 30, 28, 26, 24, 22, 20, 18].map((min, i) => ({ name: `P${i}`, min, pts: min / 2, reb: 4, ast: 2, tpm: 1 }));
+    const fit = fitRotation(list);
+    expect(fit.map((p) => p.min)).toEqual([36, 34, 32, 30, 28, 26, 24, 22, 8]);
+    expect(fit.reduce((s, p) => s + p.min, 0)).toBe(240);
+    expect(fit[8]).toMatchObject({ name: "P8", min: 8, pts: 4, reb: 1.6 });
+  });
+
+  it("fills a short rotation with a reserves line, but not one missing more than 48 minutes", () => {
+    const list = [34, 32, 30, 28, 26, 24, 22, 20].map((min, i) => ({ name: `P${i}`, min, pts: min / 2, reb: 4, ast: 2, tpm: 1 }));
+    const fit = fitRotation(list, "SAC");
+    expect(fit).toHaveLength(9);
+    expect(fit[8]).toEqual({ name: "SAC reserves", min: 24, pts: 10.08, reb: 4.32, ast: 2.16, tpm: 0.96, bench: true });
+    expect(fitRotation(list.slice(0, 6), "SAC")).toHaveLength(6);
+  });
+
+  it("holds back an NBA game whose projections can't nearly fill 240 minutes or miss the book's points", () => {
+    const team = (min: number, pts = 115) => Array.from({ length: 9 }, () => ({ name: "P", min, pts: pts / 9, reb: 4, ast: 3, tpm: 1 }));
     const g = { away: "V", home: "H", start: "", total: 230, fav: "H", spread: 0 };
     expect(nbaChecks(g, { V: team(26.7), H: team(26.7) })).toEqual([]);
-    expect(nbaChecks(g, { V: team(36.5), H: team(26.7) })[0]).toMatch(/V projected minutes add up to 329/);
+    expect(nbaChecks(g, { V: team(26.7), H: team(26.7) }, { V: 329, H: 260 })).toEqual([]);
+    expect(nbaChecks(g, { V: team(21), H: team(26.7) })[0]).toMatch(/V projected minutes add up to only 189/);
+    expect(nbaChecks(g, { V: team(26.7, 80), H: team(26.7) })[0]).toMatch(/V projected points add up to 80/);
   });
 });

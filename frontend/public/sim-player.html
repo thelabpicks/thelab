@@ -313,7 +313,7 @@ function setupNBA(){
   NBA.teams.forEach((T,ti)=>{
     const rows=DATA.nba.players[T.abbr]; const tot=rows.reduce((s,r)=>s+r.min,0); const k=240/tot;
     T.target=tgt[ti];
-    T.ps=rows.map(r=>({...r,short:short(r.name),ini:inits(r.name),m:r.min*k,
+    T.ps=rows.map(r=>({...r,short:r.bench?'Reserves':short(r.name),ini:r.bench?'RS':inits(r.name),m:r.min*k,
       w3:r.tpm/r.min+0.002, w2:Math.max(0.02,(r.pts-3*r.tpm)/r.min), wf:r.pts/r.min+0.01, wr:r.reb/r.min+0.01, wa:r.ast/r.min+0.005}));
     // rotation: 16 stints of 3 minutes; starters open each half and close the game
     const rem=T.ps.map(p=>p.m), rot=[];
