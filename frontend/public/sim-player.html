@@ -487,20 +487,55 @@ function runAll(G,sim){
   const fav=homeWins>=awayWins?1:0;
   // Replay pick, in two steps: the 150 runs closest to the median score (with the likelier winner), then among those
   // the one whose main player lines sit closest to our projections, so neither the score nor the stars look unusual.
+  // With a live pick on the game, the replay must also land on the pick's side for every picked player: runs that don't
+  // are passed over (scanning further from the median if needed), so a shared sim never contradicts a pick.
   const near=[];
   for(let i=0;i<n;i++){const s=sc[i];if((s[1]>s[0]?1:0)!==fav||s[0]===s[1])continue;
     near.push([Math.abs(s[0]-mA)+Math.abs(s[1]-mB)+Math.abs((s[1]-s[0])-(mB-mA)),i])}
   near.sort((a,b)=>a[0]-b[0]);
-  let best=near[0][1],bd=1e9;
-  for(const [d,i] of near.slice(0,150)){const g=sim(100000+i,true), t=d/3+statMiss(G,g);if(t<bd){bd=t;best=i}}
+  let best=near[0][1],bd=1e9,agree=0;
+  for(let j=0;j<near.length&&j<1500&&(j<150||agree<150);j++){const [d,i]=near[j];
+    const g=sim(100000+i,true), box=boxOf(G,g), off=pickMisses(G,box);if(!off)agree++;
+    if(j>=150&&off)continue;
+    const t=d/3+statMiss(G,box)+50*off;if(t<bd){bd=t;best=i}}
   G.dist={sc,mA,mB,homeWins,awayWins,n,meanA:sc.reduce((a,s)=>a+s[0],0)/n,meanB:sc.reduce((a,s)=>a+s[1],0)/n};
   G.game=sim(100000+best,true);
 }
-// How far a recorded run's key player lines are from the projections, each miss measured in rough standard deviations.
-function statMiss(G,g){
+// Each team's box score of a recorded run: box[team][player][stat].
+function boxOf(G,g){
   const box=G.teams.map(()=>({}));
   for(const e of g.ev)for(const [ti,p,k,v] of e.bx){const b=box[ti][p]||(box[ti][p]={});b[k]=(b[k]||0)+v}
+  return box;
+}
+// The Lab's live picks on this game (data/sims/games.json picks): which player, the box stats the market adds up, and
+// his projection for it.
+const PICK_STAT={nba:{points:['pts'],rebounds:['reb'],assists:['ast'],threes:['tpm'],pra:['pts','reb','ast']},
+  nfl:{td:['rtd','rutd'],rec_yards:['ryd'],receptions:['rec'],rush_yards:['ruyd'],carries:['car'],pass_yards:['pyd'],pass_tds:['ptd'],
+    interceptions:['int'],completions:['cmp'],attempts:['att']}};
+const NFL_PROJ={ryd:'rec_yards',rec:'receptions',ruyd:'rush_yards',car:'carries',pyd:'pass_yards',ptd:'pass_tds',int:'interceptions',cmp:'completions',att:'attempts'};
+function gamePicks(gm,G){
+  const game=gm.sport==='nfl'?gm.src.id:`${gm.src.away} at ${gm.src.home}`, out=[];
+  for(const p of DATA.picks||[]){
+    const keys=p.sport===gm.sport&&p.game===game&&PICK_STAT[gm.sport][p.market];if(!keys)continue;
+    G.teams.forEach((T,ti)=>{
+      const i=T.ps.findIndex(x=>gm.sport==='nfl'&&p.player_id?x.id===p.player_id:x.name===p.who);if(i<0)return;
+      // his own projection, the number the pick was made from (not scaled to the book's team total)
+      const pl=T.ps[i], proj=gm.sport==='nba'?keys.reduce((s,x)=>s+(pl[x]||0),0):p.market==='td'?null:keys.reduce((s,x)=>s+(pl[NFL_PROJ[x]]||0),0);
+      out.push({ti,pid:gm.sport==='nfl'?pl.id:i,keys,side:p.side,line:p.line,proj});
+    });
+  }
+  return out;
+}
+// How many of the game's picks a run's box score goes against.
+function pickMisses(G,box){
+  return (G.picks||[]).filter(k=>{const b=box[k.ti][k.pid]||{}, v=k.keys.reduce((s,x)=>s+(b[x]||0),0);
+    return k.side==='yes'?v<1:k.side==='no'?v>=1:k.line==null?false:k.side==='over'?!(v>k.line):!(v<k.line)}).length;
+}
+// How far a recorded run's key player lines are from the projections, each miss measured in rough standard deviations.
+function statMiss(G,box){
   let m=0;const miss=(v,proj,sd)=>{m+=Math.abs((v||0)-proj)/sd};
+  // a picked player also lands close to his projection, not just on the right side of the line
+  for(const k of G.picks||[])if(k.proj!=null){const b=box[k.ti][k.pid]||{};miss(k.keys.reduce((s,x)=>s+(b[x]||0),0),k.proj,Math.max(1,0.15*k.proj))}
   G.teams.forEach((T,ti)=>{const tb=box[ti];
     if(G.sport==='nba'){const k=T.target/T.ps.reduce((s,p)=>s+p.pts,0);
       // every player's line, so no bench player has a night far off his projection
@@ -992,6 +1027,7 @@ function build(gm){
   if(gm.G)return gm.G;
   if(gm.sport==='nba'){const s=gm.src;NBA={sport:'nba',runs:5000,key:gm.key,teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when),book:{total:s.total,spread:s.spread,fav:s.fav===s.home?1:0,favAbbr:s.fav}};setupNBA();gm.G=NBA}
   else{NFL={sport:'nfl',runs:5000,key:gm.key,src:gm.src,teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when)};setupNFL();gm.G=NFL}
+  gm.G.picks=gamePicks(gm,gm.G);
   runAll(gm.G,gm.sport==='nba'?simNBA:simNFL);
   gm.win=gm.G.dist.homeWins/gm.G.dist.n;
   if(G){if(G.sport==='nba')NBA=G;else NFL=G}

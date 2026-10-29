@@ -24,8 +24,12 @@ export type NbaSimGame = { away: string; home: string; start: string; total: num
 export type HeldGame = { sport: "nfl" | "nba"; game: string; reasons: string[] };
 /** A game whose inputs failed a check and were corrected, then passed every check (logged by the publish run). */
 export type FixedGame = { sport: "nfl" | "nba"; game: string; fixes: string[] };
+/** A pick The Lab has out on a simulated game (top 10 or pick of the day): the replay shown for that game must land on
+ *  the pick's side, so a follower never sees the sim contradict the pick. game: the NFL game id or "AWAY at HOME". */
+export type SimPick = { sport: "nfl" | "nba"; game: string; who: string; player_id?: string; market: string; side: string; line: number | null };
 export type SimGames = {
   generated_at: string;
+  picks: SimPick[];
   held: HeldGame[];
   fixed: FixedGame[];
   nfl: { season: number | null; week: number | null; games: NflSimGame[] };
@@ -242,4 +246,25 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: F
   games.sort((x, y) => x.start.localeCompare(y.start) || x.home.localeCompare(y.home));
   const playing = new Set(games.flatMap((g) => [g.home, g.away]));
   return { date: slate.date, games, players: Object.fromEntries(Object.entries(players).filter(([t]) => playing.has(t))) };
+}
+
+type BoardPick = { sport: string; game_id: string; kickoff: string; matchup: string; who: string; player_id?: string; market: string;
+  side: string; line: number | null; withdrawn?: boolean };
+type Board = { board?: BoardPick[]; recent?: BoardPick[]; daily?: { picks?: BoardPick[]; recent?: BoardPick[] } };
+
+/** The live picks (top 10, frozen picks of started games, picks of the day) on the games this page replays. */
+export function simPicks(board: Board | null, nfl: SimGames["nfl"], nba: SimGames["nba"]): SimPick[] {
+  if (!board) return [];
+  const all = [...(board.board ?? []), ...(board.recent ?? []), ...(board.daily?.picks ?? []), ...(board.daily?.recent ?? [])];
+  const nflIds = new Set(nfl.games.map((g) => g.id));
+  // an NBA matchup repeats across a season: a pick belongs to tonight's game only if it tips within 12 hours of it
+  const nbaStart = new Map(nba.games.map((g) => [`${g.away} at ${g.home}`, Date.parse(g.start)]));
+  const out = new Map<string, SimPick>();
+  for (const p of all) {
+    if (p.withdrawn || !p.who || (p.sport !== "nfl" && p.sport !== "nba")) continue;
+    const game = p.sport === "nfl" ? p.game_id : p.matchup;
+    if (p.sport === "nfl" ? !nflIds.has(game) : Math.abs((nbaStart.get(game) ?? NaN) - Date.parse(p.kickoff)) > 12 * 3600e3 || !nbaStart.has(game)) continue;
+    out.set(`${game}|${p.who}|${p.market}`, { sport: p.sport, game, who: p.who, player_id: p.player_id, market: p.market, side: p.side, line: p.line });
+  }
+  return [...out.values()];
 }

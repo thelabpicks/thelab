@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, type FrozenWeek, type HeldGame } from "./gamesims";
+import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -96,5 +96,17 @@ describe("game sim inputs", () => {
     const rec = out.games[0].teams.A.players.reduce((s, p) => s + (p.rec_yards ?? 0), 0);
     expect(Math.abs(rec / 240 - 1)).toBeLessThan(0.3);
     expect(repairNfl(out.games[0])).toEqual([]);
+  });
+
+  it("passes along the live picks on tonight's simulated games only", () => {
+    const nfl = { season: 2026, week: 8, games: [{ id: "2026_08_A_B" }] } as never;
+    const nba = { date: "2026-10-29", games: [{ away: "MEM", home: "POR", start: "2026-10-30T02:00Z", total: 230, fav: "POR", spread: 3 }], players: {} };
+    const pick = (o: object) => ({ sport: "nba", game_id: "1", kickoff: "2026-10-29T22:00:00-0400", matchup: "MEM at POR", who: "Ty Jerome",
+      player_id: "4065733", market: "points", side: "under", line: 23.5, ...o });
+    const out = simPicks({
+      board: [pick({}), pick({ who: "Old Pick", kickoff: "2026-10-20T22:00:00-0400" }), pick({ sport: "nfl", game_id: "2026_08_A_B", who: "R B", market: "td", side: "yes", line: null })],
+      daily: { picks: [pick({}), pick({ who: "Withdrawn", withdrawn: true })] },
+    }, nfl, nba);
+    expect(out.map((p) => `${p.game} ${p.who}`)).toEqual(["MEM at POR Ty Jerome", "2026_08_A_B R B"]);
   });
 });
