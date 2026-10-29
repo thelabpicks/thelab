@@ -483,11 +483,32 @@ function runAll(G,sim){
   const mA=median(sc.map(s=>s[0])), mB=median(sc.map(s=>s[1]));
   const homeWins=sc.filter(s=>s[1]>s[0]).length, awayWins=sc.filter(s=>s[0]>s[1]).length;
   const fav=homeWins>=awayWins?1:0;
-  let best=-1,bd=1e9;
+  // Replay pick, in two steps: the 150 runs closest to the median score (with the likelier winner), then among those
+  // the one whose main player lines sit closest to our projections, so neither the score nor the stars look unusual.
+  const near=[];
   for(let i=0;i<n;i++){const s=sc[i];if((s[1]>s[0]?1:0)!==fav||s[0]===s[1])continue;
-    const dd=Math.abs(s[0]-mA)+Math.abs(s[1]-mB)+Math.abs((s[1]-s[0])-(mB-mA));if(dd<bd){bd=dd;best=i}}
+    near.push([Math.abs(s[0]-mA)+Math.abs(s[1]-mB)+Math.abs((s[1]-s[0])-(mB-mA)),i])}
+  near.sort((a,b)=>a[0]-b[0]);
+  let best=near[0][1],bd=1e9;
+  for(const [d,i] of near.slice(0,150)){const g=sim(100000+i,true), t=d/3+statMiss(G,g);if(t<bd){bd=t;best=i}}
   G.dist={sc,mA,mB,homeWins,awayWins,n,meanA:sc.reduce((a,s)=>a+s[0],0)/n,meanB:sc.reduce((a,s)=>a+s[1],0)/n};
   G.game=sim(100000+best,true);
+}
+// How far a recorded run's key player lines are from the projections, each miss measured in rough standard deviations.
+function statMiss(G,g){
+  const box=G.teams.map(()=>({}));
+  for(const e of g.ev)for(const [ti,p,k,v] of e.bx){const b=box[ti][p]||(box[ti][p]={});b[k]=(b[k]||0)+v}
+  let m=0;const miss=(v,proj,sd)=>{m+=Math.abs((v||0)-proj)/sd};
+  G.teams.forEach((T,ti)=>{const tb=box[ti];
+    if(G.sport==='nba'){const k=T.target/T.ps.reduce((s,p)=>s+p.pts,0);
+      // every player's line, so no bench player has a night far off his projection
+      T.ps.forEach((p,i)=>{const b=tb[i]||{};miss(b.pts,p.pts*k,6);miss(b.reb,p.reb,3);miss(b.ast,p.ast,2.5);miss(b.tpm,p.tpm,1.5)});
+    }else{const g=id=>tb[id]||{},q=T.qb,b=g(q.id);
+      miss(b.pyd,q.pass_yards,60);miss(b.ptd,q.pass_tds||0,0.9);miss(b.int,q.interceptions||0,0.8);
+      [...T.rush].filter(p=>p!==q).sort((x,y)=>y.carries-x.carries).slice(0,1).forEach(p=>{miss(g(p.id).car,p.carries,4);miss(g(p.id).ruyd,p.rush_yards,30)});
+      [...T.tgt].sort((x,y)=>y.rec_yards-x.rec_yards).slice(0,3).forEach(p=>miss(g(p.id).ryd,p.rec_yards,30));
+    }});
+  return m;
 }
 
 /* ================= rendering ================= */
