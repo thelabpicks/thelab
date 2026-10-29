@@ -234,6 +234,8 @@ canvas { display: block; width: 100%; max-width: 100%; }
   .ticker { min-height: 70px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.record { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; background: var(--surface); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.record b { color: var(--fg); }
 .empty { border: 1px dashed var(--line); border-radius: 12px; padding: 22px; color: var(--muted); text-align: center; background: var(--surface); }
 .gmeta .ko { color: var(--warn); }
 </style>
@@ -1082,12 +1084,18 @@ function card(gm,big){
     <div class="gact"><a class="btn primary" href="#${gm.key}">Watch the full sim</a><button class="btn ghost copy" data-key="${gm.key}">Copy link</button></div>
   </article>`;
 }
+// How the sims did against the finals (data/sims/grades.json, scripts/sim-grades.ts), last 30 days.
+let GRADES=null;
+function recordHtml(sp){
+  const s=GRADES&&GRADES.last30&&GRADES.last30[sp];if(!s||!s.games)return '';
+  return `<div class="record"><b>How our sims did, last 30 days:</b> picked the winner in ${s.winners} of ${s.games} games (${Math.round(100*s.winners/s.games)}%). Each team's points landed within ${s.team_miss} of the sims on average${s.book_miss!=null?` (the book's line: ${s.book_miss})`:''}. Every sim is graded against the final box score after each game.</div>`;
+}
 function renderHub(){
   document.querySelectorAll('[data-sport]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.sport===hubSport)));
   const L=GAMES[hubSport], f=featured(hubSport), rest=L.filter(g=>g!==f);
-  if(!f){document.getElementById('hubbody').innerHTML=`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
+  if(!f){document.getElementById('hubbody').innerHTML=recordHtml(hubSport)+`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
   const groups={};rest.forEach(g=>{const d=ETday.format(new Date(g.when));(groups[d]=groups[d]||[]).push(g)});
-  document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('');
+  document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('')+recordHtml(hubSport);
   document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{const url=shareUrl(b.dataset.key);
     const done=()=>{b.textContent='Link copied';setTimeout(()=>b.textContent='Copy link',1600)};
     try{navigator.clipboard.writeText(url).then(done,()=>{b.textContent=url})}catch(_){b.textContent=url}});
@@ -1129,6 +1137,7 @@ fetch('data/sims/games.json',{cache:'no-cache'}).then(r=>r.ok?r.json():Promise.r
   warmQ=[featured(hubSport),...GAMES[hubSport]].filter(Boolean);
   route(); setTimeout(warm,60);
 });
+fetch('data/sims/grades.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GRADES=g;if(g&&DATA&&!document.getElementById('hub').hidden)renderHub()});
 requestAnimationFrame(frame);
 </script>
 </body></html>

@@ -44,7 +44,7 @@ describe("game sim inputs", () => {
       games: [{ game_id: 1, date: "2026-10-29", time: "2026-10-30T00:00Z", home: "H", away: "V", total: 230.5, home_spread: 4.5 },
         { game_id: 2, date: "2026-10-29", time: "2026-10-30T00:00Z", home: "X", away: "Y", total: null, home_spread: null }] } as unknown as Slate;
     const out = nbaSimGames(slate);
-    expect(out.games).toEqual([{ away: "V", home: "H", start: "2026-10-30T00:00Z", total: 230.5, fav: "V", spread: 4.5 }]);
+    expect(out.games).toEqual([{ away: "V", home: "H", start: "2026-10-30T00:00Z", total: 230.5, fav: "V", spread: 4.5, espn_id: "1" }]);
     expect(out.players.H).toHaveLength(8);
     expect(out.players.H[0]).toMatchObject({ min: 37, pts: 19, reb: 5 });
   });

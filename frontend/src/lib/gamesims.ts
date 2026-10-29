@@ -19,7 +19,7 @@ const NFL_STATS = ["targets", "receptions", "rec_yards", "carries", "rush_yards"
 export type NflSimPlayer = { id: string; name: string; pos: string } & Partial<Record<(typeof NFL_STATS)[number], number>>;
 export type NflSimGame = { id: string; away: string; home: string; kickoff: string | null; teams: Record<string, { implied: number; players: NflSimPlayer[] }> };
 export type NbaSimPlayer = { name: string; min: number; pts: number; reb: number; ast: number; tpm: number; bench?: true };
-export type NbaSimGame = { away: string; home: string; start: string; total: number; fav: string; spread: number };
+export type NbaSimGame = { away: string; home: string; start: string; total: number; fav: string; spread: number; espn_id?: string };
 /** A game left off the page because its inputs failed a sanity check even after repairs (logged by the publish run). */
 export type HeldGame = { sport: "nfl" | "nba"; game: string; reasons: string[] };
 /** A game whose inputs failed a check and were corrected, then passed every check (logged by the publish run). */
@@ -253,7 +253,8 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: F
     if (g.total == null || g.home_spread == null) { held.push({ sport: "nba", game: key, reasons: ["no book total and spread yet"] }); continue; }
     if (!players[g.home] || !players[g.away]) { held.push({ sport: "nba", game: key, reasons: ["fewer than 7 projected players on a team"] }); continue; }
     // home_spread is the home side's line: negative when the home team is favored
-    const game: NbaSimGame = { away: g.away, home: g.home, start: g.time, total: g.total, fav: g.home_spread <= 0 ? g.home : g.away, spread: Math.abs(g.home_spread) };
+    const game: NbaSimGame = { away: g.away, home: g.home, start: g.time, total: g.total, fav: g.home_spread <= 0 ? g.home : g.away,
+      spread: Math.abs(g.home_spread), espn_id: String(g.game_id) };
     let bad = nbaChecks(game, players, projected);
     if (bad.length) {
       const fixes = repairNba(game, players);
