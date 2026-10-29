@@ -156,6 +156,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
 
     out.mkdir(parents=True, exist_ok=True)
     _write(out, "slate.json", {"date": slate_date, "generated_at": utcnow(), "games": games, "rows": rows,
+                               "rotation": rotation_json(proj) if len(proj) else [],
                                "odds": {"fetched_at": odds["fetched_at"], "plan": odds["plan"],
                                         "props_priced": bool(odds["props"] or odds.get("dk"))}})
     _write(out, "markets.json", {"markets": list(reports.values()),
@@ -265,6 +266,22 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "due": bool(m in due_markets and len(recent) >= 4 and all(v < r.mu for v in recent[:4]) and (r.min_l or 0) >= 20),
         })
     return rows
+
+
+def rotation_json(proj: pd.DataFrame) -> list[dict]:
+    """Every projected player not ruled out, for the game simulations: the site's rows leave out players under 15
+    minutes, and a team's rotation must add up to its whole game. Means are the same projections the picks use
+    (conditional on playing his usual minutes, min_s); minutes_expected also counts coach's-decision DNPs as 0."""
+    keep = {"points": "pts", "rebounds": "reb", "assists": "ast", "threes": "tpm"}
+    p = proj[~proj.out & proj.market.isin(keep)]
+    w = p.pivot_table(index=["player_id", "player_name", "team"], columns="market", values="mu").rename(columns=keep)
+    info = p.drop_duplicates("player_id").set_index("player_id")[["min_s", "min_exp"]]
+    out = []
+    for (pid, name, team), r in w.iterrows():
+        mins = info.loc[pid]
+        out.append({"player_id": str(int(pid)), "player_name": name, "team": team, "minutes": _num(mins.min_s),
+                    "minutes_expected": _num(mins.min_exp), **{k: _num(r.get(k)) for k in keep.values()}})
+    return out
 
 
 def p_over_dist(dist: dict, line: float) -> float:

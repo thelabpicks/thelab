@@ -56,6 +56,19 @@ describe("game sim inputs", () => {
     expect(fit[8]).toMatchObject({ name: "P8", min: 8, pts: 4, reb: 1.6 });
   });
 
+  it("builds NBA rotations from every projected player, shrinking a sometimes-benched player's line with his minutes", () => {
+    const rot = (t: string) => Array.from({ length: 10 }, (_, i) => ({ player_id: `${t}${i}`, player_name: `${t} P${i}`, team: t,
+      minutes: i === 9 ? 21 : 28 - i, minutes_expected: i === 9 ? 10.5 : 28 - i, pts: i === 9 ? 5 : 14 - i, reb: 5, ast: 3, tpm: 1 }));
+    const slate = { date: "2026-10-29", generated_at: "", odds: {}, rows: [], rotation: [...rot("H"), ...rot("V")],
+      games: [{ game_id: 1, date: "2026-10-29", time: "2026-10-30T00:00Z", home: "H", away: "V", total: 200, home_spread: -2 }] } as unknown as Slate;
+    const out = nbaSimGames(slate);
+    expect(out.games).toHaveLength(1);
+    expect(out.players.H.reduce((s, p) => s + p.min, 0)).toBe(240);
+    // P9 plays 21 minutes when he plays but sits half the time: 10.5 expected minutes, half his line
+    const p9 = out.players.H.find((p) => p.name === "H P9")!;
+    expect(p9).toMatchObject({ min: 10.5, pts: 2.5, reb: 2.5 });
+  });
+
   it("fills a short rotation with a reserves line, but not one missing more than 48 minutes", () => {
     const list = [34, 32, 30, 28, 26, 24, 22, 20].map((min, i) => ({ name: `P${i}`, min, pts: min / 2, reb: 4, ast: 2, tpm: 1 }));
     const fit = fitRotation(list, "SAC");
@@ -76,16 +89,16 @@ describe("game sim inputs", () => {
   it("repairs a failed game and checks it again instead of hiding it", () => {
     const team = (pts: number, min = 26.7) => Array.from({ length: 9 }, (_, i) => ({ name: `P${i}`, min: i ? min : 46, pts: pts / 9, reb: 4, ast: 3, tpm: 1 }));
     const g = { away: "V", home: "H", start: "", total: 230, fav: "H", spread: 0 };
-    const players = { V: team(90), H: team(115) };
+    const players = { V: team(115), H: team(115) };
     expect(nbaChecks(g, players).length).toBeGreaterThan(0);
-    const fixes = repairNba(g, players);
-    expect(fixes).toContain("V points 90 scaled to the book's 115.0");
+    expect(repairNba(g, players)).toEqual(["V P0 minutes 46 cut to 44", "H P0 minutes 46 cut to 44"]);
     expect(nbaChecks(g, players)).toEqual([]);
     expect(players.V[0].min).toBe(44);
-    // too far off to be a projection problem: left alone, so the game stays held
-    const broken = { V: team(50), H: team(115) };
-    repairNba(g, broken);
-    expect(nbaChecks(g, broken).some((r) => r.startsWith("V projected points"))).toBe(true);
+    // points far from the book are never bent to it: the game stays held until the projections are fixed
+    const off = { V: team(90), H: team(115) };
+    repairNba(g, off);
+    expect(off.V.reduce((s, p) => s + p.pts, 0)).toBeCloseTo(90 - 10 * (2 / 46), 1);
+    expect(nbaChecks(g, off).some((r) => r.startsWith("V projected points"))).toBe(true);
 
     const week: FrozenWeek = { season: 2026, week: 8, games: { "2026_08_A_B": { game_id: "2026_08_A_B", kickoff: null, teams: { A: team0(), B: team0() } } } };
     week.games["2026_08_A_B"].teams.A.players.w.rec_yards = { mean: 300 };

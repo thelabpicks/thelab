@@ -164,23 +164,18 @@ export function repairNfl(g: NflSimGame): string[] {
 }
 
 /** Corrects a failed NBA game's inputs (checked again after): a player past 44 minutes is cut to 44 with his stats in
- *  proportion, and a team whose players' points miss the book's number by 15% or more (but less than half again) has
- *  every player's points and threes scaled to it, keeping each one's share. Returns what was changed. */
+ *  proportion. Returns what was changed. */
 export function repairNba(g: NbaSimGame, players: SimGames["nba"]["players"]): string[] {
   const fixes: string[] = [];
-  const target = nbaTargets(g);
-  [g.away, g.home].forEach((t, i) => {
-    let ps = players[t].map((p) => {
+  [g.away, g.home].forEach((t) => {
+    const ps = players[t].map((p) => {
       if (p.min <= 44) return p;
       const k = 44 / p.min;
       fixes.push(`${t} ${p.name} minutes ${p.min} cut to 44`);
       return { ...p, min: 44, pts: r2(p.pts * k), reb: r2(p.reb * k), ast: r2(p.ast * k), tpm: r2(p.tpm * k) };
     });
-    const pts = ps.reduce((s, p) => s + p.pts, 0), k = target[i] / pts;
-    if ((k < 1 / 1.15 || k > 1 / 0.85) && k >= 0.65 && k <= 1.5) {
-      fixes.push(`${t} points ${Math.round(pts)} scaled to the book's ${target[i].toFixed(1)}`);
-      ps = ps.map((p) => ({ ...p, pts: r2(p.pts * k), tpm: r2(p.tpm * k) }));
-    }
+    // Points that miss the book's number are not bent to it: the replay plays our projections, the same ones the picks
+    // use, and a gap past 15% means a projection or the rotation is off, so the game waits for corrected inputs.
     players[t] = ps;
   });
   return fixes;
@@ -211,22 +206,43 @@ export function nflSimGames(week: FrozenWeek | null, held: HeldGame[] = [], fixe
 
 export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: FixedGame[] = []): SimGames["nba"] {
   if (!slate) return { date: null, games: [], players: {} };
-  const by = new Map<string, Map<string, NbaSimPlayer>>();
-  for (const r of slate.rows) {
-    if (r.out) continue;
-    const team = by.get(r.team) ?? new Map<string, NbaSimPlayer>();
-    by.set(r.team, team);
-    const p = team.get(r.player_id) ?? { name: r.player_name, min: 0, pts: 0, reb: 0, ast: 0, tpm: 0 };
-    team.set(r.player_id, p);
-    // expected minutes count the games he sat by the coach's decision (a benched player keeps none of last season's)
-    p.min = Math.max(p.min, Math.round((r.evidence?.minutes_expected ?? r.evidence?.minutes ?? 0) * 10) / 10);
-    const k = ({ points: "pts", rebounds: "reb", assists: "ast", threes: "tpm" } as const)[r.market as "points"];
-    if (k) p[k] = r2(r.mean);
+  const by = new Map<string, Map<string, NbaSimPlayer & { usual: number }>>();
+  const add = (team: string, id: string, name: string) => {
+    const t = by.get(team) ?? new Map<string, NbaSimPlayer & { usual: number }>();
+    by.set(team, t);
+    const p = t.get(id) ?? { name, min: 0, usual: 0, pts: 0, reb: 0, ast: 0, tpm: 0 };
+    t.set(id, p);
+    return p;
+  };
+  if (slate.rotation?.length) {
+    // the whole rotation, from the same projections the picks use
+    for (const r of slate.rotation) {
+      const p = add(r.team, r.player_id, r.player_name);
+      p.usual = r.minutes ?? 0; p.min = r.minutes_expected ?? p.usual;
+      p.pts = r.pts ?? 0; p.reb = r.reb ?? 0; p.ast = r.ast ?? 0; p.tpm = r.tpm ?? 0;
+    }
+  } else {
+    for (const r of slate.rows) {
+      if (r.out) continue;
+      const p = add(r.team, r.player_id, r.player_name);
+      p.usual = r.evidence?.minutes ?? 0;
+      p.min = r.evidence?.minutes_expected ?? p.usual;
+      const k = ({ points: "pts", rebounds: "reb", assists: "ast", threes: "tpm" } as const)[r.market as "points"];
+      if (k) p[k] = r.mean;
+    }
+  }
+  // Projections are his line when he plays his usual minutes; expected minutes also count the games he sat by the
+  // coach's decision, and his expected line shrinks with them (a benched player keeps none of last season's minutes).
+  for (const t of by.values()) for (const p of t.values()) {
+    const k = p.usual > 0 ? Math.min(1, p.min / p.usual) : 1;
+    p.min = Math.round(p.min * 10) / 10;
+    for (const s of ["pts", "reb", "ast", "tpm"] as const) p[s] = r2(p[s] * k);
   }
   const players: SimGames["nba"]["players"] = {};
   const projected: Record<string, number> = {};
   for (const [team, m] of by) {
-    const list = [...m.values()].filter((p) => p.min >= 4 && p.pts > 0).sort((a, b) => b.min - a.min);
+    const list = [...m.values()].filter((p) => p.min >= 4 && p.pts > 0).sort((a, b) => b.min - a.min)
+      .map(({ usual: _, ...p }) => p);
     const total = list.reduce((s, p) => s + p.min, 0);
     const fit = fitRotation(list, team);
     if (fit.filter((p) => !p.bench).length >= 7) { players[team] = fit; projected[team] = total; }
