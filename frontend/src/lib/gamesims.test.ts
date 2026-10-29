@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, type FrozenWeek, type HeldGame } from "./gamesims";
+import { fitRotation, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -16,6 +16,8 @@ const team = (implied: number | null, qbStatus: string | null = null): FrozenWee
     w: { targets: { mean: 8 }, receptions: { mean: 5.5 }, rec_yards: { mean: 150 } },
   },
 });
+
+const team0 = () => team(21);
 
 describe("game sim inputs", () => {
   it("keeps NFL games both teams can be replayed for, in kickoff order, without backup quarterbacks", () => {
@@ -69,5 +71,30 @@ describe("game sim inputs", () => {
     expect(nbaChecks(g, { V: team(26.7), H: team(26.7) }, { V: 329, H: 260 })).toEqual([]);
     expect(nbaChecks(g, { V: team(21), H: team(26.7) })[0]).toMatch(/V projected minutes add up to only 189/);
     expect(nbaChecks(g, { V: team(26.7, 80), H: team(26.7) })[0]).toMatch(/V projected points add up to 80/);
+  });
+
+  it("repairs a failed game and checks it again instead of hiding it", () => {
+    const team = (pts: number, min = 26.7) => Array.from({ length: 9 }, (_, i) => ({ name: `P${i}`, min: i ? min : 46, pts: pts / 9, reb: 4, ast: 3, tpm: 1 }));
+    const g = { away: "V", home: "H", start: "", total: 230, fav: "H", spread: 0 };
+    const players = { V: team(90), H: team(115) };
+    expect(nbaChecks(g, players).length).toBeGreaterThan(0);
+    const fixes = repairNba(g, players);
+    expect(fixes).toContain("V points 90 scaled to the book's 115.0");
+    expect(nbaChecks(g, players)).toEqual([]);
+    expect(players.V[0].min).toBe(44);
+    // too far off to be a projection problem: left alone, so the game stays held
+    const broken = { V: team(50), H: team(115) };
+    repairNba(g, broken);
+    expect(nbaChecks(g, broken).some((r) => r.startsWith("V projected points"))).toBe(true);
+
+    const week: FrozenWeek = { season: 2026, week: 8, games: { "2026_08_A_B": { game_id: "2026_08_A_B", kickoff: null, teams: { A: team0(), B: team0() } } } };
+    week.games["2026_08_A_B"].teams.A.players.w.rec_yards = { mean: 300 };
+    const fixed: { game: string; fixes: string[] }[] = [];
+    const out = nflSimGames(week, [], fixed as never);
+    expect(out.games).toHaveLength(1);
+    expect(fixed[0].fixes[0]).toMatch(/W R rec yards 300 capped at 160/);
+    const rec = out.games[0].teams.A.players.reduce((s, p) => s + (p.rec_yards ?? 0), 0);
+    expect(Math.abs(rec / 240 - 1)).toBeLessThan(0.3);
+    expect(repairNfl(out.games[0])).toEqual([]);
   });
 });

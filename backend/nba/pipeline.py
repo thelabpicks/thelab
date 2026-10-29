@@ -184,11 +184,13 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
 
 
 MIN_START_RATE, MIN_MINUTES = 0.6, 24   # books post props for regular starters
+MIN_PICK_GAMES = 5   # rookies are projected from their second game, but picked only once their hit rate has a base
 
 
 def regular_starter(e: dict) -> bool:
     """Starts most games with starter's minutes, judged on this season once he has played in it."""
-    if (e.get("start_rate") or 0) < MIN_START_RATE or (e.get("minutes") or 0) < MIN_MINUTES:
+    if (e.get("start_rate") or 0) < MIN_START_RATE or (e.get("minutes") or 0) < MIN_MINUTES \
+            or (e.get("career_games") or MIN_PICK_GAMES) < MIN_PICK_GAMES:
         return False
     g = e.get("season_games")
     if g is None:
@@ -254,7 +256,8 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "dist": dist if validated else None, "p_over": po,
             "offers": [o for o in offers if o["line"] == line] if book_line is not None else [],
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),
-            "evidence": {"minutes": r.min_s, "minutes_long": r.min_l, "per_min": getattr(r, f"{m}_pm_l"),
+            "evidence": {"minutes": r.min_s, "minutes_long": r.min_l, "minutes_expected": _num(r.min_exp),
+                         "career_games": int(r.games_prior), "per_min": getattr(r, f"{m}_pm_l"),
                          "opp_mult": getattr(r, f"opp_{m}"), "pace": r.pace, "opp_pace": r.opp_pace, "rest": r.rest,
                          "start_rate": r.start_rate, "season_games": int(r.season_games),
                          "season_starts": int(r.season_starts),
