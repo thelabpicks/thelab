@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BOARD_MIN_PRICE, DAILY_MIN_PRICE, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BOARD_MIN_PRICE, DAILY_MIN_EDGE, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -62,8 +62,9 @@ export default function LabPicks() {
 
       <Card><CardBody className="space-y-1.5 text-xs text-muted">
         <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws only on the picks that sport already features: NFL and NBA props from confidence tiers that hit 50%+ on unseen games (NBA only at prop lines a book really posts),
-          and in college, each game's favorite to win outright plus bets rated 7+. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer (picks of the day {DAILY_MIN_PRICE} or longer):
-          a heavier favorite risks too much to win too little. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
+          and in college, each game's favorite to win outright plus bets rated 7+. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer:
+          a heavier favorite risks too much to win too little. Picks of the day are the likeliest picks the sims rate at least {DAILY_MIN_EDGE * 100} points more likely than the book's price implies,
+          so each is something the data says happens more often than the market thinks. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
           picks really did), highest first, and 70%+ picks are marked top confidence. Ties go to the tier's tested record. One pick per game and per player.
           When the books' feed carries alternate lines (a paid odds plan), they count too: only lines a book posts, priced -500 or longer, that the sims give a better chance than the price implies.
           College spreads and totals are set near 50/50, so they top out around 55%; the likeliest college picks are favorites to win outright. Even a 90% pick loses 1 time in 10: the "tested" figure on each pick is how often its tier actually hit on games the models never saw.</p>

@@ -161,8 +161,8 @@ describe("cfbCandidates", () => {
 describe("picks of the day", () => {
   const now = new Date("2026-10-24T17:00:00Z");   // Saturday noon in Chicago
   const at = (i: number, o: Partial<LabPick> = {}) => pick({ id: `p${i}`, game_id: String(i), player_id: String(i), kickoff: "2026-10-25T00:00:00Z", chance: 0.9 - i / 100, ...o });
-  it("locks each sport's 3 likeliest picks per Central-time day, priced -300 or longer at a book line, and never swaps them", () => {
-    const cands = [at(1, { price: -350 }), at(0, { line_source: "usual" }), at(2), at(3), at(4), at(5),
+  it("locks each sport's 3 likeliest picks per Central-time day that beat their price at a book line, and never swaps them", () => {
+    const cands = [at(1, { price: -900 }), at(0, { line_source: "usual" }), at(2), at(3), at(4), at(5),
       at(6, { kickoff: "2026-10-24T16:00:00Z" }),                    // already started
       at(7, { kickoff: "2026-10-26T00:00:00Z", chance: 0.99 }),      // Sunday evening in Chicago: tomorrow's list
       at(8, { kickoff: "2026-10-28T00:00:00Z", chance: 0.99 })];     // later in the week: not yet
@@ -193,8 +193,18 @@ describe("picks of the day", () => {
     expect(s.daily!.find((x) => x.id === "p5")!.withdrawn).toBe(true);
     expect(s.daily!.find((x) => x.id === "p6")!.withdrawn).toBeUndefined();
   });
-  it("withdraws a locked pick priced shorter than the -300 cap before kickoff", () => {
-    const old = { ...at(5, { price: -490 }), date: "2026-10-24", slot: 1, chosen_at: "2026-10-23T12:00:00Z" };
+  it("takes the likeliest picks the sims rate above their price, whatever the price", () => {
+    const d = chooseDaily([], [
+      at(1, { chance: 0.97, price: -5000 }),   // implies 98%: the book already knows
+      at(2, { chance: 0.83, price: -490 }),    // implies 83%: no edge
+      at(3, { chance: 0.81, price: -345 }),    // implies 78%: qualifies though shorter than -300
+      at(4, { chance: 0.62, price: 120 }),     // implies 45%: an underdog the sims like
+      at(5, { chance: 0.7, price: -155 }),     // implies 61%
+    ], now);
+    expect(d.map((x) => x.id)).toEqual(["p3", "p5", "p4"]);
+  });
+  it("withdraws a locked pick before kickoff when its sims don't beat its price", () => {
+    const old = { ...at(5, { chance: 0.83, price: -490 }), date: "2026-10-24", slot: 1, chosen_at: "2026-10-23T12:00:00Z" };
     const s = advance({ updated_at: null, board: [], frozen: [], daily: [old] }, [], {}, now);
     expect(s.daily!.find((x) => x.id === "p5")!.withdrawn).toBe(true);
   });

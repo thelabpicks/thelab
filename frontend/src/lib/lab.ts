@@ -317,10 +317,20 @@ export type LabBoard = {
 
 /** Picks of the day per sport. In testing the model's top 3 per NFL day hit about 85% (props at lines near the
  *  projection, 2021-2026) and its top 3 college favorites per Saturday hit about 88% when priced -1000 or longer
- *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing. Picks of the day are
- *  posted publicly, so they are capped at -300 (75% to break even): a record built on -1000 favorites earns no units. */
+ *  (2016-2026); with no price limit they hit 96% but at -5000 and shorter, which pays nothing.
+ *  Picks of the day are chosen by what the data shows, not by the price (Andrew, 2026-10-29): the likeliest picks whose
+ *  simulated, calibrated chance beats the chance the book's price implies by DAILY_MIN_EDGE or more, so the sims see it
+ *  happening more often than the market does. A favorite the book already prices right (Notre Dame 97% at -5000, which
+ *  implies 98%) is skipped; a 70% prop at -155 (61% implied) qualifies. -1000 stays as an outer limit. */
 export const DAILY_SIZE = 3;
-export const DAILY_MIN_PRICE = -300;
+export const DAILY_MIN_PRICE = -1000;
+/** How much the sims' chance must beat the price's implied chance (book margin included), in chance points. */
+export const DAILY_MIN_EDGE = 0.02;
+/** The chance a book's American price implies, margin included. */
+export const impliedChance = (price: number) => (price > 0 ? 100 / (price + 100) : -price / (-price + 100));
+/** True when the data backs the pick more strongly than the book's price does (or no price is posted yet). */
+export const beatsPrice = (p: Pick2) => p.price == null || p.chance - impliedChance(p.price) >= DAILY_MIN_EDGE;
+type Pick2 = { price: number | null; chance: number };
 /** A pick of the day must be at least this likely: a 51% favorite is too close to a coin flip to post. */
 export const DAILY_MIN_CHANCE = 0.6;
 const DAILY_KEEP_DAYS = 90;
@@ -328,8 +338,8 @@ const DAILY_KEEP_DAYS = 90;
 export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 /** Fills today's and tomorrow's open pick-of-the-day slots for each sport with its likeliest picks on that date (same
- *  ranking and one-per-game/player rule as the top 10; games not yet started; priced DAILY_MIN_PRICE or longer when a
- *  price is known). Slots already filled stay exactly as chosen. */
+ *  ranking and one-per-game/player rule as the top 10; games not yet started; 60%+ and beating the book's price, see
+ *  beatsPrice). Slots already filled stay exactly as chosen. */
 export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): DailyPick[] {
   const today = playDate(now), tomorrow = playDate(new Date(now.getTime() + 864e5));
   const out = [...prev];
@@ -339,7 +349,7 @@ export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): Dail
       if (have.length >= DAILY_SIZE) continue;
       const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
       const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now && listable(p)
-        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
+        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && beatsPrice(p) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
       rankBoard(pool, DAILY_SIZE - have.length).forEach((p, i) => {
         const { frozen_at: _f, ...rest } = p;
         out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: now.toISOString() });
@@ -367,9 +377,9 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
     // and so is one locked before the 60% floor existed that sits under it
     .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
-    // and one locked before the price cap that is priced shorter than it
-    .map((d) => !d.result && !started(d) && d.price != null && d.price < DAILY_MIN_PRICE
-      ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: priced shorter than ${DAILY_MIN_PRICE}, the cap for a pick of the day`, withdrawn: true } : d)
+    // and one locked before the edge rule whose sims don't beat its price
+    .map((d) => !d.result && !started(d) && !beatsPrice(d)
+      ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: the sims (${Math.round(d.chance * 100)}%) don't beat what the price implies (${Math.round(impliedChance(d.price!) * 100)}%)`, withdrawn: true } : d)
     .map((d) => { if (d.withdrawn || (d.result && d.result !== "void")) return d; const g = grade(d, res); return g ? { ...d, ...g } : d; });
   return { updated_at: now.toISOString(), board, frozen, daily };
 }
