@@ -365,7 +365,11 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
   const started = (p: LabPick) => new Date(p.kickoff) <= now;
   const known = new Set(prev.frozen.map((p) => p.id));
   const frozen = [...prev.frozen, ...prev.board.filter((p) => started(p) && !known.has(p.id)).map((p) => ({ ...p, frozen_at: at }))]
-    .map((p) => { if (p.result && p.result !== "void") return p; const g = grade(p, res); return g ? { ...p, ...g } : p; });
+    // an NBA prop at a whole-number line was a milestone or in-game line misread as DraftKings' pregame line (10/28): never counted
+    .map((p) => {
+      if (p.sport === "nba" && p.player_id && Number.isInteger(p.line)) return { ...p, result: "void" as const, actual: "Void: not a pregame DraftKings line" };
+      if (p.result && p.result !== "void") return p; const g = grade(p, res); return g ? { ...p, ...g } : p;
+    });
   const open = cands.filter((c) => !started(c));
   const board = SPORTS.flatMap((sp) => rankBoard(open.filter((c) => c.sport === sp && listable(c))));
   const cutoff = playDate(new Date(now.getTime() - DAILY_KEEP_DAYS * 864e5));

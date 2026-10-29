@@ -138,7 +138,9 @@ def test_espn_draftkings_props_keep_the_main_line():
              item(6475, "Total 3-Point Field Goals", 1.5, 1.9), item(6475, "Total 3-Point Field Goals", 1.5, 1.9),
              item(6475, "Total Steals", 0.5, 1.9), item(6475, "Total Steals", 0.5, 1.9),
              # half a pair is not a posted line
-             item(99, "Total Rebounds", 6.5, 1.9)]
+             item(99, "Total Rebounds", 6.5, 1.9),
+             # whole numbers are milestones or in-game lines, even when evenly priced
+             item(7, "Total Points", 45.0, 1.91), item(7, "Total Points", 45.0, 1.91)]
     got = sorted((r["player_id"], r["market"], r["line"]) for r in collect.parse_espn_props(items))
     assert got == [("6475", "points", 8.5), ("6475", "threes", 1.5)]
     assert collect.espn_prop_market("Total Points, Rebounds and Assists") == "pra"
