@@ -16,6 +16,11 @@ on:
     - cron: "0 14 * * 0"   # Sun 14:00 UTC
     - cron: "30 21 * * 0"  # Sun 21:30 UTC, before Sunday night
     - cron: "0 20 * * 1"   # Mon 20:00 UTC, Sunday graded, before Monday night
+    # Quick republishes (no NFL model run) that post each game's simulation on game day: 10 am Eastern (14:00 UTC in
+    # summer time, 15:00 in winter) and 12:00 UTC for games that start before about 11 am Eastern (international NFL).
+    - cron: "0 12 * * *"
+    - cron: "0 14 * * 1-6"
+    - cron: "0 15 * * 0,1,2,3,5"
   workflow_dispatch:
     inputs:
       odds_within_hours:
@@ -60,6 +65,8 @@ jobs:
         run: |
           quick=false
           if [ "${{ github.event_name }}" = workflow_run ]; then quick=true
+          elif [ "${{ github.event_name }}" = schedule ] && case "${{ github.event.schedule }}" in "0 12 * * *"|"0 14 * * 1-6"|"0 15 * * 0,1,2,3,5") true;; *) false;; esac; then
+            quick=true; echo "Game-day simulation posting: reusing the NFL pages from the last full run"
           elif [ "${{ github.event_name }}" = push ] && changed=$(git diff --name-only HEAD^1 HEAD) && [ -n "$changed" ] \
                && ! echo "$changed" | grep -qv '^frontend/'; then
             quick=true; echo "Website-only change: reusing the NFL pages from the last full run"
@@ -237,6 +244,7 @@ jobs:
         env:
           LAB_DATA: ${{ github.workspace }}/site-data
           SIMS_DIR: ${{ github.workspace }}/pick-archive/sims
+          SIM_ARCHIVE: ${{ github.workspace }}/pick-archive/gamesims
         run: npx vite-node scripts/game-sims.ts || echo "::warning::Game simulation inputs were not written this run"
 
       # The daily model report posted to the "Daily model report" issue each morning (lab-ops.yml; not on the site): how the picks and every lean did on

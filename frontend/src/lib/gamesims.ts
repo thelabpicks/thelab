@@ -292,15 +292,55 @@ export function simPicks(board: Board | null, nfl: SimGames["nfl"], nba: SimGame
 /** The calendar day of an instant in US Eastern time (YYYY-MM-DD), the day a game is "on". */
 export const etDay = (t: string | Date) => new Date(t).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
-/** Game sims post on game day (Eastern): until then they keep re-running in the background with each refresh's lines,
- *  injuries and projections, and only the game-day version is shown. Games already played stay up; a pinned replay
- *  (posted on X) always shows. */
-export function onGameDay(sims: Pick<SimGames, "nfl" | "nba">, pins: SimPin[] = [], now = new Date()) {
-  const today = etDay(now), pinned = new Set(pins.map((p) => p.game.id));
-  sims.nfl.games = sims.nfl.games.filter((g) => pinned.has(g.id) || (g.kickoff != null && etDay(g.kickoff) <= today));
-  sims.nba.games = sims.nba.games.filter((g) => etDay(g.start) <= today);
-  const playing = new Set(sims.nba.games.flatMap((g) => [g.away, g.home]));
-  sims.nba.players = Object.fromEntries(Object.entries(sims.nba.players).filter(([t]) => playing.has(t)));
+/** A game's sim as it was posted: from then on the page shows exactly these inputs and picks, never a later refresh. */
+export type PostedSim = {
+  sport: "nfl" | "nba"; key: string; start: string; posted_at: string;
+  nfl?: NflSimGame; nba?: { game: NbaSimGame; players: Record<string, NbaSimPlayer[]> }; picks: SimPick[];
+};
+/** When a game's sim posts: 10 am Eastern on game day, or 3 hours before the start if that is earlier (an international
+ *  NFL game at 9:30 am Eastern posts by 6:30). Every refresh before then re-simulates the game in the background with the
+ *  latest lines, injuries and projections; the first refresh at or after this time posts it, and it is locked from then
+ *  on. The "Refresh data and publish site" workflow runs at 12:00, 14:00 and 15:00 UTC daily for this. */
+export function postTime(start: string): number {
+  const day = etDay(start);
+  // 10 am Eastern on that day: 14:00 UTC in summer time, 15:00 UTC in winter
+  const ten = [14, 15].map((h) => Date.parse(`${day}T${String(h).padStart(2, "0")}:00:00Z`))
+    .find((t) => new Date(t).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }) === "10")!;
+  return Math.min(ten, Date.parse(start) - 3 * 3600e3);
+}
+const nbaKey = (g: NbaSimGame) => `${g.away} at ${g.home} ${g.start.slice(0, 10)}`;
+
+/** Shows each game only once it is posted, and a posted game exactly as it was posted. A game that started without
+ *  being posted (no refresh fell inside its window) posts as it stood at its start. Posts older than 3 days are dropped. */
+export function postSims(sims: Pick<SimGames, "nfl" | "nba" | "picks">, posted: Record<string, PostedSim>, now = new Date()) {
+  const t = now.getTime(), H = 3600e3;
+  for (const [k, p] of Object.entries(posted)) if (Date.parse(p.start) < t - 72 * H) delete posted[k];
+  // posted from its post time until 3 days after its start
+  const due = (_: "nfl" | "nba", start: string) => postTime(start) <= t && Date.parse(start) >= t - 72 * H;
+  const picksFor = (sport: string, game: string) => sims.picks.filter((p) => p.sport === sport && p.game === game);
+  const lockedPicks: SimPick[] = [];
+  sims.nfl.games = sims.nfl.games.flatMap((g) => {
+    if (!g.kickoff) return [];
+    const p = posted[g.id] ?? (due("nfl", g.kickoff)
+      ? (posted[g.id] = { sport: "nfl", key: g.id, start: g.kickoff, posted_at: now.toISOString(), nfl: g, picks: picksFor("nfl", g.id) }) : null);
+    if (!p) return [];
+    lockedPicks.push(...p.picks);
+    return [p.nfl!];
+  });
+  const players: SimGames["nba"]["players"] = {};
+  sims.nba.games = sims.nba.games.flatMap((g) => {
+    const k = nbaKey(g);
+    const p = posted[k] ?? (due("nba", g.start)
+      ? (posted[k] = { sport: "nba", key: k, start: g.start, posted_at: now.toISOString(),
+        nba: { game: g, players: { [g.away]: sims.nba.players[g.away], [g.home]: sims.nba.players[g.home] } }, picks: picksFor("nba", `${g.away} at ${g.home}`) })
+      : null);
+    if (!p) return [];
+    Object.assign(players, p.nba!.players);
+    lockedPicks.push(...p.picks);
+    return [p.nba!.game];
+  });
+  sims.nba.players = players;
+  sims.picks = lockedPicks;
 }
 
 /** Puts each live pin's posted inputs in place of the game's refreshed ones; returns the pins still in force. */

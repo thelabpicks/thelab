@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SimGames } from "./gamesims";
-import { applyPins, fitRotation, onGameDay, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
+import { applyPins, fitRotation, postSims, postTime, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -135,15 +135,40 @@ describe("game sim inputs", () => {
     expect(later.games[0].teams.A.implied).toBe(24);
   });
 
-  it("shows a game's sim only from its game day (Eastern), and a pinned replay always", () => {
-    const g = (id: string, kickoff: string) => ({ id, away: "A", home: "B", kickoff, teams: {} });
-    const nfl = { season: 2026, week: 8, games: [g("thu", "2026-10-30T00:15:00Z"), g("sun", "2026-11-01T17:00:00Z"), g("pinned", "2026-11-02T01:20:00Z"), g("tue", "2026-10-27T00:15:00Z")] } as never as SimGames["nfl"];
-    const nba = { date: "2026-10-30", games: [{ away: "V", home: "H", start: "2026-10-30T23:00Z", total: 220, fav: "H", spread: 2 }], players: { V: [], H: [], X: [] } };
-    const pin = { key: "k", sport: "nfl" as const, seed: 1, until: "2026-11-03T00:00:00Z", game: nfl.games[2] };
-    // Thursday 3 pm Eastern: tonight's 8:15 pm game (00:15 UTC Friday) is today's
-    onGameDay({ nfl, nba }, [pin], new Date("2026-10-29T19:00:00Z"));
-    expect(nfl.games.map((x) => x.id)).toEqual(["thu", "pinned", "tue"]);
-    expect(nba.games).toEqual([]);
-    expect(nba.players).toEqual({});
+  it("posts each sim at 10 am Eastern on game day (earlier for early games), then locks it", () => {
+    expect(new Date(postTime("2026-11-01T18:00:00Z")).toISOString()).toBe("2026-11-01T15:00:00.000Z");   // 1 pm EST: 10 am EST
+    expect(new Date(postTime("2026-10-25T17:00:00Z")).toISOString()).toBe("2026-10-25T14:00:00.000Z");   // 1 pm EDT: 10 am EDT
+    expect(new Date(postTime("2026-10-26T13:30:00Z")).toISOString()).toBe("2026-10-26T10:30:00.000Z");   // London 9:30 am: 3 hours before
+    expect(new Date(postTime("2026-10-30T00:15:00Z")).toISOString()).toBe("2026-10-29T14:00:00.000Z");   // Thursday night: Thursday 10 am
+
+    const g = (id: string, kickoff: string, implied: number) => ({ id, away: "A", home: "B", kickoff, teams: { A: { implied, players: [] }, B: { implied, players: [] } } });
+    const nbaGame = { away: "V", home: "H", start: "2026-10-29T23:00:00Z", total: 220, fav: "H", spread: 2 };
+    const sims = (implied: number, pts: number) => ({
+      nfl: { season: 2026, week: 8, games: [g("thu", "2026-10-30T00:15:00Z", implied), g("sun", "2026-11-01T17:00:00Z", implied)] },
+      nba: { date: "2026-10-29", games: [nbaGame], players: { V: [{ name: "P", min: 30, pts, reb: 1, ast: 1, tpm: 1 }], H: [], X: [] } },
+      picks: [{ sport: "nba" as const, game: "V at H", who: "P", market: "points", side: "under", line: 20 }],
+    }) as unknown as Pick<SimGames, "nfl" | "nba" | "picks">;
+    const posted = {};
+    // Thursday 9 am Eastern: nothing has posted yet
+    const early = sims(21, 18);
+    postSims(early, posted, new Date("2026-10-29T13:00:00Z"));
+    expect(early.nfl.games).toEqual([]);
+    expect(early.nba.games).toEqual([]);
+    // 10 am: Thursday's games post
+    const ten = sims(21, 18);
+    postSims(ten, posted, new Date("2026-10-29T14:05:00Z"));
+    expect(ten.nfl.games.map((x) => x.id)).toEqual(["thu"]);
+    expect(ten.nba.games).toHaveLength(1);
+    expect(ten.picks).toHaveLength(1);
+    // a later refresh with new numbers and no picks: the posted versions stay exactly as posted
+    const later = sims(27, 25);
+    later.picks = [];
+    postSims(later, posted, new Date("2026-10-29T22:45:00Z"));
+    expect(later.nfl.games[0].teams.A.implied).toBe(21);
+    expect(later.nba.players.V[0].pts).toBe(18);
+    expect(later.picks).toHaveLength(1);
+    // three days after the start the post is dropped
+    postSims(sims(21, 18), posted, new Date("2026-11-05T12:00:00Z"));
+    expect(Object.keys(posted)).toEqual([]);
   });
 });
