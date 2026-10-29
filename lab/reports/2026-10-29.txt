@@ -31,7 +31,7 @@ CFB
 
 NBA
   Picks
-    - One pick was void because the player did not play (Stephon Castle). Void picks never count.
+    - Void: not a pregame DraftKings line: Stephon Castle under 45 points. Void picks never count.
     - 5 picks are waiting on a final stat line: Duncan Robinson under 3.5 threes made; CJ McCollum under 2.5 threes made; Trae Young under 2.5 threes made; Cooper Flagg under 6.5 assists; Austin Reaves under 7.5 assists. They are graded on the next refresh after the result posts.
     - Graded since the last report: Javon Small under 2.5 threes made (void).
   Where it was off and why
