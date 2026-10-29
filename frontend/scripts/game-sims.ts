@@ -1,16 +1,17 @@
 /* Writes the Game Simulations page's inputs (run by the "Refresh data and publish site" workflow on every publish):
 
-     LAB_DATA=../site-data SIMS_DIR=../pick-archive/sims npx vite-node scripts/game-sims.ts
+     LAB_DATA=../site-data SIMS_DIR=../pick-archive/sims SIM_ARCHIVE=../pick-archive/gamesims npx vite-node scripts/game-sims.ts
 
    Takes the newest NFL week of pregame sims frozen on the nfl-data branch and today's NBA slate, and writes
    LAB_DATA/sims/games.json (src/lib/gamesims.ts). A sport whose files are missing is left empty; the page says so. */
 import fs from "node:fs";
 import path from "node:path";
 import type { Slate } from "../src/lib/nba";
-import { applyPins, nbaSimGames, nflSimGames, onGameDay, simPicks, type FrozenWeek, type SimGames, type SimPin } from "../src/lib/gamesims";
+import { applyPins, nbaSimGames, nflSimGames, postSims, simPicks, type FrozenWeek, type PostedSim, type SimGames, type SimPin } from "../src/lib/gamesims";
 
 const DATA = path.resolve(process.env.LAB_DATA || "../site-data");
 const SIMS = path.resolve(process.env.SIMS_DIR || "../data/sims");
+const ARCHIVE = path.resolve(process.env.SIM_ARCHIVE || "../data/gamesims");
 
 function readJson<T>(file: string): T | null {
   try { return JSON.parse(fs.readFileSync(file, "utf8")) as T; } catch { return null; }
@@ -24,16 +25,21 @@ const nfl = nflSimGames(weekFile ? readJson<FrozenWeek>(path.join(SIMS, weekFile
 // replays already posted keep the inputs and run followers saw (scripts/sim-pins.json)
 const pins = applyPins(JSON.parse(fs.readFileSync(path.resolve("scripts/sim-pins.json"), "utf8")).pins as SimPin[], nfl);
 const nba = nbaSimGames(readJson<Slate>(path.join(DATA, "nba", "slate.json")), held, fixed);
-// every game is simulated on every refresh, but a game's sim shows only from its game day (Eastern)
-const upcoming = nfl.games.length + nba.games.length;
-onGameDay({ nfl, nba }, pins);
-const later = upcoming - nfl.games.length - nba.games.length;
 // The Lab's picks (written by scripts/lab-picks.ts earlier in the same run): each game's replay agrees with them
 const out: SimGames = { generated_at: new Date().toISOString(), held, fixed, picks: simPicks(readJson(path.join(DATA, "lab", "board.json")), nfl, nba), pins, nfl, nba };
+// Every game is simulated on every refresh, but it shows only once posted (a few hours before its start), and a posted
+// game is locked: later refreshes never change what followers saw. Posts are kept on the nfl-data branch.
+const POSTED = path.join(ARCHIVE, "posted.json");
+const posted = readJson<Record<string, PostedSim>>(POSTED) ?? {};
+const upcoming = nfl.games.length + nba.games.length;
+postSims(out, posted);
+const later = upcoming - nfl.games.length - nba.games.length;
+fs.mkdirSync(ARCHIVE, { recursive: true });
+fs.writeFileSync(POSTED, JSON.stringify(posted));
 fs.mkdirSync(path.join(DATA, "sims"), { recursive: true });
 fs.writeFileSync(path.join(DATA, "sims", "games.json"), JSON.stringify(out));
 // a game that failed a check was corrected and checked again; one that still fails stays off the page until a later
 // run's fresh data passes
 for (const f of fixed) console.log(`::notice::Game sim corrected (${f.sport} ${f.game}): ${f.fixes.join("; ")}`);
 for (const h of held) console.log(`::warning::Game sim held back (${h.sport} ${h.game}): ${h.reasons.join("; ")}`);
-console.log(`game sims: NFL ${out.nfl.season ?? "-"} week ${out.nfl.week ?? "-"} ${out.nfl.games.length} games, NBA ${out.nba.date ?? "-"} ${out.nba.games.length} games shown; ${later} later games post on their game day`);
+console.log(`game sims: NFL ${out.nfl.season ?? "-"} week ${out.nfl.week ?? "-"} ${out.nfl.games.length} games, NBA ${out.nba.date ?? "-"} ${out.nba.games.length} games shown; ${later} later games not posted yet`);
