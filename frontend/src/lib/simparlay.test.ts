@@ -64,4 +64,22 @@ describe("sim parlay", () => {
     expect(mean).toBeGreaterThan(15);
     expect(mean).toBeLessThan(21);
   });
+
+  it("NFL: each player's average over the runs matches his projection, not an inflated one", () => {
+    const e = loadEngine();
+    const team = (t: string) => ({ implied: 23, players: [
+      { id: `${t}qb`, name: `${t} QB`, pos: "QB", attempts: 30, completions: 18.6, pass_yards: 201, pass_tds: 1.5, interceptions: 0.8, carries: 3, rush_yards: 15 },
+      { id: `${t}rb`, name: `${t} RB`, pos: "RB", carries: 17, rush_yards: 72, targets: 3, receptions: 2.4, rec_yards: 16 },
+      { id: `${t}wr`, name: `${t} WR`, pos: "WR", targets: 9, receptions: 6, rec_yards: 80 },
+      { id: `${t}wr2`, name: `${t} WR2`, pos: "WR", targets: 7, receptions: 4.5, rec_yards: 55 },
+      { id: `${t}te`, name: `${t} TE`, pos: "TE", targets: 6, receptions: 4.2, rec_yards: 40 },
+      { id: `${t}rb2`, name: `${t} RB2`, pos: "RB", carries: 6, rush_yards: 25, targets: 2, receptions: 1.5, rec_yards: 10 },
+    ] });
+    const G = e.nfl({ id: "2026_09_AAA_BBB", away: "AAA", home: "BBB", kickoff: "2026-11-01T18:00:00Z", teams: { AAA: team("A"), BBB: team("B") } } as never);
+    const runs = runBoxes(e, G, 600);
+    const avg = (id: string, k: string) => runs.reduce((s, b) => s + (b[0][id]?.[k] ?? 0), 0) / runs.length;
+    expect(Math.abs(avg("Arb", "ruyd") - 72)).toBeLessThan(8);
+    expect(Math.abs(avg("Awr", "ryd") - 80)).toBeLessThan(8);
+    expect(Math.abs(avg("Aqb", "pyd") - 201)).toBeLessThan(20);
+  });
 });
