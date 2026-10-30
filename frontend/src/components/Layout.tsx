@@ -43,7 +43,7 @@ const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
     { to: "/cfb/games", label: "All games", short: "Games", icon: ListOrdered },
     { to: "/cfb/teams", label: "Teams", icon: Trophy },
   ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
-  nba: sportNav("/nba", "Today", [], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
+  nba: sportNav("/nba", "Today", [{ to: "/nba/hitrates", label: "Hit rates", icon: Percent }], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
 };
 // Mobile bar: Home, Game Simulations, Ask, Parlay builder (then More, which holds Player props), whatever the sport.
 const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];

@@ -813,6 +813,56 @@ export function answerHitRates(d: AskData, n: number, f: Filters, o: { threshold
   };
 }
 
+/** The "X+" milestones the books post for every player with props (DraftKings: "50+ receiving yards"). */
+export const NFL_MILESTONES: Record<string, number[]> = {
+  pass_yards: [150, 175, 200, 225, 250, 275, 300], pass_tds: [1, 2, 3], completions: [15, 18, 20, 22, 25], pass_attempts: [25, 30, 35],
+  rush_yards: [25, 40, 50, 60, 75, 100], carries: [10, 12, 15, 18, 20], rec_yards: [25, 40, 50, 60, 75, 100],
+  receptions: [2, 3, 4, 5, 6, 7, 8], rush_rec_yards: [50, 60, 75, 100],
+};
+/** A floor pick needs this model chance: the model's 85%+ calls have hit about 90% on unseen games. */
+export const FLOOR_MIN_CHANCE = 0.85;
+
+/** Floor picks: per player and market, the highest milestone ("X+") the model gives 85%+ that he also reached in at
+ *  least `threshold` of his recent games. Only players the books post that prop for this week. */
+export function answerFloorPicks(d: AskData, n: number, f: Filters, o: { threshold?: number; window?: number; markets?: string[] } = {}): Answer {
+  const threshold = o.threshold ?? 1, window = o.window ?? 8;
+  const all: Pick[] = [];
+  for (const m of o.markets ?? Object.keys(d.props)) {
+    const rungs = NFL_MILESTONES[m];
+    if (!rungs) continue;
+    for (const r of d.props[m]?.rows ?? []) {
+      if (!r.eligible || !r.dist || !propPlays(d, r, m) || !bookLines(d.feed, m, r.player_id).length) continue;
+      if (!keep(d, f, { pos: r.position, team: r.team, opp: r.opponent, game_id: r.game_id })) continue;
+      const rec = (r.recent ?? []).slice(0, window);
+      if (rec.length < 5) continue;
+      let best: { x: number; hits: number } | null = null;
+      for (const x of rungs) {
+        const hits = rec.filter((g) => g.value >= x).length;
+        if (pOver(r.dist, x - 0.5) >= FLOOR_MIN_CHANCE && hits >= threshold * rec.length - 1e-9) best = { x, hits };
+      }
+      if (!best) continue;
+      const pk = propPick(d, m, r, best.x - 0.5, "over");
+      const h5 = rec.slice(0, 5).filter((g) => g.value >= best!.x).length;
+      all.push({ ...pk, id: `${m}:${r.player_id}:floor`, label: `${best.x}+ ${lc(d.props[m].label)}`, reasons: [
+        `Reached ${best.x}+ in ${frac(best.hits, rec.length)} of his last ${rec.length} games (last 5: ${frac(h5, 5)})`,
+        `Recent games: ${rec.map((g) => num1(g.value)).join(", ")}`,
+        `Model chance ${pct(pk.p)}; projection ${num1(r.median)}`,
+        pk.price != null ? `Posted at ${fmtPrice(pk.price)} (${pk.book})` : "Milestones like this are usually priced -300 to -1000; check your book's price"] });
+    }
+  }
+  const picks = all.sort((a, b) => b.p - a.p);
+  const label = `${Math.round(threshold * 100)}%`;
+  if (!d.feed.at) return { title: "Floor picks need the books' lines", summary: "Only players the sportsbooks post props for are listed, and no book lines are loaded for this week yet.", notes: [], followups: ["Props at a 100% hit rate"] };
+  if (!picks.length) return none(d, `No floor picks at a ${label} hit rate over the last ${window} games`, f);
+  return {
+    title: `Floor picks: ${label} hit rate, last ${window} games`,
+    summary: `${picks.length} milestones ("X+") the model gives ${Math.round(FLOOR_MIN_CHANCE * 100)}%+ that the player also reached in at least ${label} of his last ${window} games. Highest model chance first. They hit often but pay little, which makes them parlay legs more than single bets.`,
+    picks: picks.slice(0, n), notes: [picks.length > n ? `Showing ${n} of ${picks.length}.` : "",
+      "Only players the books post this prop for are listed. The milestone is the highest standard rung that holds."].filter(Boolean),
+    followups: ["Props at a 100% hit rate", "Safest pick, any prop"],
+  };
+}
+
 /** Every line for one player and market: model chance and how often he cleared it. */
 export function answerLadder(d: AskData, ids: string[], market?: string, window = 8): Answer {
   const id = ids[0];

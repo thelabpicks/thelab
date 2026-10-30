@@ -126,7 +126,7 @@ export const STAR_MIN_POINTS = 15;
 export const MIN_PICK_GAMES = 5;
 const regularStarter = (e: NbaRow["evidence"]) => e.start_rate >= 0.6 && e.minutes >= 24 && (e.career_games ?? MIN_PICK_GAMES) >= MIN_PICK_GAMES
   && (e.season_games == null || (e.season_games > 0 && (e.season_starts ?? 0) / e.season_games >= 0.6 && (e.season_min ?? 0) >= 24));
-const surePlay = (r: NbaRow) => !r.out && (!r.injury || /probable/i.test(r.injury));
+export const surePlay = (r: NbaRow) => !r.out && (!r.injury || /probable/i.test(r.injury));
 export function starsOf(rows: NbaRow[]): Set<string> {
   const byTeam = new Map<string, NbaRow[]>();
   for (const r of rows) if (r.market === "points" && r.mean >= STAR_MIN_POINTS && surePlay(r) && regularStarter(r.evidence)) byTeam.set(r.team, [...(byTeam.get(r.team) ?? []), r]);
