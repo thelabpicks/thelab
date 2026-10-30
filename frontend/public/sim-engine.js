@@ -130,7 +130,7 @@ function setupNFL(){
 // not from inflating every gain, which ran rushing yards about 6 and QB passing yards about 17 over the projections.
 function calibrateNFL(){
   const T=NFL.teams, N=250, f=(want,got)=>Math.pow(Math.max(want,0.05)/Math.max(got,0.05),0.7);
-  T.forEach(t=>{t.cv=0.25;t.pace=1});
+  T.forEach(t=>{t.cv=0.25;t.pace=1;t.rz=1});
   for(let it=0;it<6;it++){
     const box=T.map(()=>({})), sc=[0,0];
     for(let s=0;s<N;s++){const g=simNFL(7000+s,true);sc[0]+=g.score[0];sc[1]+=g.score[1];
@@ -142,6 +142,9 @@ function calibrateNFL(){
       t.pace=clamp(t.pace*Math.pow(got/want,0.7),0.6,1.6);
       t.passRate=clamp(t.passRate*f(t.qb.attempts,q.att||0),0.25,0.9);
       t.cmp=clamp(t.cmp*f(t.qb.completions,q.cmp||0),0.35,0.85);
+      // red zone pass rate: the passing touchdowns match the QB's projected ones, so touchdowns split between passes and
+      // runs as the projections do (left alone, about 2.3 of GB's 3.2 touchdowns a game came through the air against 1.7 projected)
+      if(t.qb.pass_tds>0)t.rz=clamp(t.rz*f(t.qb.pass_tds,q.ptd||0),0.1,1.6);
       t.rush.forEach(p=>{const x=b(p.id);p.wc*=f(p.carries,x.car||0);if(x.car>0.2&&p.rush_yards>0)p.rr*=f(p.rush_yards/p.carries,(x.ruyd||0)/x.car)});
       t.tgt.forEach(p=>{const x=b(p.id);p.wt*=f(p.receptions||0,x.rec||0);if(x.rec>0.2&&p.receptions>0.2)p.yc*=f(p.rec_yards/p.receptions,(x.ryd||0)/x.rec)});
     });
@@ -191,6 +194,7 @@ function simNFL(seed,rec){
     let pr=o.passRate*0.9;
     if(down===3&&togo>=5)pr=0.75; else if(down>=3&&togo<=2)pr=0.35;
     if(hurry)pr=0.85; else if(q===3&&left<300&&diff>0)pr=0.3;
+    if(o.rz&&yl>=80)pr=Math.min(0.95,pr*o.rz);
     let g=0, e;
     dPlays++;
     if(r()<pr){

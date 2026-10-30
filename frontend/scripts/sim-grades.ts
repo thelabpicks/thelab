@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SimGames } from "../src/lib/gamesims";
-import { findEvent, freezeSims, gradeSim, parseBox, summarize, type SimArchive, type Sport } from "../src/lib/simgrades";
+import { findEvent, freezeSims, gradeSim, parseBox, parseFirst, summarize, type SimArchive, type Sport } from "../src/lib/simgrades";
 
 const DATA = path.resolve(process.env.LAB_DATA || "../site-data");
 const ARCHIVE = path.resolve(process.env.SIM_ARCHIVE || "../data/gamesims");
@@ -55,9 +55,14 @@ for (const f of Object.values(archive.frozen)) {
     id = findEvent(f, boards.get(bk) as never);
   }
   if (!id) continue;
-  const box = parseBox(f.sport, await get(`${ESPN}/${LEAGUE[f.sport]}/summary?event=${id}`));
+  const summary = await get(`${ESPN}/${LEAGUE[f.sport]}/summary?event=${id}`);
+  const box = parseBox(f.sport, summary);
   if (!box) continue;   // not final yet
   const g = gradeSim(f, id, box, now);
+  // who really scored first, for the Ask the sims answers (src/lib/simanswers.ts)
+  const first = parseFirst(f.sport, summary);
+  if (first) g.first = first;
+  else console.log(`::warning::No first ${f.sport === "nba" ? "basket" : "touchdown"} found in ESPN's play-by-play (${f.key})`);
   // no players matched means ESPN's box score changed shape or names: worth a look, the game is still graded on the score
   if (!g.players.length) console.log(`::warning::Game sim graded without player stats (${f.key}): no box score names matched`);
   archive.grades.push(g);
