@@ -101,9 +101,11 @@ function simNBA(seed,rec){
 
 /* ================= NFL engine ================= */
 let NFL=null;
+// NFL.legacy (a replay already posted on X, sim-pins.json) keeps the engine those runs were made with: one yardage scale
+// per team (k) tuned so the team scores its implied points. Otherwise calibrateNFL tunes each player to his projection.
 function setupNFL(){
   NFL.teams.forEach(T=>{
-    const src=NFL.src.teams[T.abbr]; T.target=src.implied;
+    const src=NFL.src.teams[T.abbr]; T.target=src.implied; T.legacy=!!NFL.legacy;
     T.ps=src.players.map(p=>({...p,short:short(p.name),ini:inits(p.name)}));
     T.qb=T.ps.find(p=>p.attempts);
     T.rush=T.ps.filter(p=>(p.carries||0)>0.3); T.tgt=T.ps.filter(p=>(p.targets||0)>0.3);
@@ -111,10 +113,38 @@ function setupNFL(){
     T.passRate=T.qb.attempts/(T.qb.attempts+ru); T.cmp=T.qb.completions/T.qb.attempts;
     T.ypr=ry/ru; T.intr=T.qb.interceptions/T.qb.attempts; T.k=1;
     T.tgt.forEach(p=>p.ypc=p.receptions>0.2?p.rec_yards/p.receptions:9);
+    // each player's share of the carries and targets, and his own yards per carry and per catch
+    T.rush.forEach(p=>{p.wc=p.carries;p.rr=p.rush_yards>0?p.rush_yards/p.carries:T.ypr});
+    T.tgt.forEach(p=>{p.wt=p.targets;p.yc=p.ypc});
   });
+  if(!NFL.legacy){calibrateNFL();return}
   for(let it=0;it<6;it++){
     const sum=[0,0]; for(let s=0;s<300;s++){const g=simNFL(7000+s,false);sum[0]+=g.score[0];sum[1]+=g.score[1]}
     NFL.teams.forEach((T,ti)=>{T.k=clamp(T.k*Math.pow(T.target/(sum[ti]/300),0.7),0.5,1.8)});
+  }
+}
+// Tunes the engine until every player's average over the runs matches his projection, as calibrateNBA does: the team's
+// pace (plays a game), pass rate and completion rate match its QB's attempts and completions, each player's carry and target shares his
+// carries and catches, his yards per carry and per catch his yards. Yards are then the projections' own, so the team's
+// implied points come from how well drives finish (cv: a third or fourth down play that comes up short still converts),
+// not from inflating every gain, which ran rushing yards about 6 and QB passing yards about 17 over the projections.
+function calibrateNFL(){
+  const T=NFL.teams, N=250, f=(want,got)=>Math.pow(Math.max(want,0.05)/Math.max(got,0.05),0.7);
+  T.forEach(t=>{t.cv=0.25;t.pace=1});
+  for(let it=0;it<6;it++){
+    const box=T.map(()=>({})), sc=[0,0];
+    for(let s=0;s<N;s++){const g=simNFL(7000+s,true);sc[0]+=g.score[0];sc[1]+=g.score[1];
+      for(const e of g.ev)for(const [ti,p,k,v] of e.bx){const b=box[ti][p]||(box[ti][p]={});b[k]=(b[k]||0)+v/N}}
+    T.forEach((t,ti)=>{const b=id=>box[ti][id]||{}, q=b(t.qb.id);
+      t.cv=clamp(t.cv+(t.target-sc[ti]/N)*0.05,0,0.95);
+      // plays: the offense's pace, so its attempts plus carries come to the projected volume
+      const want=t.qb.attempts+t.rush.reduce((a,p)=>a+p.carries,0), got=(q.att||0)+t.rush.reduce((a,p)=>a+(b(p.id).car||0),0);
+      t.pace=clamp(t.pace*Math.pow(got/want,0.7),0.6,1.6);
+      t.passRate=clamp(t.passRate*f(t.qb.attempts,q.att||0),0.25,0.9);
+      t.cmp=clamp(t.cmp*f(t.qb.completions,q.cmp||0),0.35,0.85);
+      t.rush.forEach(p=>{const x=b(p.id);p.wc*=f(p.carries,x.car||0);if(x.car>0.2&&p.rush_yards>0)p.rr*=f(p.rush_yards/p.carries,(x.ruyd||0)/x.car)});
+      t.tgt.forEach(p=>{const x=b(p.id);p.wt*=f(p.receptions||0,x.rec||0);if(x.rec>0.2&&p.receptions>0.2)p.yc*=f(p.rec_yards/p.receptions,(x.ryd||0)/x.rec)});
+    });
   }
 }
 function nflQ(c){return c>=3600?4:Math.min(3,Math.floor(c/900))}
@@ -127,7 +157,7 @@ function simNFL(seed,rec){
   const bump=(ti,p)=>{const q=nflQ(Math.max(0,c-0.01));line[ti][q]=(line[ti][q]||0)+p};
   const newDrive=(team,start)=>{off=team;yl=start;down=1;togo=10;drive++;dStart=start;dPlays=0;if(ot)otDrives++};
   const kick=(recv)=>{const s=r()<0.62?35:20+Math.floor(r()*20);newDrive(recv,s);add({type:'kick',off:recv,y0:s,y1:s,bx:[]})};
-  const tick=(sec)=>{const b=c<3600?900*(Math.floor(c/900)+1):4200;c=Math.min(c+sec,b)};
+  const tick=(sec)=>{const b=c<3600?900*(Math.floor(c/900)+1):4200;c=Math.min(c+sec*(T[off].pace||1),b)};
   const pickW=(arr,f)=>pick(r,arr,arr.map(f));
   kick(off);
   for(let guard=0;guard<400;guard++){
@@ -168,20 +198,21 @@ function simNFL(seed,rec){
       if(r()<0.065){g=-(4+Math.floor(r()*6));tick(hurry?12:32);e={type:'sack',p:qb,bx:[]}}
       else if(r()<o.intr){const back=5+Math.floor(r()*20);tick(8);
         e={type:'int',p:qb,bx:[[off,qb.id,'att',1],[off,qb.id,'int',1]],ret:clamp(y0+back,1,99)}}
-      else{const tg=pickW(o.tgt,p=>p.targets);
-        if(r()<o.cmp){const m=tg.ypc*o.k;g=Math.max(0,Math.round(2+(-Math.log(1-r()))*Math.max(2,m-2)));
+      else{const tg=pickW(o.tgt,p=>p.wt);
+        if(r()<o.cmp){const m=o.legacy?tg.ypc*o.k:tg.yc;g=Math.max(0,Math.round(2+(-Math.log(1-r()))*Math.max(2,m-2)));
           const air=Math.min(g,Math.max(0,Math.round(g*(0.45+r()*0.4))));tick(hurry?14:34);
           e={type:'comp',p:qb,t:tg,air,bx:[[off,qb.id,'att',1],[off,qb.id,'cmp',1],[off,tg.id,'rec',1]]}}
         else{tick(6);const air=5+Math.floor(r()*18);e={type:'inc',p:qb,t:tg,air,bx:[[off,qb.id,'att',1]]}}
       }
     }else{
-      const rb=pickW(o.rush,p=>p.carries);
-      if(r()<0.09)g=-(1+Math.floor(r()*3)); else g=Math.round((-Math.log(1-r()))*(o.ypr*o.k+0.18)/0.91);
+      const rb=pickW(o.rush,p=>p.wc);
+      if(r()<0.09)g=-(1+Math.floor(r()*3)); else g=Math.round((-Math.log(1-r()))*((o.legacy?o.ypr*o.k:rb.rr)+0.18)/0.91);
       if(r()<0.007){tick(30);e={type:'fum',p:rb,bx:[[off,rb.id,'car',1]],ret:y0+Math.max(0,g)}}
       else{tick(hurry?14:36);e={type:'run',p:rb,bx:[[off,rb.id,'car',1]]}}
     }
     e.off=off; Object.assign(e,ctx);
     if(e.type==='int'||e.type==='fum'){e.y1=e.ret;add(e);newDrive(1-off,clamp(100-e.ret,1,99));if(ot&&otDrives>2&&score[0]!==score[1])break;continue}
+    if(o.cv&&down>=3&&g<togo&&(e.type==='run'||e.type==='comp')&&r()<o.cv)g=togo;
     g=Math.min(g,100-yl); yl+=g; e.g=g; e.y1=yl;
     if(e.type==='comp'){e.bx.push([off,e.p.id,'pyd',g],[off,e.t.id,'ryd',g])}
     if(e.type==='run'){e.bx.push([off,e.p.id,'ruyd',g])}

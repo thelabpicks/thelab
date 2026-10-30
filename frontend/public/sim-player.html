@@ -897,7 +897,7 @@ function makeGames(){GAMES={
 function build(gm){
   if(gm.G)return gm.G;
   if(gm.sport==='nba'){const s=gm.src;NBA={sport:'nba',runs:5000,key:gm.key,teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when),book:{total:s.total,spread:s.spread,fav:s.fav===s.home?1:0,favAbbr:s.fav}};setupNBA();gm.G=NBA}
-  else{NFL={sport:'nfl',runs:5000,key:gm.key,src:gm.src,teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when)};setupNFL();gm.G=NFL}
+  else{NFL={sport:'nfl',runs:5000,key:gm.key,src:gm.src,legacy:(DATA.pins||[]).some(p=>p.key===gm.key),teams:gm.teams.map(t=>({...t})),venue:gm.venue||'',when:fmtWhen(gm.when)};setupNFL();gm.G=NFL}
   gm.G.picks=gamePicks(gm,gm.G);
   runAll(gm.G,gm.sport==='nba'?simNBA:simNFL);
   // a replay already posted (a clip on X) keeps the run followers saw
