@@ -36,6 +36,7 @@ import CfbHow from "./pages/cfb/CfbHow";
 import CfbParlay from "./pages/cfb/CfbParlay";
 import CfbGames from "./pages/cfb/CfbGames";
 import HitRates from "./pages/HitRates";
+import NbaHitRates from "./pages/nba/NbaHitRates";
 import LabPicks from "./pages/LabPicks";
 import Previous from "./pages/Previous";
 import NbaPrevious from "./pages/nba/NbaPrevious";
@@ -80,6 +81,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="sims/:game" element={<Sims sport="nfl" />} />
               <Route path="nba" element={<NbaHome />} />
               <Route path="nba/props" element={<NbaProps />} />
+              <Route path="nba/hitrates" element={<NbaHitRates />} />
               <Route path="nba/builder" element={<NbaBuilder />} />
               <Route path="nba/ask" element={<NbaAsk />} />
               <Route path="nba/players/:id" element={<NbaPlayer />} />
