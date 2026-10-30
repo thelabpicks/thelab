@@ -513,13 +513,30 @@ function runAll(G,sim){
   for(let i=0;i<n;i++){const s=sc[i];if((s[1]>s[0]?1:0)!==fav||s[0]===s[1])continue;
     near.push([Math.abs(s[0]-mA)+Math.abs(s[1]-mB)+Math.abs((s[1]-s[0])-(mB-mA)),i])}
   near.sort((a,b)=>a[0]-b[0]);
-  let best=near[0][1],bd=1e9,agree=0;
+  const cand=[];let agree=0;
   for(let j=0;j<near.length&&j<1500&&(j<150||agree<150);j++){const [d,i]=near[j];
-    const g=sim(100000+i,true), box=boxOf(G,g), off=pickMisses(G,box);if(!off)agree++;
+    const box=boxOf(G,sim(100000+i,true)), off=pickMisses(G,box);if(!off)agree++;
     if(j>=150&&off)continue;
-    const t=d/3+statMiss(G,box)+50*off;if(t<bd){bd=t;best=i}}
+    cand.push({d,i,box,off})}
+  // NFL: the touchdowns go to the likeliest scorers too. Each player's chance to score is how often he scores across these
+  // runs, and a run costs how unlikely its scorers and non-scorers are together, so the replay's TDs read like the game's
+  // most typical ones instead of a fourth receiver catching two.
+  const tdP=G.sport==='nfl'?tdRates(G,cand.map(c=>c.box)):null;
+  let best=near[0][1],bd=1e9;
+  for(const c of cand){const t=c.d/3+statMiss(G,c.box)+50*c.off+(tdP?2*tdMiss(G,c.box,tdP):0);if(t<bd){bd=t;best=c.i}}
   G.dist={sc,mA,mB,homeWins,awayWins,n,meanA:sc.reduce((a,s)=>a+s[0],0)/n,meanB:sc.reduce((a,s)=>a+s[1],0)/n};
   G.game=sim(100000+best,true);
+}
+const tds=b=>(b&&((b.rtd||0)+(b.rutd||0)))||0;
+function tdRates(G,boxes){
+  return G.teams.map((T,ti)=>{const r={};for(const b of boxes)for(const [id,x] of Object.entries(b[ti]))if(tds(x))r[id]=(r[id]||0)+1;
+    for(const id in r)r[id]=r[id]/boxes.length;return r});
+}
+// -log chance of the run's scorers scoring (each of a player's TDs counts) and every other likely scorer (1 in 20 or better) not scoring
+function tdMiss(G,box,p){
+  let m=0;p.forEach((r,ti)=>{for(const [id,q] of Object.entries(r)){const n=tds(box[ti][id]);
+    if(n)m-=n*Math.log(Math.max(q,0.02));else if(q>=0.05)m-=Math.log(1-Math.min(q,0.98))}});
+  return m;
 }
 // Each team's box score of a recorded run: box[team][player][stat].
 function boxOf(G,g){

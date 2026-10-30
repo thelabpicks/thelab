@@ -59,6 +59,22 @@ def test_benched_games_count_as_zero_in_expected_minutes_only():
     assert up.min_exp < up.min_s / 2          # expected minutes: four games of 0 pull them down
 
 
+def test_expected_minutes_follow_this_season_not_last():
+    d = _box(10)
+    # player 100 played big minutes last season and has sat all three games of this one by the coach's decision
+    new = d.game_id >= 1007
+    d.loc[new, "season"] = 2027
+    sat = new & (d.player_id == 100)
+    d.loc[sat, ["played", "minutes"]] = [False, 0.0]
+    d["benched"] = sat
+    up = pd.DataFrame([{**d[d.player_id == 100].iloc[-1].to_dict(), "game_id": 2000, "game_date": pd.Timestamp("2025-12-01"),
+                        "played": False, "benched": False, "upcoming": True}])
+    f = history.build_features(pd.concat([d, up], ignore_index=True))
+    r = f[f.game_id == 2000].iloc[0]
+    assert r.min_s > 20                       # his minutes when he plays still come from last season
+    assert r.min_exp < 5                      # but this season he has not played: (Memphis's Mashack was given 31)
+
+
 def test_rookies_are_projected_from_their_second_game():
     f = history.build_features(_box(10))
     rows = props.model_rows(f, "points")

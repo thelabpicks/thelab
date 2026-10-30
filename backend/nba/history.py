@@ -92,7 +92,15 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     # showed no gain from it on played games.
     upcoming = d["upcoming"].fillna(False).astype(bool) if "upcoming" in d else False
     benched = d["benched"].fillna(False).astype(bool) if "benched" in d else False
-    p["min_exp"] = _ewm_prior(d[d.played | upcoming | benched].groupby("player_id").minutes, 4).reindex(p.index)
+    # A fast career average blended with this season's own, which takes over as his games this season add up (k / (k+1)):
+    # last season's role fades within a few games (2025-2027 games of players who played or sat: average miss 5.17
+    # minutes -> 5.00; games 2-12 of a season 5.05 -> 4.62; 2026-27 so far 6.14 -> 4.81).
+    src = d[d.played | upcoming | benched]
+    career = _ewm_prior(src.groupby("player_id").minutes, 2)
+    this = _ewm_prior(src.groupby(["player_id", "season"]).minutes, 2)
+    k = src.groupby(["player_id", "season"]).cumcount()
+    w = k / (k + 1)
+    p["min_exp"] = (w * this.fillna(0) + (1 - w) * career).reindex(p.index)
     p["start_rate"] = _ewm_prior(gp.starter, 5)
     p["last_min"] = gp.minutes.shift(1)
     p["games_prior"] = gp.cumcount()

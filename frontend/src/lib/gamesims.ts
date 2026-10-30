@@ -37,7 +37,8 @@ export type SimGames = {
   held: HeldGame[];
   fixed: FixedGame[];
   nfl: { season: number | null; week: number | null; games: NflSimGame[] };
-  nba: { date: string | null; games: NbaSimGame[]; players: Record<string, NbaSimPlayer[]> };
+  /** generated_at: when the NBA slate the sims were built from was made (it decides when an NBA game may post) */
+  nba: { date: string | null; generated_at?: string | null; games: NbaSimGame[]; players: Record<string, NbaSimPlayer[]> };
 };
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -266,7 +267,7 @@ export function nbaSimGames(slate: Slate | null, held: HeldGame[] = [], fixed: F
   }
   games.sort((x, y) => x.start.localeCompare(y.start) || x.home.localeCompare(y.home));
   const playing = new Set(games.flatMap((g) => [g.home, g.away]));
-  return { date: slate.date, games, players: Object.fromEntries(Object.entries(players).filter(([t]) => playing.has(t))) };
+  return { date: slate.date, generated_at: slate.generated_at ?? null, games, players: Object.fromEntries(Object.entries(players).filter(([t]) => playing.has(t))) };
 }
 
 type BoardPick = { sport: string; game_id: string; kickoff: string; matchup: string; who: string; player_id?: string; market: string;
@@ -312,6 +313,16 @@ export function postTime(start: string, sport: "nfl" | "nba" = "nfl"): number {
   const at = sport === "nba" ? Date.parse(`${day}T16:00:00Z`) : ten;
   return Math.min(at, Date.parse(start) - 3 * 3600e3);
 }
+/** NBA numbers fresh enough to post a game: made by the noon refresh (16:00 UTC) of game day or later, or for a game
+ *  that posts before then (3 hours before an early tip), by that morning's 09:00 UTC refresh. On October 29 the sims
+ *  posted at the first refresh after 16:00 from the morning's numbers, built before that day's rotation fix, and stayed
+ *  that way all night; a game whose numbers never refresh in time posts at its start. */
+export function nbaFresh(start: string, generatedAt: string | null | undefined): boolean {
+  if (!generatedAt) return false;
+  const day = etDay(start), noon = Date.parse(`${day}T16:00:00Z`);
+  const need = postTime(start, "nba") >= noon ? noon : Date.parse(`${day}T08:00:00Z`);
+  return Date.parse(generatedAt) >= need;
+}
 const nbaKey = (g: NbaSimGame) => `${g.away} at ${g.home} ${g.start.slice(0, 10)}`;
 
 /** Shows each game only once it is posted, and a posted game exactly as it was posted. A game that started without
@@ -334,7 +345,8 @@ export function postSims(sims: Pick<SimGames, "nfl" | "nba" | "picks">, posted: 
   const players: SimGames["nba"]["players"] = {};
   sims.nba.games = sims.nba.games.flatMap((g) => {
     const k = nbaKey(g);
-    const p = posted[k] ?? (due("nba", g.start)
+    const fresh = nbaFresh(g.start, sims.nba.generated_at) || Date.parse(g.start) <= t;
+    const p = posted[k] ?? (due("nba", g.start) && fresh
       ? (posted[k] = { sport: "nba", key: k, start: g.start, posted_at: now.toISOString(),
         nba: { game: g, players: { [g.away]: sims.nba.players[g.away], [g.home]: sims.nba.players[g.home] } }, picks: picksFor("nba", `${g.away} at ${g.home}`) })
       : null);
