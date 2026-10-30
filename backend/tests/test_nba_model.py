@@ -75,6 +75,25 @@ def test_expected_minutes_follow_this_season_not_last():
     assert r.min_exp < 5                      # but this season he has not played: (Memphis's Mashack was given 31)
 
 
+def test_a_season_debut_after_the_team_has_played_gets_part_of_his_career_minutes():
+    d = _box(10)
+    # a new season starts at game 1007; player 100 is not with the team (no rows) for its first three games
+    new = d.game_id >= 1007
+    d.loc[new, "season"] = 2027
+    d = d[~(new & (d.player_id == 100))]
+    up = pd.DataFrame([{**d[d.player_id == 100].iloc[-1].to_dict(), "game_id": 2000, "game_date": pd.Timestamp("2025-12-01"),
+                        "season": 2027, "played": False, "upcoming": True}])
+    f = history.build_features(pd.concat([d, up], ignore_index=True))
+    r = f[f.game_id == 2000].iloc[0]
+    career = d[d.player_id == 100].minutes.ewm(halflife=2).mean().iloc[-1]
+    assert abs(r.min_exp - history.DEBUT_SHARE * career) < 0.01   # Lakers signing Lawson Lovering was given 26
+    # on opening night everyone debuts: no cut
+    old = d[d.season == 2026]
+    opener = pd.DataFrame([{**up.iloc[0].to_dict(), "game_date": d[d.season == 2027].game_date.min()}])
+    g = history.build_features(pd.concat([old, opener], ignore_index=True))
+    assert abs(g[g.game_id == 2000].iloc[0].min_exp - career) < 0.01
+
+
 def test_rookies_are_projected_from_their_second_game():
     f = history.build_features(_box(10))
     rows = props.model_rows(f, "points")
