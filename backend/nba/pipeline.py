@@ -254,7 +254,7 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "home": int(r.home), "headshot": r.headshot, "game_id": int(r.game_id), "injury": r.injury or None,
             "injury_note": r.injury_note or None, "out": bool(r.out), "market": m, "mean": r.mu, "q10": r.q10, "q90": r.q90,
             "line": line, "line_source": "book" if book_line is not None else "usual", "usual_line": r.line, "dk_line": dk_line,
-            "milestones": odds.get("dk_ladder", {}).get((str(int(r.player_id)), m), []),
+            "milestones": collect.pick_ladder(odds.get("dk_ladder", {}).get((str(int(r.player_id)), m), {}), dk_line),
             "dist": dist if validated else None, "p_over": po,
             "offers": [o for o in offers if o["line"] == line] if book_line is not None else [],
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),

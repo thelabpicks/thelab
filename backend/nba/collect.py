@@ -203,13 +203,27 @@ def parse_espn_props(items: list[dict]) -> list[dict]:
     return out
 
 
+def espn_milestone_market(type_name: str) -> str | None:
+    """Our market for an ESPN milestone ladder ('Points Milestones'); None for combos ('Points + Rebounds') and for
+    quarter or half ladders, which ESPN also lists and which would otherwise be read as the full game."""
+    t = type_name.lower().replace("milestones", "").replace("milestone", "").replace("(incl. overtime)", "").strip()
+    if any(w in t for w in ("quarter", "half", "1st", "2nd", "3rd", "4th", "first", "q1", "q2", "q3", "q4", "steal", "block")):
+        return None
+    if any(c in t for c in ("+", "&", ",", " and ")):
+        return "pra" if all(w in t for w in ("point", "rebound", "assist")) and t.count("+") + t.count(",") + t.count(" and ") <= 2 else None
+    if "3-point" in t or "three" in t:
+        return "threes"
+    return {"points": "points", "rebounds": "rebounds", "assists": "assists"}.get(t)
+
+
 def parse_espn_milestones(items: list[dict]) -> list[dict]:
-    """DraftKings' "X+" ladders ('Points Milestones': 15+ at -446), one priced item per rung, per player and market."""
+    """DraftKings' "X+" ladders ('Points Milestones': 15+ at -446), one priced item per rung, per player, market and
+    ESPN type (kept so a stray ladder can be told apart from the full-game one)."""
     import re  # noqa: PLC0415
     out: dict = {}
     for it in items:
         name = (it.get("type") or {}).get("name", "")
-        m = espn_prop_market(name) if "milestone" in name.lower() else None
+        m = espn_milestone_market(name) if "milestone" in name.lower() else None
         aid = re.search(r"/athletes/(\d+)", (it.get("athlete") or {}).get("$ref", ""))
         x = ((it.get("current") or {}).get("target") or {}).get("value")
         try:
@@ -217,8 +231,30 @@ def parse_espn_milestones(items: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             continue
         if m and aid and x is not None and float(x) >= 1:
-            out[(aid.group(1), m, float(x))] = price
-    return [{"player_id": pid, "market": m, "x": x, "price": price} for (pid, m, x), price in sorted(out.items())]
+            out[(aid.group(1), m, name, float(x))] = price
+    return [{"player_id": pid, "market": m, "type": t, "x": x, "price": price} for (pid, m, t, x), price in sorted(out.items())]
+
+
+def _implied(american: int) -> float:
+    return -american / (100 - american) if american < 0 else 100 / (american + 100)
+
+
+def pick_ladder(ladders: dict[str, list[list]], line: float | None) -> list[list]:
+    """The full-game ladder among a player's ladders for one market: rungs must get less likely as they rise, and the
+    rung nearest even money must sit near DraftKings' main line (a quarter ladder or a combo would not). [] if none fits."""
+    if line is None:
+        return []
+    best, gap = [], None
+    for rungs in ladders.values():
+        rungs = sorted(rungs)
+        p = [_implied(price) for _, price in rungs]
+        if len(rungs) < 2 or any(b > a + 1e-9 for a, b in zip(p, p[1:])):
+            continue
+        mid = min(rungs, key=lambda r: abs(_implied(r[1]) - 0.5))[0]
+        g = abs(mid - line)
+        if g <= max(3.0, 0.3 * line) and (gap is None or g < gap):
+            best, gap = rungs, g
+    return best
 
 
 def save_espn_props(day: str, log=print) -> dict:
@@ -264,13 +300,14 @@ def load_espn_props(day: str) -> dict[tuple[str, str], float]:
     return {(r["player_id"], r["market"]): r["line"] for r in json.loads(f.read_text()).get("lines", [])} if f.exists() else {}
 
 
-def load_espn_milestones(day: str) -> dict[tuple[str, str], list[list]]:
-    """{(player_id, market): [[x, American price], ...]} DraftKings' X+ ladders saved for `day`, lowest rung first."""
+def load_espn_milestones(day: str) -> dict[tuple[str, str], dict[str, list[list]]]:
+    """{(player_id, market): {ESPN type: [[x, American price], ...]}} DraftKings' X+ ladders saved for `day`."""
     f = sources.archive_dir() / "espn_props" / f"{day}.json"
     out: dict = {}
     for r in json.loads(f.read_text()).get("milestones", []) if f.exists() else []:
-        out.setdefault((r["player_id"], r["market"]), []).append([r["x"], r["price"]])
-    return {k: sorted(v) for k, v in out.items()}
+        if "type" in r:  # ladders saved before 10/31 lost their type and mixed quarter and combo ladders in
+            out.setdefault((r["player_id"], r["market"]), {}).setdefault(r["type"], []).append([r["x"], r["price"]])
+    return out
 
 
 def load_espn_lines(day: str) -> dict:

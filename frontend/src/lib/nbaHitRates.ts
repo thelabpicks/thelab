@@ -6,6 +6,8 @@ import { onDraftKings, overAt, starsOf, surePlay, type NbaRow } from "@/lib/nba"
 export const FLOOR_MIN_CHANCE = 0.8;
 /** A rung priced shorter than this is not worth betting (12+ points at -1200): realistic odds only. */
 export const FLOOR_SHORTEST_PRICE = -700;
+/** Largest gap allowed between the model's chance and the price's: beyond it the data, not the bet, is suspect. */
+export const FLOOR_MAX_GAP = 0.15;
 
 export type HitPick = {
   row: NbaRow; kind: "line" | "floor"; side: "over" | "under"; line: number; milestone: number | null; chance: number;
@@ -52,6 +54,8 @@ export function floorPicks(rows: NbaRow[], o: HitOpts): HitPick[] {
     for (const [x, price] of r.milestones ?? []) {
       if (price < FLOOR_SHORTEST_PRICE) continue;
       const chance = overAt(r, x - 0.5);
+      // the model and DraftKings this far apart means the rung is misread (a quarter ladder as the full game), not an edge
+      if (chance == null || Math.abs(chance - implied(price)) > FLOOR_MAX_GAP) continue;
       const ok = (v: number) => v >= x;
       const l10 = count(r.recent.slice(0, 10), ok), l5 = count(r.recent.slice(0, 5), ok);
       const w = o.window === 5 ? l5 : l10;

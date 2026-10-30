@@ -22,6 +22,8 @@ describe("nba hit rates", () => {
     expect(p.milestone).toBe(20);   // 25+ is about 69%, under the bar; 15+ is priced past -700
     expect(p.price).toBe(-446);
     expect(p.chance).toBeGreaterThan(0.8);
+    // a rung the model and the price disagree on wildly is a misread ladder, never a pick
+    expect(floorPicks([row("1", "points", 27, 26.5, brunson, { milestones: [[20, 140]] })], { threshold: 1, window: 10 })).toEqual([]);
     expect(p.l5).toEqual([5, 5]);
     expect(p.l10).toEqual([10, 10]);
   });
