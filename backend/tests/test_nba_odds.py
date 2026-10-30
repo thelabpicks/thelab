@@ -160,8 +160,21 @@ def test_espn_draftkings_milestone_ladders_keep_each_rung_and_price():
         return {"athlete": {"$ref": f"http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2027/athletes/{aid}?lang=en"},
                 "type": {"id": "9", "name": name}, "odds": {"american": {"value": american}}, "current": {"target": {"value": x}}}
     items = [item(1, "Points Milestones", 12.0, "-1200"), item(1, "Points Milestones", 15.0, "-446"), item(1, "Points Milestones", 20.0, "+120"),
-             item(1, "3-Point Field Goals Milestones", 2.0, "-230"), item(1, "Total Points", 18.5, "-110")]
+             item(1, "3-Point Field Goals Milestones", 2.0, "-230"), item(1, "Total Points", 18.5, "-110"),
+             # quarter and combo ladders are not the full-game stat (Booker "3+ points" at -620 on 10/30)
+             item(1, "1st Quarter Points Milestones", 3.0, "-620"), item(1, "Points + Rebounds Milestones", 25.0, "-300"),
+             item(1, "Points, Rebounds and Assists Milestones", 30.0, "-250")]
     got = collect.parse_espn_milestones(items)
-    assert [(r["market"], r["x"], r["price"]) for r in got] == [("points", 12.0, -1200), ("points", 15.0, -446), ("points", 20.0, 120), ("threes", 2.0, -230)]
+    assert sorted((r["market"], r["x"], r["price"]) for r in got) == [
+        ("points", 12.0, -1200), ("points", 15.0, -446), ("points", 20.0, 120), ("pra", 30.0, -250), ("threes", 2.0, -230)]
     # a milestone rung is never read as the main line
     assert collect.parse_espn_props(items + [item(1, "Points Milestones", 15.5, "-110"), item(1, "Points Milestones", 15.5, "-110")]) == []
+
+
+def test_the_full_game_ladder_is_the_one_near_the_main_line():
+    full = [[15.0, -2000], [20.0, -300], [25.0, -110], [30.0, 150]]
+    quarter = [[2.0, -2200], [5.0, -230], [7.0, 101], [10.0, 321]]
+    jumbled = [[18.0, -360], [20.0, -545], [25.0, -202]]   # gets more likely as it rises: two ladders mixed
+    assert collect.pick_ladder({"a": quarter, "b": full, "c": jumbled}, 23.5) == full
+    assert collect.pick_ladder({"a": quarter, "c": jumbled}, 23.5) == []
+    assert collect.pick_ladder({"b": full}, None) == []
