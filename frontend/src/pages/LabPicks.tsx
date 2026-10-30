@@ -228,7 +228,8 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
       {[...byDay.entries()].map(([d, ps]) => {
         const t = tally(ps);
         return (
-          <div key={d} className="border-t border-line">
+          // keyed by sport too, so switching sports builds a fresh list instead of reusing the last sport's rows
+          <div key={`${sport}|${d}`} className="border-t border-line">
             <div className="flex items-center justify-between bg-raised/40 px-4 py-1.5 text-xs font-semibold sm:px-5">
               <span>{day(d)}</span><span className="text-muted">{t.n ? `${recText(t)} that day` : ps.some((p) => !p.result) ? "Pending" : t.unbooked ? "Not counted" : "Void"}</span>
             </div>
@@ -236,7 +237,8 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
               {ps.map((p) => {
                 const daily = potd.get(`${p.game_id}|${p.bet}`);
                 return (
-                  <li key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
+                  // a pick of the day can share its top 10 pick's id at another line (Ty Jerome 23.5 and 24.5, 10/29): key by bet
+                  <li key={`${p.id}|${p.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
                     <ResultMark p={daily?.result ? daily : p} />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent">Pick of the day</span>}</div>
