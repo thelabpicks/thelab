@@ -3,7 +3,7 @@ The Lab daily report, Friday, Oct 30 (results from Thursday, Oct 29)
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 10-2 +5.67u / 4-1 +2.20u
-  CFB: 15-3 +0.64u / 3-0 +0.71u
+  CFB: 15-3 +0.64u / 4-0 +1.17u
   NBA: 7-1 +3.98u / 5-0 +3.50u
 
 NFL
@@ -26,8 +26,13 @@ NFL
 CFB
   Picks
     - Withdrawn before kickoff: North Texas to win (ML -490). Reason: priced shorter than -300, the cap for a pick of the day. Withdrawn picks never count.
+    - Graded since the last report: Missouri State to win (ML -220) ✓.
   How the model did
-    - Suggested college bets this season: 11-9 (55%).
+    - Winners (3 games): 1-2 (33%). By confidence: 70%+ hit 50% of 2, under 60% hit 0% of 1.
+    - Spreads (3 games): 0-3 (0%). By confidence: under 60% hit 0% of 3.
+    - Totals (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
+    - Furthest off: Jacksonville State at New Mexico State (projected 51.1 total, scored 24, −27.1); Florida Atlantic at North Texas (projected 75.9 total, scored 89, +13.1).
+    - Suggested college bets this season: 12-12 (50%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 19.1 to 7.1 points (44 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +1.43 vs the pregame input (typical miss 6.5).
