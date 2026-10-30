@@ -945,8 +945,7 @@ function renderHub(){
   const L=GAMES[hubSport], f=featured(hubSport), rest=L.filter(g=>g!==f);
   if(!f){document.getElementById('hubbody').innerHTML=recordHtml(hubSport)+`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
   const groups={};rest.forEach(g=>{const d=ETday.format(new Date(g.when));(groups[d]=groups[d]||[]).push(g)});
-  const pd=parlayOfDay(hubSport);
-  document.getElementById('hubbody').innerHTML=(pd?parlayCard(pd,true):'')+card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('')+recordHtml(hubSport);
+  document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('')+recordHtml(hubSport);
   document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{const url=shareUrl(b.dataset.key);
     const done=()=>{b.textContent='Link copied';setTimeout(()=>b.textContent='Copy link',1600)};
     try{navigator.clipboard.writeText(url).then(done,()=>{b.textContent=url})}catch(_){b.textContent=url}});
@@ -959,7 +958,7 @@ const gameKey=p=>`${p.sport}-${p.game.replace(' at ','-')}`.toLowerCase();
 const pct=x=>Math.round(100*x)+'%';
 const price=x=>x>0?'+'+x:String(x);
 function parlayRecord(sp){const r=PARLAYS&&PARLAYS.record&&PARLAYS.record[sp];return r?`${r.won}-${r.lost}`:'0-0'}
-function parlayCard(p,hub){
+function parlayCard(p){
   const done=p.graded_at&&p.hit!=null, [A,H]=p.game.split(' at '), n=p.legs.length;
   const fin=done&&p.final?`${A} ${p.final[A]} · ${H} ${p.final[H]} · final`:fmtWhen(p.start);
   const mark=l=>l.hit==null?(done?'<span class="mark void" title="Did not play: void">–</span>':'<span class="mark wait"></span>'):l.hit?'<span class="mark ok">✓</span>':'<span class="mark no">✗</span>';
@@ -967,25 +966,19 @@ function parlayCard(p,hub){
   const legs=p.legs.map(l=>`<li class="leg">${mark(l)}<div class="who"><b>${l.name} ${l.min}+ ${LEGW[l.stat]}</b><small>${sub(l)}</small></div><div class="chance"><span class="p">${pct(l.chance)}</span><div class="pbar"><i style="width:${pct(l.chance)}"></i></div></div></li>`).join('');
   const joint=done?`<b>The sims gave all ${n} legs a ${pct(p.chance)} chance together.</b> ${p.hit?'Every leg cleared its number.':'One miss sinks the parlay, and it counts in the record like any hit.'}`
     :`<b>All ${n} legs hit together in ${pct(p.chance)} of our ${p.runs.toLocaleString('en-US')} sims.</b> Counted straight from the runs, so legs that move together are not double counted. Fair price ${price(p.fair)}.`;
-  const hist=!hub&&PARLAYS.recent&&PARLAYS.recent.filter(r=>r.sport===p.sport&&r.key!==p.key).slice(0,5);
+  const hist=PARLAYS.recent&&PARLAYS.recent.filter(r=>r.sport===p.sport&&r.key!==p.key).slice(0,5);
   const hrows=hist&&hist.length?`<div class="hist"><div class="label">Recent Sim Parlays</div>${hist.map(r=>`<div class="hrow"><span class="d">${r.game.replace(' at ',' @ ')}</span><div class="dots">${r.legs.map(l=>`<i class="${l.hit==null?'v':l.hit?'':'x'}"></i>`).join('')}</div><span class="res ${r.hit?'w':'l'}">${r.hit?'HIT':'MISS'}</span></div>`).join('')}</div>`:'';
   return `<section class="parlay" aria-label="Sim Parlay">
-    <div class="ph"><div class="t"><b>${hub?'Sim Parlay of the day':'Sim Parlay'}</b><span class="g">${p.game.replace(' at ',' @ ')} · ${fin}</span></div>
+    <div class="ph"><div class="t"><b>Sim Parlay</b><span class="g">${p.game.replace(' at ',' @ ')} · ${fin}</span></div>
       <span class="pill${done?(p.hit?' hit':' miss'):''}">${done?(p.hit?'HIT':'MISS'):p.graded_at?'NO ACTION':Date.parse(p.start)<=Date.now()?'LIVE':'PENDING'}</span></div>
     <ul class="legs">${legs}</ul>
     <div class="joint"><p>${joint}</p><span class="big">${pct(p.chance)}</span></div>${hrows}
-    <div class="pfoot"><span>Sim Parlay record <span class="rec">${parlayRecord(p.sport)}</span> · graded after every game</span>${hub?`<a class="btn primary" href="#${gameKey(p)}">Watch the full sim</a>`:''}</div>
+    <div class="pfoot"><span>Sim Parlay record <span class="rec">${parlayRecord(p.sport)}</span> · graded after every game</span></div>
   </section>`;
-}
-// The hub's pick: the surest parlay on a game that has not started, else the latest one shown.
-function parlayOfDay(sp){
-  const L=(PARLAYS&&PARLAYS.games||[]).filter(p=>p.sport===sp);if(!L.length)return null;
-  const up=L.filter(p=>Date.parse(p.start)>Date.now());
-  return up.length?[...up].sort((a,b)=>b.chance-a.chance)[0]:[...L].sort((a,b)=>b.start.localeCompare(a.start))[0];
 }
 function renderGameParlay(gm){
   const el=document.getElementById('vparlay'), p=PARLAYS&&(PARLAYS.games||[]).find(x=>gameKey(x)===gm.key);
-  el.innerHTML=p?parlayCard(p,false):'';
+  el.innerHTML=p?parlayCard(p):'';
 }
 // warm every game in the background so cards show real win chances and open instantly
 let warmQ=[];
@@ -1025,7 +1018,7 @@ fetch('data/sims/games.json',{cache:'no-cache'}).then(r=>r.ok?r.json():Promise.r
   route(); setTimeout(warm,60);
 });
 fetch('data/sims/parlays.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PARLAYS=p;if(!p||!DATA)return;
-  if(!document.getElementById('hub').hidden)renderHub();else{const gm=[...GAMES.nba,...GAMES.nfl].find(g=>g.key===location.hash.slice(1));if(gm)renderGameParlay(gm)}});
+  const gm=[...GAMES.nba,...GAMES.nfl].find(g=>g.key===location.hash.slice(1));if(gm)renderGameParlay(gm)});
 fetch('data/sims/grades.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GRADES=g;if(g&&DATA&&!document.getElementById('hub').hidden)renderHub()});
 requestAnimationFrame(frame);
 </script>
