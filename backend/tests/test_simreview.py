@@ -93,8 +93,8 @@ def test_market_and_input_tables_attribute_the_miss():
     mk = {m["market"]: m for m in simreview._market_table(g["rows"])}
     assert mk["carries"]["miss"]["roles"] == 0 and mk["carries"]["chance"] == 0
     assert 0 <= sum(mk["rec_yards"]["share"].values()) <= 1.0001
-    it = {x["input"]: x for x in simreview._input_table(g["inputs"], g["inputs"], {"pass_adj": 1.03}, {"ypc_adj": {"adopt": True, "gain": 0.001}})}
-    assert it["team_attempts"]["correction"] == {"key": "pass_adj", "value": 1.03, "adopted": True}
+    it = {x["input"]: x for x in simreview._input_table(g["inputs"], g["inputs"], {"pass_adj": 1.03}, {"ypc_adj": {"adopt": True, "gain": 0.001}, "volume": {"adopt": True, "gain": 0.002}})}
+    assert it["team_attempts"]["correction"] == {"key": "pass_adj", "value": 1.03, "adopted": True, "gain": 0.002}
     assert it["ypc"]["correction"]["adopted"] is True
     assert it["catch_rate"]["correction"]["adopted"] is False
     assert not it["team_attempts"]["clear"]  # one game is never enough to call a bias
@@ -117,7 +117,8 @@ def test_efficiency_factor_uses_only_earlier_weeks_and_moves_the_sim():
     adj = gamesim.efficiency_factor(f, 2026, 3)   # week 3's own result must not count
     assert 1.0 < adj["catch_adj"] < 0.9 / 0.6 and adj["ypt_adj"] == 1.0 and adj["ypc_adj"] == 1.0
     assert gamesim.efficiency_factor(f, 2026, 1) == {"catch_adj": 1.0, "ypt_adj": 1.0, "ypc_adj": 1.0}
-    assert gamesim.week_params(f, 2026, 3) == gamesim.volume_factor(f, 2026, 3)   # nothing adopted: volume only
+    assert gamesim.week_params(f, 2026, 3) == {}   # nothing adopted: no corrections, not even volume
+    assert gamesim.week_params(f, 2026, 3, ["volume"]) == gamesim.volume_factor(f, 2026, 3)
     assert gamesim.week_params(f, 2026, 3, ["catch_adj"])["catch_adj"] == adj["catch_adj"]
     hi = gamesim.simulate_team(_team(), np.random.default_rng(4), n=3000, params={"catch_adj": 1.2})
     lo = gamesim.simulate_team(_team(), np.random.default_rng(4), n=3000)

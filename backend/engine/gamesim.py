@@ -76,7 +76,8 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
     # is tuned, since a fully random margin adds more noise than it explains.
     exp_margin = float(r0.get("spread_for") or 0.0)
     margin = exp_margin + P["script_sd"] * rng.standard_normal(n)
-    vol = np.exp(P["vol_sd"] * rng.standard_normal(n))
+    # mean-one noise: exp(sd*z) alone averages exp(sd^2/2) (+2% volume at sd 0.2; 2019-2026 team attempts ran +0.8 a game)
+    vol = np.exp(P["vol_sd"] * rng.standard_normal(n) - P["vol_sd"] ** 2 / 2)
     pos = rows.position.to_numpy()
 
     def pos_mult(col, p):
@@ -208,7 +209,11 @@ def volume_factor(frame: pd.DataFrame, season: int, week: int, k: int = 4) -> di
 
 
 # Efficiency corrections and the markets each is judged on (the stat it moves most directly).
-CORRECTIONS = {"catch_adj": ("receptions", "completions"), "ypt_adj": ("rec_yards", "pass_yards"), "ypc_adj": ("rush_yards",)}
+# The team volume correction (volume_factor) is tested the same way: 2019-2026 team-weeks showed no gain from it on its own
+# (attempts miss 6.34 a game without it, 6.35 with it), and in October 2026 it kept pass volume 3-5% high after September's
+# heavier passing, so it is used only while it helps.
+CORRECTIONS = {"catch_adj": ("receptions", "completions"), "ypt_adj": ("rec_yards", "pass_yards"), "ypc_adj": ("rush_yards",),
+               "volume": ("pass_attempts", "completions", "pass_yards", "carries", "rush_yards")}
 
 
 def efficiency_factor(frame: pd.DataFrame, season: int, week: int, k: int = 4) -> dict:
@@ -219,7 +224,7 @@ def efficiency_factor(frame: pd.DataFrame, season: int, week: int, k: int = 4) -
     wk = sorted(lab.week.unique())[-k:]
     g = lab[lab.week.isin(wk)]
     if g.empty:
-        return {key: 1.0 for key in CORRECTIONS}
+        return {key: 1.0 for key in CORRECTIONS if key != "volume"}
     num = lambda col: pd.to_numeric(g[col], errors="coerce").fillna(0.0)  # noqa: E731
     tg, ca = num("targets"), num("carries")
 
@@ -234,10 +239,11 @@ def efficiency_factor(frame: pd.DataFrame, season: int, week: int, k: int = 4) -
 
 
 def week_params(frame: pd.DataFrame, season: int, week: int, corrections=()) -> dict:
-    """What the pregame simulation of a week learns from the weeks before it: the volume correction always, and each
-    efficiency correction that was adopted."""
+    """What the pregame simulation of a week learns from the weeks before it: each volume and efficiency correction that
+    was adopted."""
     eff = efficiency_factor(frame, season, week) if corrections else {}
-    return {**volume_factor(frame, season, week), **{key: v for key, v in eff.items() if key in corrections}}
+    vol = volume_factor(frame, season, week) if "volume" in corrections else {}
+    return {**vol, **{key: v for key, v in eff.items() if key in corrections}}
 
 
 def _logit(p):
@@ -439,7 +445,7 @@ def review(c, frame: pd.DataFrame | None = None, season: int | None = None, week
     vol = {"pass": [], "rush": []}
     for w in done:
         rows = lab[(lab.season == season) & (lab.week == w)]
-        runs = {"pregame": simulate_week(rows, n, seed=season * 100 + w, params=volume_factor(frame, season, w))}
+        runs = {"pregame": simulate_week(rows, n, seed=season * 100 + w, params=week_params(frame, season, w, adopted_corrections()))}
         for level in ("volume", "role"):
             runs[level] = simulate_week(_postgame_rows(rows, level), n, seed=season * 100 + w, params=params)
         for t, g in rows.groupby("team"):
