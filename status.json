@@ -1,6 +1,6 @@
 {
   "date": "2026-10-30",
-  "ran_at": "2026-10-30T16:52:31+00:00",
+  "ran_at": "2026-10-30T23:00:00+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -36,11 +36,13 @@
     },
     {
       "file": "player_box_2027.csv",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 992239
     },
     {
       "file": "nba_schedule_2027.csv",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 2464018
     }
   ],
   "box_scores": {
@@ -52,7 +54,7 @@
   "espn": {
     "injuries": {
       "saved": "2026-10-30.json",
-      "items": 29
+      "items": 28
     },
     "scoreboard": {
       "saved": "2026-10-30.json",
@@ -61,8 +63,8 @@
   },
   "official_injuries": {
     "saved": "2026-10-30.json",
-    "players": 82,
-    "report": "Injury-Report_2026-10-30_06_00AM.pdf"
+    "players": 119,
+    "report": "Injury-Report_2026-10-30_06_45PM.pdf"
   },
   "rosters": {
     "teams": 30,
@@ -70,7 +72,7 @@
   },
   "espn_props": {
     "saved": "2026-10-30.json",
-    "lines": 555,
+    "lines": 578,
     "errors": {}
   },
   "odds": {
