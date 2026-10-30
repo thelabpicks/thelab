@@ -2,16 +2,15 @@
    Two views: DraftKings' posted line (either side), and floor picks, the highest "X+" milestone he almost always reaches. */
 import { onDraftKings, overAt, starsOf, surePlay, type NbaRow } from "@/lib/nba";
 
-/** The "X+" milestones DraftKings posts for every player with props (15+ points, 6+ rebounds, ...). */
-export const NBA_MILESTONES: Record<string, number[]> = {
-  points: [10, 15, 20, 25, 30, 35, 40], rebounds: [4, 6, 8, 10, 12, 14], assists: [2, 4, 6, 8, 10, 12],
-  threes: [1, 2, 3, 4, 5, 6], pra: [15, 20, 25, 30, 35, 40, 45, 50],
-};
-/** A floor pick needs this model chance: tonight's 85%+ calls hit 91% of 225 graded games (Oct 22-29). */
-export const FLOOR_MIN_CHANCE = 0.85;
+/** Floor picks need this model chance: tonight's 80-85% calls have hit 83% of graded games, 85%+ calls 91%. */
+export const FLOOR_MIN_CHANCE = 0.8;
+/** A rung priced shorter than this is not worth betting (12+ points at -1200): realistic odds only. */
+export const FLOOR_SHORTEST_PRICE = -700;
 
 export type HitPick = {
   row: NbaRow; kind: "line" | "floor"; side: "over" | "under"; line: number; milestone: number | null; chance: number;
+  /** DraftKings' American price for a floor pick's rung */
+  price: number | null;
   /** cleared in his last 5 and last 10 games (games he played) */
   l5: [number, number]; l10: [number, number];
 };
@@ -39,25 +38,30 @@ export function lineHitRates(rows: NbaRow[], o: HitOpts): HitPick[] {
     const w = o.window === 5 ? l5 : l10;
     const over = overAt(r, r.line);
     if (over == null || w[0] < o.threshold * w[1] - 1e-9) continue;
-    out.push({ row: r, kind: "line", side, line: r.line, milestone: null, chance: side === "over" ? over : 1 - over, l5, l10 });
+    out.push({ row: r, kind: "line", side, line: r.line, milestone: null, chance: side === "over" ? over : 1 - over, price: null, l5, l10 });
   }
   return out.sort((a, b) => b.chance - a.chance);
 }
 
-/** Per player and market, the highest milestone the model gives 85%+ that he also reached in at least `threshold` of his last games. */
+/** Per player and market, the highest rung of DraftKings' "X+" ladder priced -700 or longer that the model gives 80%+ and
+ *  that he reached in at least `threshold` of his last games. Only rungs DraftKings actually posts. */
 export function floorPicks(rows: NbaRow[], o: HitOpts): HitPick[] {
   const out: HitPick[] = [];
   for (const r of pool(rows, o)) {
     let best: HitPick | null = null;
-    for (const x of NBA_MILESTONES[r.market] ?? []) {
+    for (const [x, price] of r.milestones ?? []) {
+      if (price < FLOOR_SHORTEST_PRICE) continue;
       const chance = overAt(r, x - 0.5);
       const ok = (v: number) => v >= x;
       const l10 = count(r.recent.slice(0, 10), ok), l5 = count(r.recent.slice(0, 5), ok);
       const w = o.window === 5 ? l5 : l10;
-      if (chance != null && chance >= FLOOR_MIN_CHANCE && w[0] >= o.threshold * w[1] - 1e-9)
-        best = { row: r, kind: "floor", side: "over", line: x - 0.5, milestone: x, chance, l5, l10 };
+      if (chance != null && chance >= FLOOR_MIN_CHANCE && w[0] >= o.threshold * w[1] - 1e-9 && (!best || x > best.milestone!))
+        best = { row: r, kind: "floor", side: "over", line: x - 0.5, milestone: x, chance, price, l5, l10 };
     }
     if (best) out.push(best);
   }
   return out.sort((a, b) => b.chance - a.chance);
 }
+
+/** The chance a price implies (-446 is 82%). */
+export const implied = (american: number) => (american < 0 ? -american / (100 - american) : 100 / (american + 100));

@@ -182,7 +182,8 @@ def parse_espn_props(items: list[dict]) -> list[dict]:
     import re  # noqa: PLC0415
     pairs: dict = {}
     for it in items:
-        m = espn_prop_market((it.get("type") or {}).get("name", ""))
+        name = (it.get("type") or {}).get("name", "")
+        m = None if "milestone" in name.lower() else espn_prop_market(name)
         aid = re.search(r"/athletes/(\d+)", (it.get("athlete") or {}).get("$ref", ""))
         line = ((it.get("current") or {}).get("target") or {}).get("value")
         if not m or not aid or line is None or float(line) % 1 != 0.5:
@@ -202,6 +203,24 @@ def parse_espn_props(items: list[dict]) -> list[dict]:
     return out
 
 
+def parse_espn_milestones(items: list[dict]) -> list[dict]:
+    """DraftKings' "X+" ladders ('Points Milestones': 15+ at -446), one priced item per rung, per player and market."""
+    import re  # noqa: PLC0415
+    out: dict = {}
+    for it in items:
+        name = (it.get("type") or {}).get("name", "")
+        m = espn_prop_market(name) if "milestone" in name.lower() else None
+        aid = re.search(r"/athletes/(\d+)", (it.get("athlete") or {}).get("$ref", ""))
+        x = ((it.get("current") or {}).get("target") or {}).get("value")
+        try:
+            price = int(float(str(((it.get("odds") or {}).get("american") or {}).get("value")).replace("+", "")))
+        except (TypeError, ValueError):
+            continue
+        if m and aid and x is not None and float(x) >= 1:
+            out[(aid.group(1), m, float(x))] = price
+    return [{"player_id": pid, "market": m, "x": x, "price": price} for (pid, m, x), price in sorted(out.items())]
+
+
 def save_espn_props(day: str, log=print) -> dict:
     """DraftKings' player prop lines for each of today's games, from ESPN (free, every game and market)."""
     sb = sources.archive_dir() / "scoreboard" / f"{day}.json"
@@ -210,7 +229,7 @@ def save_espn_props(day: str, log=print) -> dict:
     # games not yet started only: once a game tips ESPN lists DraftKings' in-game lines, not the pregame ones
     events = [e["id"] for e in json.loads(sb.read_text())["data"].get("events", [])
               if ((e.get("status") or {}).get("type") or {}).get("state", "pre") == "pre"]
-    rows, errors = [], {}
+    rows, ladders, errors = [], [], {}
     for eid in events:
         try:
             items, page = [], 1
@@ -222,13 +241,19 @@ def save_espn_props(day: str, log=print) -> dict:
                     break
                 page += 1
             rows += [r | {"event_id": eid} for r in parse_espn_props(items)]
+            ladders += [r | {"event_id": eid} for r in parse_espn_milestones(items)]
         except Exception as ex:  # noqa: BLE001 - a game without props keeps its usual lines
             errors[eid] = str(ex)
     dest = sources.archive_dir() / "espn_props" / f"{day}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
+    # games already under way keep the pregame lines saved by an earlier run
+    prev = json.loads(dest.read_text()) if dest.exists() else {}
+    fresh = {e for e in events if e not in errors}
+    rows += [r for r in prev.get("lines", []) if r.get("event_id") not in fresh]
+    ladders += [r for r in prev.get("milestones", []) if r.get("event_id") not in fresh]
     dest.write_text(json.dumps({"fetched_at": utcnow(), "source": f"{ESPN_CORE}/events/{{id}}/competitions/{{id}}/odds/{DK_PROVIDER}/propBets",
-                                "book": "draftkings", "lines": rows, "errors": errors}))
-    log(f"nba: saved {len(rows)} DraftKings prop lines from ESPN for {len(events) - len(errors)} of {len(events)} games"
+                                "book": "draftkings", "lines": rows, "milestones": ladders, "errors": errors}))
+    log(f"nba: saved {len(rows)} DraftKings prop lines and {len(ladders)} milestone rungs from ESPN for {len(events) - len(errors)} of {len(events)} games"
         + (f" ({len(errors)} failed)" if errors else ""))
     return {"saved": dest.name, "lines": len(rows), "errors": errors}
 
@@ -237,6 +262,15 @@ def load_espn_props(day: str) -> dict[tuple[str, str], float]:
     """{(player_id, market): DraftKings line} saved for `day` ({} when none)."""
     f = sources.archive_dir() / "espn_props" / f"{day}.json"
     return {(r["player_id"], r["market"]): r["line"] for r in json.loads(f.read_text()).get("lines", [])} if f.exists() else {}
+
+
+def load_espn_milestones(day: str) -> dict[tuple[str, str], list[list]]:
+    """{(player_id, market): [[x, American price], ...]} DraftKings' X+ ladders saved for `day`, lowest rung first."""
+    f = sources.archive_dir() / "espn_props" / f"{day}.json"
+    out: dict = {}
+    for r in json.loads(f.read_text()).get("milestones", []) if f.exists() else []:
+        out.setdefault((r["player_id"], r["market"]), []).append([r["x"], r["price"]])
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def load_espn_lines(day: str) -> dict:

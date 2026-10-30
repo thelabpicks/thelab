@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Percent } from "lucide-react";
-import { FLOOR_MIN_CHANCE, NFL_MILESTONES, answerFloorPicks, answerHitRates, type Pick } from "@/lib/ask";
+import { FLOOR_MIN_CHANCE, FLOOR_SHORTEST_PRICE, answerFloorPicks, answerHitRates, type Pick } from "@/lib/ask";
 import { useLinkSuffix, useSeasonWeek } from "@/lib/state";
 import { PageTitle } from "@/components/Layout";
 import { Card, CardBody, CardHeader, Input, LoadingBlock, Notice, Segmented, Select } from "@/components/ui";
@@ -40,10 +40,9 @@ export default function HitRatesPage() {
       <PageTitle kicker={`${season} · Week ${week}`} title="Hit rates" />
       <Segmented label="View" value={view} onChange={setView} options={[{ value: "book", label: "Book lines" }, { value: "floor", label: "Floor picks (X+)" }]} />
       {floor ? (
-        <Notice tone="info" title="Milestones he almost always reaches">
-          The highest &ldquo;X+&rdquo; milestone (like 50+ receiving yards) that the model gives {Math.round(FLOOR_MIN_CHANCE * 100)}% or better and that he also reached
-          in your chosen share of recent games. In testing the model&apos;s {Math.round(FLOOR_MIN_CHANCE * 100)}%+ calls hit about 90%. Books price these steeply, so they
-          suit parlay legs more than single bets. Only players the books post that prop for are listed.
+        <Notice tone="info" title="Posted lines he keeps clearing">
+          The highest over line the books post (shown as &ldquo;X+&rdquo;), priced {FLOOR_SHORTEST_PRICE} or longer, that the model gives {Math.round(FLOOR_MIN_CHANCE * 100)}% or
+          better and that he also cleared in your chosen share of recent games. Only lines the books post are listed.
         </Notice>
       ) : (
         <Notice tone="info" title="Find lines a player keeps clearing">
@@ -59,7 +58,7 @@ export default function HitRatesPage() {
           {!floor && <Segmented size="sm" label="Side" value={side} onChange={setSide} options={[{ value: "over", label: "Overs" }, { value: "under", label: "Unders" }]} />}
           <Select aria-label="Market" value={market} onChange={(e) => setMarket(e.target.value)} className="h-8 w-44 text-xs">
             <option value="all">All markets</option>
-            {Object.entries(data?.props ?? {}).filter(([m]) => !floor || NFL_MILESTONES[m]).map(([m, v]) => <option key={m} value={m}>{v.label}</option>)}
+            {Object.entries(data?.props ?? {}).map(([m, v]) => <option key={m} value={m}>{v.label}</option>)}
           </Select>
           <Segmented size="sm" label="Position" value={pos} onChange={setPos} options={POSITIONS.map((x) => ({ value: x, label: x }))} />
           <Select aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as "chance" | "hits")} className="h-8 w-44 text-xs">

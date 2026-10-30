@@ -174,16 +174,17 @@ describe("ask parser", () => {
     expect(lad.table?.rows.every((r) => parseFloat(String(r[0])) >= 168)).toBe(true);
   });
 
-  it("floor picks: the highest milestone the model gives 85%+ that he kept reaching, posted players only", () => {
+  it("floor picks: the highest posted over line at a bettable price the model gives 80%+ that he kept clearing", () => {
     const rec = [6, 7, 8, 6, 9, 7, 6, 10].map((v, i) => ({ season: 2026, week: 6 - i, opponent: "BUF", value: v }));
     const wr = { player_id: "2", player_name: "Amon-Ra St. Brown", team: "DET", opponent: "TB", position: "WR", game_id: "2026_07_TB_DET", eligible: 1,
       median: 7, q10: 4, q90: 10, recent: rec, evidence: { receptions_med: 7, snap_pct: 0.9 },
       dist: { type: "quantiles" as const, q: Array.from({ length: 99 }, (_, i) => 3 + i * 0.08), platt: [1, 0] as [number, number] } };
-    const posted = [{ market: "receptions", player_id: "2", line: 6.5, side: "over", book: "DraftKings", price: -110 }];
-    const feed = (rows: typeof posted) => ({ at: "2026-10-22T01:00:00Z", get: (m: string, p: string, s: string) => rows.filter((r) => r.market === m && r.player_id === p && r.side === s) });
-    const dd = { ...d, props: { receptions: { label: "Receptions", rows: [wr] } }, feed: feed(posted) } as AskData;
+    const at = (line: number, price: number) => ({ market: "receptions", player_id: "2", line, side: "over", book: "DraftKings", price });
+    const feed = (rows: ReturnType<typeof at>[]) => ({ at: "2026-10-22T01:00:00Z", get: (m: string, p: string, s: string) => rows.filter((r) => r.market === m && r.player_id === p && r.side === s) });
+    const dd = { ...d, props: { receptions: { label: "Receptions", rows: [wr] } }, feed: feed([at(2.5, -2000), at(3.5, -600), at(4.5, -350), at(6.5, -110)]) } as AskData;
     const a = answerFloorPicks(dd, 10, {}, { threshold: 1, window: 8 });
-    expect(a.picks?.map((p) => p.label)).toEqual(["4+ receptions"]);   // 5+ is about 81%, under the floor
+    // 2.5 is priced past -700; 4.5 is about 81%; 6.5 is under 80%
+    expect(a.picks?.map((p) => [p.label, p.price])).toEqual([["5+ receptions", -350]]);
     expect(a.picks?.[0].reasons?.[0]).toContain("8 of 8");
     expect(answerFloorPicks({ ...dd, feed: feed([]) } as AskData, 10, {}, {}).picks ?? []).toHaveLength(0);
   });
