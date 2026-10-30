@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SimGames } from "./gamesims";
-import { applyPins, fitRotation, postSims, postTime, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
+import { applyPins, fitRotation, nbaFresh, postSims, postTime, nbaChecks, nbaSimGames, nflSimGames, repairNba, repairNfl, simPicks, type FrozenWeek, type HeldGame } from "./gamesims";
 import type { Slate } from "./nba";
 
 const team = (implied: number | null, qbStatus: string | null = null): FrozenWeek["games"][string]["teams"][string] => ({
@@ -142,12 +142,16 @@ describe("game sim inputs", () => {
     expect(new Date(postTime("2026-10-30T00:15:00Z")).toISOString()).toBe("2026-10-29T14:00:00.000Z");   // Thursday night: Thursday 10 am
     expect(new Date(postTime("2026-10-29T23:00:00Z", "nba")).toISOString()).toBe("2026-10-29T16:00:00.000Z");   // NBA 7 pm: after the noon picks
     expect(new Date(postTime("2026-11-01T18:00:00Z", "nba")).toISOString()).toBe("2026-11-01T15:00:00.000Z");   // NBA 1 pm EST: 3 hours before
+    expect(nbaFresh("2026-10-29T23:00:00Z", "2026-10-29T09:40:00Z")).toBe(false);   // the morning's numbers: too early for a night game
+    expect(nbaFresh("2026-10-29T23:00:00Z", "2026-10-29T16:38:00Z")).toBe(true);
+    expect(nbaFresh("2026-11-01T18:00:00Z", "2026-11-01T09:40:00Z")).toBe(true);    // an early tip posts on the morning's
+    expect(nbaFresh("2026-11-01T18:00:00Z", "2026-10-31T22:40:00Z")).toBe(false);   // never on the day before's
 
     const g = (id: string, kickoff: string, implied: number) => ({ id, away: "A", home: "B", kickoff, teams: { A: { implied, players: [] }, B: { implied, players: [] } } });
     const nbaGame = { away: "V", home: "H", start: "2026-10-29T23:00:00Z", total: 220, fav: "H", spread: 2 };
     const sims = (implied: number, pts: number) => ({
       nfl: { season: 2026, week: 8, games: [g("thu", "2026-10-30T00:15:00Z", implied), g("sun", "2026-11-01T17:00:00Z", implied)] },
-      nba: { date: "2026-10-29", games: [nbaGame], players: { V: [{ name: "P", min: 30, pts, reb: 1, ast: 1, tpm: 1 }], H: [], X: [] } },
+      nba: { date: "2026-10-29", generated_at: "2026-10-29T16:38:00Z", games: [nbaGame], players: { V: [{ name: "P", min: 30, pts, reb: 1, ast: 1, tpm: 1 }], H: [], X: [] } },
       picks: [{ sport: "nba" as const, game: "V at H", who: "P", market: "points", side: "under", line: 20 }],
     }) as unknown as Pick<SimGames, "nfl" | "nba" | "picks">;
     const posted = {};
@@ -161,6 +165,11 @@ describe("game sim inputs", () => {
     postSims(ten, posted, new Date("2026-10-29T14:05:00Z"));
     expect(ten.nfl.games.map((x) => x.id)).toEqual(["thu"]);
     expect(ten.nba.games).toEqual([]);
+    // after 16:00 but still on the morning's numbers: waits for the noon refresh's
+    const stale = sims(21, 18);
+    stale.nba.generated_at = "2026-10-29T09:40:00Z";
+    postSims(stale, posted, new Date("2026-10-29T16:10:00Z"));
+    expect(stale.nba.games).toEqual([]);
     const noon = sims(21, 18);
     postSims(noon, posted, new Date("2026-10-29T16:10:00Z"));
     expect(noon.nba.games).toHaveLength(1);
