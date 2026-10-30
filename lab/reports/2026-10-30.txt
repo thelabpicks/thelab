@@ -13,11 +13,11 @@ NFL
     - Every graded prop and TD lean on 1 game: 20-24 (45%). By confidence: 70%+ hit 50% of 2, 60-70% hit 44% of 9, under 60% hit 45% of 33.
     - Featured picks this season: 49 of 81 (60%).
   Where it was off and why
-    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 27.9 to 14.8, mostly from his role.
-    - Carry share keeps running above the pregame input (+3.4 pct pts over 97). Watching it; no automatic correction for this input.
-    - Biggest misses: Christian Watson rec yards (sim 52.2, had 113; efficiency); Bryce Young pass yards (sim 249.7, had 209; efficiency); Jordan Love pass yards (sim 254.8, had 288; team volume).
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 28.0 to 14.8, mostly from his role.
+    - Carry share keeps running above the pregame input (+3.5 pct pts over 95). Watching it; no automatic correction for this input.
+    - Biggest misses: Christian Watson rec yards (sim 49.3, had 113; efficiency); Jordan Love pass yards (sim 251.7, had 288; team volume); Bryce Young pass yards (sim 244.1, had 209; efficiency).
   Model changes
-    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0010), yards per target (−0.0009), yards per carry (−0.0003).
+    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0009), yards per target (−0.0010), yards per carry (−0.0004), volume (+0.0003).
     - Team volume learned from the re-sims: passes x1.0292, runs x0.9969.
   Game sims vs the final
     - CAR 19-27 GB (sims CAR 22-26 GB, winner ✓); biggest misses: Christian Watson 113 receiving yards (sims 68.6), Chuba Hubbard 38 receiving yards (sims 18.9)
