@@ -18,7 +18,7 @@ what really happened swapped in one layer at a time:
 How much each layer cuts the typical miss, market by market, is where the pregame inputs were off; what is left after
 layer 4 is plain chance. Each input is also compared directly (actual minus pregame), per game and over the season, so a
 bias that keeps pointing the same way shows up. The league-wide versions of those inputs feed the next simulation:
-team volume always (gamesim.volume_factor), efficiency where its walk-forward test helped (gamesim.correction_test),
+team volume (gamesim.volume_factor) and efficiency where their walk-forward test helped (gamesim.correction_test),
 both refit every update from the newest finished weeks.
 
 Frozen files live in FG_SIMS_DIR (default: next to the pick log); the hosted site keeps them on the nfl-data branch.
@@ -301,7 +301,8 @@ def _input_table(inputs: list[dict], last: list[dict], params: dict, corrections
         feeds = meta["feeds"]
         used = None
         if feeds in ("pass_adj", "rush_adj"):
-            used = {"key": feeds, "value": params.get(feeds), "adopted": True}
+            cr = corrections.get("volume") or {}
+            used = {"key": feeds, "value": params.get(feeds, 1.0), "adopted": bool(cr.get("adopt")), "gain": cr.get("gain")}
         elif feeds:
             cr = corrections.get(feeds) or {}
             used = {"key": feeds, "value": params.get(feeds), "adopted": bool(cr.get("adopt")), "gain": cr.get("gain")}

@@ -62,3 +62,11 @@ def test_share_of_a_back_sitting_out_goes_to_the_backs_playing():
     full = gamesim.simulate_team(_team(), np.random.default_rng(3), n=4000, params={"fill_tgt": 1.0})
     base = gamesim.simulate_team(_team(), np.random.default_rng(3), n=4000, params={"fill_tgt": 0.0})
     assert full["wr1"]["targets"].mean() >= base["wr1"]["targets"].mean()
+
+
+def test_volume_noise_keeps_the_mean():
+    # game-to-game volume noise widens the spread of team passes without raising their average (it used to add ~2%)
+    noisy = gamesim.simulate_team(_team(), np.random.default_rng(1), n=40000, params={"vol_sd": 0.2})
+    flat = gamesim.simulate_team(_team(), np.random.default_rng(1), n=40000, params={"vol_sd": 0.0})
+    assert abs(noisy["qb"]["attempts"].mean() - flat["qb"]["attempts"].mean()) < 0.15
+    assert noisy["qb"]["attempts"].std() > flat["qb"]["attempts"].std()
