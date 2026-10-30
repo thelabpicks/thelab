@@ -66,7 +66,7 @@ def book_odds(day: str) -> dict:
     f = sources.archive_dir() / "odds" / f"{day}.json"
     espn = collect.load_espn_lines(day)
     if not f.exists():
-        return {"games": espn, "props": {}, "dk": collect.load_espn_props(day), "fetched_at": None, "plan": None}
+        return {"games": espn, "props": {}, "dk": collect.load_espn_props(day), "dk_ladder": collect.load_espn_milestones(day), "fetched_at": None, "plan": None}
     s = json.loads(f.read_text())
     ev = {g["event_id"]: g for g in s.get("games", [])}
     games = {}
@@ -88,7 +88,7 @@ def book_odds(day: str) -> dict:
         pr.setdefault((_norm(p["player"]), p["market"]), []).append(
             {"book": p["book"], "side": p["side"], "line": p["line"], "price": p["price"]})
     # DraftKings' lines for every game and market, free from ESPN: the line when no prices were bought for it
-    return {"games": games, "props": pr, "dk": collect.load_espn_props(day), "fetched_at": s.get("fetched_at"),
+    return {"games": games, "props": pr, "dk": collect.load_espn_props(day), "dk_ladder": collect.load_espn_milestones(day), "fetched_at": s.get("fetched_at"),
             "plan": (s.get("budget") or {}).get("plan")}
 
 
@@ -254,6 +254,7 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "home": int(r.home), "headshot": r.headshot, "game_id": int(r.game_id), "injury": r.injury or None,
             "injury_note": r.injury_note or None, "out": bool(r.out), "market": m, "mean": r.mu, "q10": r.q10, "q90": r.q90,
             "line": line, "line_source": "book" if book_line is not None else "usual", "usual_line": r.line, "dk_line": dk_line,
+            "milestones": odds.get("dk_ladder", {}).get((str(int(r.player_id)), m), []),
             "dist": dist if validated else None, "p_over": po,
             "offers": [o for o in offers if o["line"] == line] if book_line is not None else [],
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),

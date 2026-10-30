@@ -16,18 +16,22 @@ const row = (id: string, market: string, mu: number, line: number, recent: numbe
 const brunson = [27, 26, 30, 22, 28, 31, 25, 24, 29, 27];
 
 describe("nba hit rates", () => {
-  it("floor picks take the highest milestone the model gives 85%+ that he kept reaching", () => {
-    const [p] = floorPicks([row("1", "points", 27, 26.5, brunson)], { threshold: 1, window: 10 });
-    expect(p.milestone).toBe(20);   // 25+ is about 69%, under the floor
-    expect(p.chance).toBeGreaterThan(0.85);
+  it("floor picks take the highest DraftKings rung at a bettable price the model gives 80%+ that he kept reaching", () => {
+    const ladder: [number, number][] = [[10, -5000], [15, -1500], [20, -446], [25, -150], [30, 160]];
+    const [p] = floorPicks([row("1", "points", 27, 26.5, brunson, { milestones: ladder })], { threshold: 1, window: 10 });
+    expect(p.milestone).toBe(20);   // 25+ is about 69%, under the bar; 15+ is priced past -700
+    expect(p.price).toBe(-446);
+    expect(p.chance).toBeGreaterThan(0.8);
     expect(p.l5).toEqual([5, 5]);
     expect(p.l10).toEqual([10, 10]);
   });
-  it("leaves out players DraftKings posts nothing for, players not sure to play, and broken streaks", () => {
+  it("leaves out rungs DraftKings doesn't post, players not sure to play, and broken streaks", () => {
+    expect(floorPicks([row("5", "points", 27, 26.5, brunson)], { threshold: 1, window: 10 })).toEqual([]);   // no ladder posted
+    const ladder: [number, number][] = [[20, -446]];
     const rows = [
-      row("2", "points", 27, 26.5, brunson, { dk_line: null, line_source: "usual" }),
-      row("3", "points", 27, 26.5, brunson, { out: true, injury: "Out" }),
-      row("4", "points", 27, 26.5, [27, 8, 30, 22, 28, 31, 25, 24, 29, 27]),
+      row("2", "points", 27, 26.5, brunson, { dk_line: null, line_source: "usual", milestones: ladder }),
+      row("3", "points", 27, 26.5, brunson, { out: true, injury: "Out", milestones: ladder }),
+      row("4", "points", 27, 26.5, [27, 8, 30, 22, 28, 31, 25, 24, 29, 27], { milestones: ladder }),
     ];
     expect(floorPicks(rows, { threshold: 1, window: 10 })).toEqual([]);
     expect(floorPicks(rows, { threshold: 0.9, window: 10 }).map((p) => p.row.player_id)).toEqual(["4"]);

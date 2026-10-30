@@ -25,7 +25,9 @@ export type NbaRow = {
   injury: string | null; injury_note: string | null; out: boolean; market: string; mean: number; q10: number; q90: number;
   line: number; line_source: "book" | "usual"; usual_line: number | null;
   /** DraftKings' line for this player and market (free from ESPN, every game), absent in data published before it */
-  dk_line?: number | null; dist: PropDist | null; p_over: number | null; offers: Offer[];
+  dk_line?: number | null;
+  /** DraftKings' "X+" ladder for this player and market: [rung, American price], lowest rung first (free from ESPN) */
+  milestones?: [number, number][]; dist: PropDist | null; p_over: number | null; offers: Offer[];
   recent: number[]; recent_minutes: number[]; due: boolean;
   evidence: { minutes: number; minutes_long: number; per_min: number; opp_mult: number | null; pace: number | null; opp_pace: number | null; rest: number; start_rate: number;
     /** this season so far (absent in data published before they were added) */

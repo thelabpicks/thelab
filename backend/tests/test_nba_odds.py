@@ -153,3 +153,15 @@ def test_espn_lines_far_from_the_player_are_not_his_main_line():
     assert pipeline.plausible_line(4.5, 3.8)
     assert not pipeline.plausible_line(2.0, 23.9)    # Curry over 2 points
     assert not pipeline.plausible_line(45.0, 17.7)   # Castle under 45
+
+
+def test_espn_draftkings_milestone_ladders_keep_each_rung_and_price():
+    def item(aid, name, x, american):
+        return {"athlete": {"$ref": f"http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2027/athletes/{aid}?lang=en"},
+                "type": {"id": "9", "name": name}, "odds": {"american": {"value": american}}, "current": {"target": {"value": x}}}
+    items = [item(1, "Points Milestones", 12.0, "-1200"), item(1, "Points Milestones", 15.0, "-446"), item(1, "Points Milestones", 20.0, "+120"),
+             item(1, "3-Point Field Goals Milestones", 2.0, "-230"), item(1, "Total Points", 18.5, "-110")]
+    got = collect.parse_espn_milestones(items)
+    assert [(r["market"], r["x"], r["price"]) for r in got] == [("points", 12.0, -1200), ("points", 15.0, -446), ("points", 20.0, 120), ("threes", 2.0, -230)]
+    # a milestone rung is never read as the main line
+    assert collect.parse_espn_props(items + [item(1, "Points Milestones", 15.5, "-110"), item(1, "Points Milestones", 15.5, "-110")]) == []

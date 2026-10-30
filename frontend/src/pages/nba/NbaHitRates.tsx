@@ -2,8 +2,8 @@ import * as React from "react";
 import { Link } from "react-router-dom";
 import { Percent, Search } from "lucide-react";
 import { cn, pct } from "@/lib/format";
-import { NBA_MARKETS, marketLabel, useNba, type Slate } from "@/lib/nba";
-import { FLOOR_MIN_CHANCE, NBA_MILESTONES, floorPicks, lineHitRates, type HitPick } from "@/lib/nbaHitRates";
+import { NBA_MARKETS, fmtPrice, marketLabel, useNba, type Slate } from "@/lib/nba";
+import { FLOOR_MIN_CHANCE, FLOOR_SHORTEST_PRICE, floorPicks, implied, lineHitRates, type HitPick } from "@/lib/nbaHitRates";
 import { PageTitle } from "@/components/Layout";
 import { Card, CardHeader, Input, LoadingBlock, Notice, Segmented, Select, TeamBadge } from "@/components/ui";
 import { Headshot, NotPublished } from "./shared";
@@ -42,10 +42,10 @@ export default function NbaHitRates() {
       <PageTitle kicker={slate.data?.date ? `NBA · ${new Date(slate.data.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}` : "NBA"} title="Hit rates" />
       <Segmented label="View" value={view} onChange={setView} options={[{ value: "floor", label: "Floor picks (X+)" }, { value: "line", label: "DraftKings lines" }]} />
       {floor ? (
-        <Notice tone="info" title="Milestones he almost always reaches">
-          The highest &ldquo;X+&rdquo; milestone (like 15+ points or 6+ rebounds) that tonight&apos;s model gives {Math.round(FLOOR_MIN_CHANCE * 100)}% or better and that he also
-          reached in your chosen share of recent games. The model&apos;s {Math.round(FLOOR_MIN_CHANCE * 100)}%+ calls have hit 91% so far. Books price these steeply, so they suit
-          parlay legs more than single bets. A perfect streak alone barely predicts: across two seasons, a 5-for-5 player hit next time about as often as his longer record said.
+        <Notice tone="info" title="DraftKings milestones he keeps reaching">
+          The highest rung of DraftKings&apos; &ldquo;X+&rdquo; ladder (like 15+ points or 6+ rebounds) priced {FLOOR_SHORTEST_PRICE} or longer, that tonight&apos;s model gives
+          {" "}{Math.round(FLOOR_MIN_CHANCE * 100)}% or better and that he also reached in your chosen share of recent games. Only rungs DraftKings posts are listed, with its
+          price. A perfect streak alone barely predicts: across two seasons, a 5-for-5 player hit next time about as often as his longer record said.
         </Notice>
       ) : (
         <Notice tone="info" title="DraftKings lines a player keeps clearing">
@@ -62,7 +62,7 @@ export default function NbaHitRates() {
           {!floor && <Segmented size="sm" label="Side" value={side} onChange={setSide} options={[{ value: "over", label: "Overs" }, { value: "under", label: "Unders" }]} />}
           <Select aria-label="Market" value={market} onChange={(e) => setMarket(e.target.value)} className="h-8 w-40 text-xs">
             <option value="all">All markets</option>
-            {NBA_MARKETS.filter((m) => !floor || NBA_MILESTONES[m.market]).map((m) => <option key={m.market} value={m.market}>{m.label}</option>)}
+            {NBA_MARKETS.map((m) => <option key={m.market} value={m.market}>{m.label}</option>)}
           </Select>
           <Segmented size="sm" label="Players" value={starsOnly ? "stars" : "all"} onChange={(v) => setStarsOnly(v === "stars")}
             options={[{ value: "stars", label: "Stars" }, { value: "all", label: "Everyone" }]} />
@@ -83,7 +83,7 @@ export default function NbaHitRates() {
                       <Link to={`/nba/players/${p.row.player_id}`} className="truncate font-medium hover:text-accent">{p.row.player_name}</Link>
                       <span className="shrink-0 text-xs text-muted">{p.row.home ? "vs" : "@"} {p.row.opp}</span>
                     </div>
-                    <div className="text-sm font-semibold">{bet(p)}</div>
+                    <div className="text-sm"><span className="font-semibold">{bet(p)}</span>{p.price != null && <span className="text-muted" title="The price's own chance; the model's chance is on the right"> · DraftKings {fmtPrice(p.price)} ({pct(implied(p.price), 0)})</span>}</div>
                   </div>
                   <span className="font-display text-lg font-semibold tabular-nums" title="Tonight's model chance">{pct(p.chance, 0)}</span>
                 </div>
@@ -97,7 +97,7 @@ export default function NbaHitRates() {
         ) : (
           <p className="p-4 text-sm text-muted">{slate.data.odds.props_priced
             ? `Nothing at a ${Math.round(threshold * 100)}% hit rate over the last ${win} games${starsOnly ? " among stars" : ""}. Try a lower hit rate${starsOnly ? " or everyone" : ""}.`
-            : "Hit rates list players DraftKings posts props for, about 10 AM Eastern."}</p>
+            : "Hit rates list players DraftKings posts props for, about 10 AM Eastern."}{floor ? " DraftKings posts most milestone ladders by early afternoon Eastern." : ""}</p>
         )}
       </Card>
     </div>
