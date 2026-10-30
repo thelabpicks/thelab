@@ -257,6 +257,16 @@ jobs:
           SIM_ARCHIVE: ${{ github.workspace }}/pick-archive/gamesims
         run: npx vite-node scripts/sim-grades.ts || echo "::warning::Game simulations were not graded this run"
 
+      # Each posted game's Sim Parlay: legs counted from the same 5,000 seeded runs the page plays, built once when the
+      # game posts and never changed, then graded from the sim's grade above. Kept in gamesims/parlays.json on the
+      # nfl-data branch. A failure leaves the page without new parlays for this run.
+      - name: Build and grade the Sim Parlays
+        working-directory: frontend
+        env:
+          LAB_DATA: ${{ github.workspace }}/site-data
+          SIM_ARCHIVE: ${{ github.workspace }}/pick-archive/gamesims
+        run: npx vite-node scripts/sim-parlays.ts || echo "::warning::Sim Parlays were not built this run"
+
       # The daily model report posted to the "Daily model report" issue each morning (lab-ops.yml; not on the site): how the picks and every lean did on
       # yesterday's games, where the predictions were off and why, and what the models changed in themselves. Every run
       # rewrites today's report, so the 4 am Central run (after the 09:00 UTC NBA collect) writes the first one.
