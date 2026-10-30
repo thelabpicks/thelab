@@ -1,6 +1,6 @@
 {
   "date": "2026-10-30",
-  "ran_at": "2026-10-30T16:34:21+00:00",
+  "ran_at": "2026-10-30T16:52:31+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -36,13 +36,11 @@
     },
     {
       "file": "player_box_2027.csv",
-      "status": "downloaded",
-      "bytes": 992239
+      "status": "kept"
     },
     {
       "file": "nba_schedule_2027.csv",
-      "status": "downloaded",
-      "bytes": 2464018
+      "status": "kept"
     }
   ],
   "box_scores": {
@@ -72,7 +70,7 @@
   },
   "espn_props": {
     "saved": "2026-10-30.json",
-    "lines": 554,
+    "lines": 555,
     "errors": {}
   },
   "odds": {
