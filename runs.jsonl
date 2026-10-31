@@ -8,3 +8,4 @@
 {"date": "2026-10-28", "ran_at": "2026-10-28T15:39:39+00:00", "odds": {"skipped": "not a line day (Tuesday and Saturday)", "credits_remaining": 285.0}}
 {"date": "2026-10-29", "ran_at": "2026-10-29T15:40:46+00:00", "odds": {"skipped": "not a line day (Tuesday and Saturday)", "credits_remaining": 282.0}}
 {"date": "2026-10-30", "ran_at": "2026-10-30T15:39:33+00:00", "odds": {"skipped": "not a line day (Tuesday and Saturday)", "credits_remaining": 273.0}}
+{"date": "2026-10-31", "ran_at": "2026-10-31T15:23:19+00:00", "odds": {"saved": "2026-10-31.json", "game_lines": 2374, "team_totals": 12, "props": 118, "credits_remaining": 262.0, "errors": []}}
