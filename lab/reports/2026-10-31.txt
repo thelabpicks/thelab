@@ -63,4 +63,4 @@ NBA
     - NY 93-98 PHI (sims NY 113-116 PHI, winner ✓); biggest misses: Anfernee Simons 21 points (sims 10.8), Landry Shamet 0 points (sims 9.5)
     - ORL 121-114 TOR (sims ORL 104-108 TOR, winner ✗); biggest misses: Scottie Barnes 41 points (sims 18.5), Collin Murray-Boyles 15 points (sims 6.1)
     - CHA 79-95 WSH (sims CHA 99-114 WSH, winner ✓); biggest misses: Bilal Coulibaly 1 points (sims 11.2), Grayson Allen 5 points (sims 15.1)
-    - Last 30 days: 13 games, winner right in 8 (62%); each team's points missed by 13.6 on average (the book's line by 10.6), running +4.6 vs projected. Furthest-leaning stat: rebounds, +0.2 per player vs projected.
+    - Last 30 days: 14 games, winner right in 9 (64%); each team's points missed by 13.3 on average (the book's line by 10.9), running +3.6 vs projected. Furthest-leaning stat: rebounds, +0.2 per player vs projected.
