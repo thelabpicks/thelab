@@ -91,16 +91,31 @@ const MAX_RESERVE_MINUTES = 48;
 /** Per-minute production of a typical end-of-rotation player, for the minutes no projected player covers. */
 const BENCH_RATE = { pts: 0.42, reb: 0.18, ast: 0.09, tpm: 0.04 };
 
+/** The most minutes a player is stretched to when a short rotation is scaled up to 240. */
+const MAX_SCALED_MINUTES = 42;
+
 /** Fits a team's projections into 240 minutes. Each player's projected minutes are his minutes when he plays, so a
  *  team's sum usually runs past 240 (Memphis once summed to 329): the deep bench is who sits. Players keep their
  *  projected minutes in order, most first, until 240 are used; the last one in gets what is left, and his counting
- *  stats shrink with his minutes. Players left under 4 minutes are dropped. A team whose projected players come up
- *  short (rookies and new signings have too little history to project) gets one "reserves" line for the rest, at a
- *  typical bench player's rate, so no projected player is stretched past his own minutes to fill the gap. */
+ *  stats shrink with his minutes. Players left under 4 minutes are dropped.
+ *  A team whose expected minutes come up short of 240 has every player scaled up in proportion (to at most 42), his
+ *  counting stats with his minutes: expected minutes count the games a player sat, so they run low, and the minutes
+ *  that are left go to the players who are dressed, not to a bench of unknowns. Walk-forward on 2024-25 and 2025-26
+ *  (5,261 team-games, 2026-10-31): team points ran 4.5 low per team before (as the live sims did, 4.6) and 0.2 low
+ *  after; each team's points miss 12.9 -> 11.2, game total miss 21.1 -> 17.6, margin miss 15.7 -> 13.7, winners the
+ *  same (59.9% -> 59.5%). Whatever the cap leaves uncovered (rookies and new signings have too little history to
+ *  project) goes to one "reserves" line at a typical bench player's rate. */
 export function fitRotation(list: NbaSimPlayer[], team = ""): NbaSimPlayer[] {
+  const sum = list.reduce((s, p) => s + p.min, 0);
+  const scaled = sum > 0 && sum < 240
+    ? list.map((p) => {
+      const m = Math.max(p.min, Math.min(p.min * 240 / sum, MAX_SCALED_MINUTES)), k = m / p.min;
+      return { ...p, min: m, pts: p.pts * k, reb: p.reb * k, ast: p.ast * k, tpm: p.tpm * k };
+    })
+    : list;
   let left = 240;
   const out: NbaSimPlayer[] = [];
-  for (const p of [...list].sort((a, b) => b.min - a.min)) {
+  for (const p of [...scaled].sort((a, b) => b.min - a.min)) {
     const m = Math.min(p.min, left);
     if (m < 4) break;
     const k = m / p.min;
