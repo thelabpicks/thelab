@@ -21,7 +21,11 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
-    - Suggested college bets this season: 12-12 (50%).
+    - Winners (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
+    - Spreads (3 games): 2-1 (67%). By confidence: under 60% hit 67% of 3.
+    - Totals (3 games): 2-1 (67%). By confidence: under 60% hit 67% of 3.
+    - Furthest off: Tulane at Charlotte (projected 47.3 total, scored 69, +21.7); Kent State at Sacramento State (projected 47.1 total, scored 41, −6.1).
+    - Suggested college bets this season: 14-14 (50%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 19.1 to 7.1 points (44 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +1.43 vs the pregame input (typical miss 6.5).
