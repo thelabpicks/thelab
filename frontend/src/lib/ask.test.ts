@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { altPool, answer, answerFloorPicks, anyPool, estimatedLine, parse, type AskData } from "./ask";
 import type { RankingRow } from "./types";
 
@@ -124,8 +124,15 @@ describe("ask parser", () => {
   });
 
   it("builds parlays from every market unless TDs are asked for", () => {
-    expect(answer(d, "Give me the best 3 leg parlay for tonights game").title).toContain("any market");
-    expect(answer(d, "3 leg TD parlay").title).toContain("TD parlay");
+    // "tonight" narrows to today's games when the fixtures play on today's weekday (on a Sunday only DAL-NYG's two legs
+    // are left), so the clock is pinned to a Wednesday, a day none of them play
+    vi.useFakeTimers({ now: new Date("2026-10-28T18:00:00") });
+    try {
+      expect(answer(d, "Give me the best 3 leg parlay for tonights game").title).toContain("any market");
+      expect(answer(d, "3 leg TD parlay").title).toContain("TD parlay");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("takes each player's likeliest alternate line that books post at -500 or longer and that beats its price", () => {
