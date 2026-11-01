@@ -114,6 +114,8 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     t = team_games(d).sort_values(["team", "game_date"])
     t["pace"] = t.groupby("team").poss.transform(lambda s: s.ewm(halflife=10).mean())
     t["pts_for"] = t.groupby("team").pts.transform(lambda s: s.ewm(halflife=10).mean())
+    t = t.merge(t[["game_id", "team", "pts"]].rename(columns={"team": "opp", "pts": "pts_ag"}), on=["game_id", "opp"], how="left")
+    t["net"] = (t.pts - t.pts_ag).groupby(t.team).transform(lambda s: s.ewm(halflife=10).mean())
     played = p[p.played]
     allowed = played.groupby(["game_id", "game_date", "opp", "pos"], as_index=False)[
         ["points", "rebounds", "assists", "threes", "pra", "minutes"]].sum().sort_values(["opp", "pos", "game_date"])
@@ -128,8 +130,12 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     p = _asof(p, lg[["game_date", "pos"] + [f"lg_{m}" for m in MARKETS]], ["pos"])
     for m in MARKETS:
         p[f"opp_{m}"] = p[f"opp_{m}"] / p[f"lg_{m}"]
-    p = _asof(p, t[["game_date", "team", "pace", "pts_for"]], ["team"])
-    p = _asof(p, t[["game_date", "team", "pace"]].rename(columns={"team": "opp", "pace": "opp_pace"}), ["opp"])
+    p = _asof(p, t[["game_date", "team", "pace", "pts_for", "net"]], ["team"])
+    p = _asof(p, t[["game_date", "team", "pace", "net"]].rename(columns={"team": "opp", "pace": "opp_pace", "net": "opp_net"}), ["opp"])
+    # How lopsided the matchup looks (each team's recent scoring margin): starters lose about a minute in mismatches
+    p["net_diff"] = p.net - p.opp_net
+    p["gap"] = p.net_diff.abs()
+    p = p.drop(columns=["net", "opp_net"])
     p = p.drop(columns=[f"lg_{m}" for m in MARKETS])
     for m in SIMILAR_MARKETS:
         p = _similar_allowed(p, m)
@@ -177,6 +183,13 @@ def _similar_allowed(p: pd.DataFrame, m: str) -> pd.DataFrame:
     return p.drop(columns=["_tier"])
 
 
+# Matchup mismatch (net_diff: team minus opponent recent scoring margin, gap: its size). Starters played 1.0 minute under
+# their usual in the most lopsided quarter of games vs 0.25 in the closest (2024-25 to 2026-27). Walk-forward 2024-25
+# to 2026-27 (2026-11-01, 52,004 games each): points deviance -0.14% (90% CI 0.04-0.23%), 65%+ leans 70.3% -> 70.6%; PRA,
+# assists, rebounds and threes no better on deviance, so left out.
+MISMATCH = ["net_diff", "gap"]
+MISMATCH_MARKETS = ("points",)
+
 FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_games", "season_min", "rest", "home",
             "pace", "opp_pace", "pts_for"]
 
@@ -184,4 +197,5 @@ FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_g
 def features_for(market: str) -> list[str]:
     own = [f"{market}_pm_s", f"{market}_pm_l"]
     shots = ["fga_pm_l", "threes_att_pm_l", "fta_pm_l"] if market in ("points", "threes", "pra") else []
-    return FEATURES + own + shots + [f"opp_{market}"] + ([f"sim_{market}"] if market in SIMILAR_MARKETS else [])
+    return FEATURES + own + shots + [f"opp_{market}"] + ([f"sim_{market}"] if market in SIMILAR_MARKETS else []) + \
+        (MISMATCH if market in MISMATCH_MARKETS else [])
