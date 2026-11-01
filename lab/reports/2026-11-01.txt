@@ -3,7 +3,7 @@ The Lab daily report, Sunday, Nov 1 (results from Saturday, Oct 31)
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 10-2 +5.67u / 4-1 +2.20u
-  CFB: 15-3 +0.64u / 4-0 +1.17u
+  CFB: 27-9 −1.07u / 7-0 +2.57u
   NBA: 16-5 +3.57u / 11-0 +3.50u
 
 NFL
@@ -19,20 +19,26 @@ NFL
 
 CFB
   Picks
-    - 20 picks are waiting on a final stat line: NC State to win (ML -300); SMU to win (ML -320); South Florida to win (ML -285); Ole Miss to win (ML -420); Georgia to win (ML -440); Utah State to win (ML -285); TCU to win (ML -220); Penn State to win (ML -375); Georgia Southern to win (ML -205); Oklahoma State to win (ML -345); Florida State to win (ML -215); San Diego State to win (ML -134); Pittsburgh to win (ML -295); Ohio State to win (ML -220); Missouri to win (ML -375); Nebraska to win (ML -295); Memphis to win (ML -210); Memphis to win (ML -218); Boise State to win (ML -420); Oregon State to win (ML -215). They are graded on the next refresh after the result posts.
+    - Surest hit: Georgia to win (ML -440) (82%), final 8–27.
+    - Miss: Oklahoma State to win (ML -345) at 75%. Final 49–51.
+    - Miss: SMU to win (ML -320) at 73%. Final 27–30.
+    - Miss: Nebraska to win (ML -295) at 72%. Final 17–10.
+    - Miss: Florida State to win (ML -215) at 68%. Final 36–24.
+    - Miss: Oregon State to win (ML -215) at 67%. Final 22–38.
+    - Miss: Ohio State to win (ML -220) at 65%. Final 18–30.
   How the model did
-    - Winners (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Spreads (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Totals (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Furthest off: Kent State at Sacramento State (projected 47.1 total, scored 41, −6.1).
-    - Suggested college bets this season: 14-14 (50%).
+    - Winners (48 games): 27-21 (56%). By confidence: 70%+ hit 100% of 16, 60-70% hit 43% of 7, under 60% hit 32% of 25.
+    - Spreads (48 games): 27-18 (60%). By confidence: under 60% hit 60% of 45.
+    - Totals (48 games): 22-25 (47%). By confidence: under 60% hit 47% of 47.
+    - Furthest off: Oklahoma State at Iowa State (projected 57.5 total, scored 100, +42.5); App State at Georgia Southern (projected 56.8 total, scored 22, −34.8).
+    - Suggested college bets this season: 25-25 (50%).
   Where it was off and why
-    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 19.1 to 7.1 points (44 games), so most of the miss was the inputs, not chance.
-    - Pace (plays) ran +1.43 vs the pregame input (typical miss 6.5).
-    - Yards per play ran −0.18 vs the pregame input (typical miss 1).
-    - Turnovers ran +0.02 vs the pregame input (typical miss 0.9).
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.3 to 7.6 points (98 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.78 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.16 vs the pregame input (typical miss 0.9).
+    - Turnovers ran +0.12 vs the pregame input (typical miss 0.9).
   Model changes
-    - Totals: typical miss 14.7 points vs 14.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+    - Totals: typical miss 12.8 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
 
 NBA
   Picks
