@@ -15,7 +15,7 @@ NFL
     - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0009), yards per target (−0.0010), yards per carry (−0.0004), volume (+0.0003).
     - Team volume learned from the re-sims: passes x1.0292, runs x0.9969.
   Game sims vs the final
-    - Last 30 days: 1 games, winner right in 1 (100%); each team's points missed by 2.3 on average, running -0.7 vs projected. Furthest-leaning stat: receptions, +0.9 per player vs projected.
+    - Last 30 days: 9 games, winner right in 7 (78%); each team's points missed by 9.8 on average, running +0.6 vs projected. Furthest-leaning stat: rushing yards, +13.8 per player vs projected.
 
 CFB
   Picks
