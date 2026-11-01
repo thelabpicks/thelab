@@ -4,7 +4,7 @@ Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 10-2 +5.67u / 4-1 +2.20u
   CFB: 27-9 −1.07u / 7-0 +2.57u
-  NBA: 16-5 +3.57u / 11-0 +3.50u
+  NBA: 21-7 +4.34u / 13-1 +3.50u
 
 NFL
   Picks
@@ -42,13 +42,20 @@ CFB
 
 NBA
   Picks
-    - 9 picks are waiting on a final stat line: Keyonte George under 6.5 assists; Brandon Miller under 37.5 pts + reb + ast; Tyrese Maxey under 3.5 threes made; Zion Williamson under 22.5 points; Tyler Herro under 21.5 points; Darius Acuff Jr. over 5.5 assists; Victor Wembanyama under 3.5 assists; Shai Gilgeous-Alexander under 4.5 rebounds; Kevin Durant over 2.5 assists. They are graded on the next refresh after the result posts.
+    - Surest hit: Kevin Durant over 2.5 assists (83%), finished with 4.
+    - Miss: Tyrese Maxey under 3.5 threes made at 76% (pick of the day). Finished with 4.
+    - Miss: Darius Acuff Jr. over 5.5 assists at 67%. Finished with 5.
+    - Miss: Victor Wembanyama under 3.5 assists at 66%. Finished with 4.
+  How the model did
+    - Every lean the model made on 7 games: 367-201 (65%). By confidence: 70%+ hit 89% of 106, 60-70% hit 65% of 178, under 60% hit 55% of 284.
+    - Unders 69% (427), overs 52% (141).
+    - Furthest off among confident leans: Tyrese Maxey pra (projected 32.2, had 46, line 39.5); Aday Mara rebounds (projected 3.7, had 9, line 5.5); Jared McCain rebounds (projected 2.4, had 4, line 3.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 830 of 1878 losing leans would have been right, so minutes caused 44% of the misses and production the rest (last 2 weeks).
-    - Minutes ran −1.4 per player vs the projection (typical miss 5.5).
-    - Team scoring: rotations scored −0.6 points per team vs projected (typical miss 12.6).
+    - Re-run with the minutes players really got, 930 of 2079 losing leans would have been right, so minutes caused 45% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.5 per player vs the projection (typical miss 5.6).
+    - Team scoring: rotations scored −0.7 points per team vs projected (typical miss 12.4).
   Model changes
-    - Refit this morning on every box score through 2026-10-30; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Refit this morning on every box score through 2026-10-31; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
   Game sims vs the final
     - OKC 98-119 HOU (sims OKC 104-106 HOU, winner ✓); biggest misses: Jabari Smith Jr. 30 points (sims 14.5)
