@@ -4,7 +4,7 @@ Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 17-5 +7.41u / 6-2 +2.10u
   CFB: 27-9 −1.07u / 7-0 +2.57u
-  NBA: 21-7 +4.34u / 13-1 +3.50u
+  NBA: 22-10 +3.34u / 14-2 +3.50u
 
 NFL
   Picks
@@ -60,13 +60,21 @@ CFB
 
 NBA
   Picks
-    - 6 picks are waiting on a final stat line: Franz Wagner under 6.5 assists; Julius Randle under 5.5 assists; Yaxel Lendeborg under 4.5 assists; Darius Garland under 34.5 pts + reb + ast; Scottie Barnes under 7.5 rebounds; Scottie Barnes under 1.5 threes made. They are graded on the next refresh after the result posts.
+    - Surest hit: Darius Garland under 34.5 pts + reb + ast (75%), finished with 22.
+    - Miss: Julius Randle under 5.5 assists at 78% (pick of the day). Finished with 6.
+    - Miss: Yaxel Lendeborg under 4.5 assists at 73%. Finished with 6.
+    - Miss: Franz Wagner under 6.5 assists at 68%. Finished with 12.
+    - 1 pick is waiting on a final stat line: Scottie Barnes under 1.5 threes made. It is graded on the next refresh after the result posts.
+  How the model did
+    - Every lean the model made on 4 games: 173-124 (58%). By confidence: 70%+ hit 73% of 40, 60-70% hit 65% of 110, under 60% hit 50% of 147.
+    - Unders 59% (231), overs 56% (66).
+    - Furthest off among confident leans: Julius Randle assists (projected 4, had 6, line 5.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 930 of 2079 losing leans would have been right, so minutes caused 45% of the misses and production the rest (last 2 weeks).
-    - Minutes ran −1.5 per player vs the projection (typical miss 5.6).
-    - Team scoring: rotations scored −0.7 points per team vs projected (typical miss 12.4).
+    - Re-run with the minutes players really got, 991 of 2203 losing leans would have been right, so minutes caused 45% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.4 per player vs the projection (typical miss 5.5).
+    - Team scoring: rotations scored −0.5 points per team vs projected (typical miss 12.3).
   Model changes
-    - Refit this morning on every box score through 2026-10-31; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Refit this morning on every box score through 2026-11-01; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
   Game sims vs the final
     - TOR 125-131 LAL (sims TOR 108-100 LAL, winner ✗); biggest misses: Jamison Battle 20 points (sims 6.3), Sandro Mamukelashvili 11 points (sims 1.8)
