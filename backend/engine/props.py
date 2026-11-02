@@ -291,23 +291,27 @@ def _defense_similar(t: pd.DataFrame) -> pd.DataFrame:
 
 def _last_carries_share(hist: pd.DataFrame, t: pd.DataFrame) -> pd.DataFrame:
     """last_carries_share: the player's share of his team's carries in the team's previous game, when he played in it
-    (the game simulation blends it into the window share; see gamesim.PARAMS["last_car_w"])."""
-    tg = hist.groupby(["season", "week", "team"]).carries.sum().rename("team_car").reset_index()
-    pc = hist.groupby(["season", "week", "team", "player_id"]).carries.sum().rename("car").reset_index()
+    (the game simulation blends it into the window share; see gamesim.PARAMS["last_car_w"]). last_att_share: the same for
+    pass attempts, which tells the simulation who is starting at quarterback (see gamesim.starting_qb)."""
+    cols = ["last_carries_share", "last_att_share"]
+    if "attempts" not in hist:
+        hist = hist.assign(attempts=0.0)
+    tg = hist.groupby(["season", "week", "team"])[["carries", "attempts"]].sum().reset_index()
+    pc = hist.groupby(["season", "week", "team", "player_id"])[["carries", "attempts"]].sum()
     order = tg.sort_values(["season", "week"])
-    by_team = {tm: list(zip(g.season, g.week, g.team_car)) for tm, g in order.groupby("team")}
-    car = {(r.season, r.week, r.team, r.player_id): r.car for r in pc.itertuples(index=False)}
+    by_team = {tm: list(zip(g.season, g.week, g.carries, g.attempts)) for tm, g in order.groupby("team")}
+    vals = {k: (r.carries, r.attempts) for k, r in zip(pc.index, pc.itertuples(index=False))}
     out = {}
     for idx, r in zip(t.index, t[["season", "week", "team", "player_id"]].itertuples(index=False)):
         games = [x for x in by_team.get(r.team, []) if (x[0], x[1]) < (r.season, r.week)]
         if not games:
             continue
-        s_, w_, tot = games[-1]
-        n = car.get((s_, w_, r.team, r.player_id))
-        if n is not None and tot > 0:
-            out[idx] = {"last_carries_share": n / tot}
-    return pd.DataFrame.from_dict(out, orient="index", columns=["last_carries_share"]) if out else \
-        pd.DataFrame(index=t.index[:0], columns=["last_carries_share"])
+        s_, w_, car_tot, att_tot = games[-1]
+        v = vals.get((s_, w_, r.team, r.player_id))
+        if v is not None:
+            out[idx] = {"last_carries_share": v[0] / car_tot if car_tot > 0 else np.nan,
+                        "last_att_share": v[1] / att_tot if att_tot > 0 else np.nan}
+    return pd.DataFrame.from_dict(out, orient="index", columns=cols) if out else pd.DataFrame(index=t.index[:0], columns=cols)
 
 
 def population(t: pd.DataFrame, market: str) -> pd.Series:
