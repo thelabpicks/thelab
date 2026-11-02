@@ -117,15 +117,18 @@ canvas { display: block; width: 100%; max-width: 100%; }
 .tbl .pj { color: var(--muted); }
 .tbl .up { color: var(--accent); } .tbl .dn { color: var(--danger); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-.boxcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-.bteam { display: grid; gap: 4px; min-width: 0; }
+.boxcols { display: grid; gap: 14px; }
+.bpair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px 24px; align-items: start; }
 .bhead { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-display); font-weight: 700; font-size: 18px; }
-.bsec { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding: 10px 0 4px; }
-.brow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size: 13px; }
-.brow span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
-.brow .pj { white-space: nowrap; }
-.boxcols > .bteam { overflow: hidden; }
-.brow .pj { color: var(--muted); }
+.btbl { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
+.btbl th { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 6px 0 4px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.btbl td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; padding: 5px 0 5px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); white-space: nowrap; }
+.btbl .nm { text-align: left; padding-left: 0; width: 100%; font-family: inherit; white-space: normal; }
+.btbl th.nm { color: var(--fg); }
+.btbl td.nm { font-family: var(--font-body, inherit); }
+.btbl .pj { color: var(--muted); padding-left: 14px; }
+.btbl .none { color: var(--muted); }
+@media (max-width: 420px) { .btbl { font-size: 12px; } .btbl th, .btbl td { padding-left: 7px; } .btbl .pj { padding-left: 9px; } }
 .final { position: absolute; inset: 0; z-index: 2; background: var(--surface); display: grid; align-content: center; gap: 14px; padding: 18px max(16px, 4%); overflow-y: auto; }
 .final[hidden], .after[hidden] { display: none !important; }
 .after { display: grid; gap: 16px; }
@@ -343,7 +346,7 @@ canvas { display: block; width: 100%; max-width: 100%; }
   <div id="vanswers"></div>
 
   <div id="after" class="after" hidden>
-  <section class="card"><h2>Box score <small id="boxnote">this run, with our projection in grey</small></h2><div class="boxcols" id="box"></div></section>
+  <section class="card"><h2>Box score <small id="boxnote">this run · PROJ is our projection</small></h2><div class="boxcols" id="box"></div></section>
 
   <div class="panels">
     <section class="card"><h2>All 5,000 runs <small>where this run sits</small></h2><div id="dist"></div></section>
@@ -770,26 +773,32 @@ function playerLines(box){
   G.teams.forEach((T,ti)=>{const tb=box[ti];
     if(G.sport==='nba'){
       T.ps.forEach((p,i)=>{const b=tb[i]||{};out[ti].push({p,ti,sec:'Players',score:(b.pts||0)+1.2*(b.reb||0)+1.5*(b.ast||0),
-        txt:`${b.pts||0} PTS, ${b.reb||0} REB, ${b.ast||0} AST, ${b.tpm||0} 3PM`,proj:`${p.pts.toFixed(1)} / ${p.reb.toFixed(1)} / ${p.ast.toFixed(1)}`,sort:(b.pts||0)*100+p.pts,label:'',any:true})});
+        txt:`${b.pts||0} PTS, ${b.reb||0} REB, ${b.ast||0} AST, ${b.tpm||0} 3PM`,proj:`${p.pts.toFixed(1)} / ${p.reb.toFixed(1)} / ${p.ast.toFixed(1)}`,cells:[b.pts||0,b.reb||0,b.ast||0,b.tpm||0],pc:[p.pts.toFixed(0),p.reb.toFixed(0),p.ast.toFixed(0)].join('/'),sort:(b.pts||0)*100+p.pts,label:'',any:true})});
     }else{
       const g=id=>tb[id]||{};
       const q=T.qb,b=g(q.id);
-      out[ti].push({p:q,ti,sec:'Passing',label:'Passing',score:(b.pyd||0)/25+4*(b.ptd||0)-2*(b.int||0),txt:`${b.cmp||0}/${b.att||0}, ${b.pyd||0} YDS, ${b.ptd||0} TD, ${b.int||0} INT`,proj:`${q.pass_yards.toFixed(0)} yds`,sort:1e6,any:true});
-      T.rush.forEach(p=>{const b=g(p.id);if(!b.car)return;out[ti].push({p,ti,sec:'Rushing',label:'Rushing',score:(b.ruyd||0)/10+6*(b.rutd||0),txt:`${b.car} CAR, ${b.ruyd||0} YDS, ${b.rutd||0} TD`,proj:`${p.rush_yards.toFixed(0)} yds`,sort:b.ruyd||0,any:true})});
-      T.tgt.forEach(p=>{const b=g(p.id);if(!b.rec)return;out[ti].push({p,ti,sec:'Receiving',label:'Receiving',score:(b.ryd||0)/10+6*(b.rtd||0)+0.5*b.rec,txt:`${b.rec} REC, ${b.ryd||0} YDS, ${b.rtd||0} TD`,proj:`${p.rec_yards.toFixed(0)} yds`,sort:b.ryd||0,any:true})});
-      const k=g('K');if(k.fga||k.xpa)out[ti].push({p:{name:T.abbr+' kicker',ini:'K',short:'Kicker'},ti,sec:'Kicking',label:'Kicking',score:0,txt:`${k.fgm||0}/${k.fga||0} FG, ${k.xpm||0}/${k.xpa||0} XP, ${3*(k.fgm||0)+(k.xpm||0)} PTS`,proj:'',sort:0,any:true});
+      out[ti].push({p:q,ti,sec:'Passing',label:'Passing',score:(b.pyd||0)/25+4*(b.ptd||0)-2*(b.int||0),txt:`${b.cmp||0}/${b.att||0}, ${b.pyd||0} YDS, ${b.ptd||0} TD, ${b.int||0} INT`,proj:`${q.pass_yards.toFixed(0)} yds`,cells:[`${b.cmp||0}/${b.att||0}`,b.pyd||0,b.ptd||0,b.int||0],pc:q.pass_yards.toFixed(0),sort:1e6,any:true});
+      T.rush.forEach(p=>{const b=g(p.id);if(!b.car)return;out[ti].push({p,ti,sec:'Rushing',label:'Rushing',score:(b.ruyd||0)/10+6*(b.rutd||0),txt:`${b.car} CAR, ${b.ruyd||0} YDS, ${b.rutd||0} TD`,proj:`${p.rush_yards.toFixed(0)} yds`,cells:[b.car,b.ruyd||0,b.rutd||0],pc:p.rush_yards.toFixed(0),sort:b.ruyd||0,any:true})});
+      T.tgt.forEach(p=>{const b=g(p.id);if(!b.rec)return;out[ti].push({p,ti,sec:'Receiving',label:'Receiving',score:(b.ryd||0)/10+6*(b.rtd||0)+0.5*b.rec,txt:`${b.rec} REC, ${b.ryd||0} YDS, ${b.rtd||0} TD`,proj:`${p.rec_yards.toFixed(0)} yds`,cells:[b.rec,b.ryd||0,b.rtd||0],pc:p.rec_yards.toFixed(0),sort:b.ryd||0,any:true})});
+      const k=g('K');if(k.fga||k.xpa)out[ti].push({p:{name:T.abbr+' kicker',ini:'K',short:'Kicker'},ti,sec:'Kicking',label:'Kicking',score:0,txt:`${k.fgm||0}/${k.fga||0} FG, ${k.xpm||0}/${k.xpa||0} XP, ${3*(k.fgm||0)+(k.xpm||0)} PTS`,proj:'',cells:[`${k.fgm||0}/${k.fga||0}`,`${k.xpm||0}/${k.xpa||0}`,3*(k.fgm||0)+(k.xpm||0)],pc:null,sort:0,any:true});
     }
   });
   return out;
 }
+// The box score: one table per section with a column per stat and our projection in its own column, the two teams'
+// tables side by side on wide screens so their sections line up, stacked team by team within each section on a phone.
+const BOX_COLS={Players:['PTS','REB','AST','3PM'],Passing:['C/ATT','YDS','TD','INT'],Rushing:['CAR','YDS','TD'],Receiving:['REC','YDS','TD'],Kicking:['FG','XP','PTS']};
 function renderBox(){
   const {box}=cumulative(idx), el=document.getElementById('box'), L=playerLines(box), sc=idx>=0?G.game.ev[idx].score:[0,0];
-  el.innerHTML=[0,1].map(ti=>{const T=G.teams[ti];let h=`<div class="bteam"><div class="bhead"><span>${teamTag(ti)}</span><span class="mono">${sc[ti]}</span></div>`;
-    const secs=G.sport==='nba'?['Players']:['Passing','Rushing','Receiving','Kicking'];
-    for(const sname of secs){const rows=L[ti].filter(x=>x.sec===sname).sort((a,b)=>b.sort-a.sort);if(!rows.length)continue;
-      h+=`<div class="bsec">${G.sport==='nba'?'Player · PTS, REB, AST, 3PM <span style="float:right">proj PTS / REB / AST</span>':sname+(sname==='Kicking'?'':' <span style="float:right">proj</span>')}</div>`;
-      for(const x of rows)h+=`<div class="brow"><span>${x.p.name}</span><span>${x.txt}${x.proj?` <span class="pj">· ${x.proj}</span>`:''}</span></div>`}
-    return h+'</div>'}).join('');
+  const secs=G.sport==='nba'?['Players']:['Passing','Rushing','Receiving','Kicking'];
+  const head=`<div class="bpair">${[0,1].map(ti=>`<div class="bhead"><span>${teamTag(ti)}</span><span class="mono">${sc[ti]}</span></div>`).join('')}</div>`;
+  el.innerHTML=head+secs.map(sname=>{
+    const cols=BOX_COLS[sname], pj=sname==='Kicking'?'':G.sport==='nba'?'PROJ P/R/A':'PROJ YDS';
+    const tables=[0,1].map(ti=>{const rows=L[ti].filter(x=>x.sec===sname).sort((a,b)=>b.sort-a.sort);
+      return `<table class="btbl"><thead><tr><th class="nm"><span class="dot" style="background:${G.teams[ti].color}"></span>${G.teams[ti].abbr} ${sname==='Players'?'':sname}</th>${cols.map(c=>`<th>${c}</th>`).join('')}${pj?`<th class="pj">${pj}</th>`:''}</tr></thead>
+      <tbody>${rows.length?rows.map(x=>`<tr><td class="nm">${x.p.name}</td>${x.cells.map(v=>`<td>${v}</td>`).join('')}${pj?`<td class="pj">${x.pc}</td>`:''}</tr>`).join(''):`<tr><td class="nm none" colspan="${cols.length+1+(pj?1:0)}">None yet</td></tr>`}</tbody></table>`});
+    if(!L[0].some(x=>x.sec===sname)&&!L[1].some(x=>x.sec===sname))return '';
+    return `<div class="bpair">${tables.join('')}</div>`}).join('');
 }
 function renderFinal(){
   const el=document.getElementById('final'), sc=G.game.score, w=sc[1]>sc[0]?1:0;
