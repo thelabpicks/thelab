@@ -271,6 +271,37 @@ canvas { display: block; width: 100%; max-width: 100%; }
 @media (max-width: 480px) { .parlay .chance { min-width: 64px; } .parlay .hrow { grid-template-columns: 72px minmax(0, 1fr) auto; } }
 .empty { border: 1px dashed var(--line); border-radius: 12px; padding: 22px; color: var(--muted); text-align: center; background: var(--surface); }
 .gmeta .ko { color: var(--warn); }
+/* Ask the sims (data/sims/answers.json, src/lib/simanswers.ts): the hub's question box over every game, and each game's answers */
+#vanswers:empty { display: none; }
+.ask .ans { border: 0; padding: 0; background: none; }
+.ask { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; display: grid; gap: 12px; margin-top: 14px; min-width: 0; }
+.ask h2, .ans h2 { margin: 0; font-family: var(--font-display); font-size: 18px; }
+.ask .sub { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+.ask form { display: flex; gap: 8px; }
+.ask input { flex: 1; min-width: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 9px; color: var(--fg); padding: 9px 12px; font: inherit; }
+.ask input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.qchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qchips button { border: 1px solid var(--line); background: var(--raised); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+.qchips button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.alead { margin: 0; font-size: 13px; color: var(--muted); } .alead b { color: var(--fg); }
+.arows { display: grid; }
+.arow { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.arow:first-child { border-top: 0; }
+.arow .g { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.arow .w { min-width: 0; } .arow .w b { font-weight: 600; } .arow .w small { display: block; color: var(--muted); font-size: 12px; }
+.arow .v { text-align: right; font-family: var(--font-mono); font-weight: 700; } .arow .v small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+.ans { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; display: grid; gap: 14px; }
+.ans .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.ans .blk { display: grid; gap: 7px; align-content: start; min-width: 0; }
+.brow { display: grid; grid-template-columns: minmax(0, 1fr) 90px 48px; gap: 10px; align-items: center; font-size: 13px; }
+.brow .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .brow .n span { color: var(--muted); font-size: 12px; }
+.brow .t { height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; } .brow .t i { display: block; height: 100%; background: var(--accent); }
+.brow .p { font-family: var(--font-mono); text-align: right; font-weight: 600; }
+.brow.real .n { color: var(--accent); }
+.pk { display: grid; gap: 2px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); font-size: 13px; }
+.pk .l { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; } .pk b { font-weight: 600; } .pk .c { color: var(--accent); font-family: var(--font-mono); }
+.afoot { font-size: 12px; color: var(--muted); margin: 0; }
+@media (max-width: 480px) { .arow { grid-template-columns: 70px minmax(0, 1fr) auto; } .brow { grid-template-columns: minmax(0, 1fr) 60px 44px; } }
 </style>
 </head>
 <body>
@@ -309,6 +340,7 @@ canvas { display: block; width: 100%; max-width: 100%; }
     <div class="final" id="final" hidden></div>
   </section>
   <div id="vparlay"></div>
+  <div id="vanswers"></div>
 
   <div id="after" class="after" hidden>
   <section class="card"><h2>Box score <small id="boxnote">this run, with our projection in grey</small></h2><div class="boxcols" id="box"></div></section>
@@ -945,10 +977,14 @@ function renderHub(){
   const L=GAMES[hubSport], f=featured(hubSport), rest=L.filter(g=>g!==f);
   if(!f){document.getElementById('hubbody').innerHTML=recordHtml(hubSport)+`<div class="empty">${hubSport==='nba'?'No NBA games today yet. Each game\'s sim posts on game day, once the slate and lines are in, and keeps updating until tip-off.':'No NFL games today. Each game\'s sim posts on its game day and keeps updating with the latest lines and injury news until kickoff.'}</div>`;return}
   const groups={};rest.forEach(g=>{const d=ETday.format(new Date(g.when));(groups[d]=groups[d]||[]).push(g)});
-  document.getElementById('hubbody').innerHTML=card(f,true)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('')+recordHtml(hubSport);
+  // the hub redraws as each game finishes simulating: keep what the visitor is typing
+  const ai=document.getElementById('askin'), typed=ai?ai.value:'', focused=ai&&document.activeElement===ai;
+  document.getElementById('hubbody').innerHTML=card(f,true)+askHtml(hubSport)+Object.entries(groups).map(([d,gs])=>`<h3 class="day">${d}</h3><div class="grid">${gs.map(g=>card(g,false)).join('')}</div>`).join('')+recordHtml(hubSport);
   document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{const url=shareUrl(b.dataset.key);
     const done=()=>{b.textContent='Link copied';setTimeout(()=>b.textContent='Copy link',1600)};
     try{navigator.clipboard.writeText(url).then(done,()=>{b.textContent=url})}catch(_){b.textContent=url}});
+  bindAsk(hubSport);
+  const ni=document.getElementById('askin');if(ni&&typed){ni.value=typed;if(focused){ni.focus();ni.setSelectionRange(typed.length,typed.length)}}
 }
 // The Sim Parlay of each game (data/sims/parlays.json, scripts/sim-parlays.ts): legs counted from the same 5,000 runs,
 // posted with the sim, graded after the final with its own record.
@@ -980,6 +1016,93 @@ function renderGameParlay(gm){
   const el=document.getElementById('vparlay'), p=PARLAYS&&(PARLAYS.games||[]).find(x=>gameKey(x)===gm.key);
   el.innerHTML=p?parlayCard(p):'';
 }
+// Ask the sims (data/sims/answers.json, scripts/sim-parlays.ts): who scores first, who wins and the best pick in each
+// game, counted from the same 5,000 runs, locked when the sim posts and graded on the real play-by-play.
+let ANSWERS=null, askQ='first', askGame=null, askMsg='';
+const ansOf=gm=>ANSWERS&&(ANSWERS.games||[]).find(a=>gameKey(a)===gm.key);
+const who=n=>n==='Reserves'?'A bench player':n;
+const MKT={points:'points',rebounds:'rebounds',assists:'assists',threes:'threes',pra:'pts + reb + ast',rec_yards:'receiving yards',receptions:'receptions',
+  rush_yards:'rushing yards',carries:'carries',pass_yards:'passing yards',pass_tds:'passing TDs',interceptions:'interceptions',completions:'completions',attempts:'pass attempts'};
+const pickText=p=>p.market==='td'?`${p.who} ${p.side==='no'?'no touchdown':'to score a touchdown'}`:`${p.who} ${p.side} ${p.line} ${MKT[p.market]||p.market}`;
+const fairOf=x=>price(x>=0.5?-Math.round(100*x/(1-x)):Math.round(100*(1-x)/x));
+const firstWord=sp=>sp==='nba'?'first basket':'first touchdown';
+const QS={nba:[['first','Who scores first?'],['win','Who wins?'],['best','Best pick in each game']],
+  nfl:[['first','Who scores the first TD?'],['anytime','Who scores a TD?'],['win','Who wins?'],['best','Best pick in each game']]};
+function askKind(q){const t=q.toLowerCase();
+  if(/any ?time|score an? (td|touchdown)|scores? a (td|touchdown)|td scorers?/.test(t)&&!/first|1st/.test(t))return 'anytime';
+  if(/first|1st|opening|basket/.test(t))return 'first';
+  if(/best|pick|bet|lock|parlay|prop/.test(t))return 'best';
+  if(/win|winner|beat|final score|who.*(take|wins)/.test(t))return 'win';
+  return null}
+// a game named in the question: a team's nickname, city or abbreviation
+function askFind(q,sp){const t=' '+q.toLowerCase().replace(/[^a-z0-9 ]/g,' ')+' ';
+  return GAMES[sp].find(gm=>gm.teams.some(T=>{const full=team(sp,T.abbr)[0].toLowerCase(), words=full.split(' ');
+    return t.includes(' '+T.abbr.toLowerCase()+' ')||t.includes(' '+words[words.length-1]+' ')||t.includes(' '+full+' ')||(words.length>2&&t.includes(' '+words.slice(0,-1).join(' ')+' '))}))||null}
+function bars(list,actual){const top=Math.max(...list.map(x=>x.chance),0.01);
+  return list.map(x=>{const real=actual&&x.team===actual.team&&x.name===actual.name;
+    return `<div class="brow${real?' real':''}"><span class="n">${real?'✓ ':''}${who(x.name)} <span>${x.team}</span></span><span class="t"><i style="width:${100*x.chance/top}%"></i></span><span class="p">${pct(x.chance)}</span></div>`}).join('')}
+function firstRecordLine(sp){const r=ANSWERS&&ANSWERS.record&&ANSWERS.record[sp];if(!r||!r.games)return '';
+  return `Our pick to score first scored first in ${r.top_hits} of ${r.games} games (the sims expected about ${Math.round(r.expected)}). The real first scorer was on our list in ${r.listed} of ${r.games}.`}
+// one game's answers: first scorer, TD scorers (NFL), the best pick and who wins
+function ansBlock(a,gm){
+  const [A,H]=[a.away,a.home], fav=a.win[H]>=a.win[A]?H:A, done=a.graded_at&&a.actual;
+  const real=done?`<p class="afoot"><b style="color:var(--fg)">Scored first: ${who(a.actual.name)} (${a.actual.team})</b>, who scored first in ${a.actual.chance?pct(a.actual.chance):'fewer than the listed share'} of our runs.</p>`:'';
+  const top=a.first[0];
+  return `<section class="ans" aria-label="Ask the sims">
+    <h2>Ask the sims <small class="label" style="margin-left:6px">${A} @ ${H} · ${a.runs.toLocaleString('en-US')} runs</small></h2>
+    <div class="cols">
+      <div class="blk"><div class="label">Who scores the ${firstWord(a.sport)}?</div>
+        <p class="alead">${top?`<b>${who(top.name)}</b> scores first in ${pct(top.chance)} of runs (fair ${fairOf(top.chance)}). Nobody is a lock: even the likeliest scorer does it less than 1 time in ${Math.max(2,Math.floor(1/top.chance))}.`:'No touchdowns in these runs.'}</p>
+        ${bars(a.first,done?a.actual:null)}${a.sport==='nfl'&&a.none?`<p class="afoot">No touchdown at all in ${pct(a.none)} of runs.</p>`:''}${real}</div>
+      ${a.anytime?`<div class="blk"><div class="label">Who scores a touchdown?</div><p class="alead">Share of runs in which each player scores at least once.</p>${bars(a.anytime)}</div>`:''}
+      <div class="blk"><div class="label">Best pick</div>
+        ${a.picks.length?a.picks.map(p=>`<div class="pk"><span class="l">The Lab's pick</span><b>${pickText(p)}</b></div>`).join(''):'<div class="pk"><span class="l">The Lab\'s pick</span><span>No pick on this game. Our picks only go out when a line clears the bar our backtests set.</span></div>'}
+        ${a.sure.map(l=>`<div class="pk"><span class="l">Surest sim line</span><b>${l.name} ${l.min}+ ${LEGW[l.stat]} <span class="c">· ${pct(l.chance)} of runs</span></b></div>`).join('')}
+        <div class="label" style="margin-top:6px">Who wins?</div>
+        <p class="alead"><b>${fav}</b> wins ${pct(a.win[fav])} of runs (fair ${fairOf(a.win[fav])}). Average score ${A} ${a.avg[A].toFixed(1)}, ${H} ${a.avg[H].toFixed(1)}.</p></div>
+    </div>
+    <p class="afoot">Counted from this game's ${a.runs.toLocaleString('en-US')} simulations, posted with the sim and locked. ${a.sport==='nba'?'The first basket is the first made field goal; free throws don\'t count. The sims treat the opening tip as a coin flip.':'The sims have no defensive or return touchdowns.'} ${firstRecordLine(a.sport)}</p>
+  </section>`}
+function askRows(sp){
+  const L=GAMES[sp].map(gm=>({gm,a:ansOf(gm)})).filter(x=>x.a);
+  if(!L.length)return '<p class="alead">The answers post with each game\'s sim on game day.</p>';
+  const row=(gm,mid,v)=>`<a class="arow" href="#${gm.key}"><span class="g">${gm.teams[0].abbr} @ ${gm.teams[1].abbr}</span><span class="w">${mid}</span><span class="v">${v}</span></a>`;
+  if(askQ==='first'||askQ==='anytime'){const any=askQ==='anytime';
+    return `<p class="alead">${any?'The likeliest touchdown scorer in each game: the share of runs where he scores at least once.':`The likeliest ${firstWord(sp)} scorer in each game. Nobody is a lock: the top name usually does it in fewer than 1 run in 5.`}</p><div class="arows">${L.map(({gm,a})=>{const l=any?a.anytime:a.first, x=l&&l[0];
+      return x?row(gm,`<b>${who(x.name)}</b> <small>${x.team}${l[1]?` · next: ${who(l[1].name)} ${pct(l[1].chance)}`:''}</small>`,`${pct(x.chance)}<small>fair ${fairOf(x.chance)}</small>`):''}).join('')}</div>`}
+  if(askQ==='win')return `<p class="alead">Share of the 5,000 runs each favorite wins.</p><div class="arows">${L.map(({gm,a})=>{const f=a.win[a.home]>=a.win[a.away]?a.home:a.away;
+      return row(gm,`<b>${team(sp,f)[0]}</b> <small>avg ${a.away} ${a.avg[a.away].toFixed(1)} · ${a.home} ${a.avg[a.home].toFixed(1)}</small>`,`${pct(a.win[f])}<small>fair ${fairOf(a.win[f])}</small>`)}).join('')}</div>`;
+  return `<p class="alead">The Lab's pick on each game, and the line the sims hit most often from the books' ladders.</p><div class="arows">${L.map(({gm,a})=>{const s=a.sure[0];
+      return row(gm,`<b>${a.picks.length?a.picks.map(pickText).join(' · '):'No Lab pick on this game'}</b>${s?`<small>Surest sim line: ${s.name} ${s.min}+ ${LEGW[s.stat]}</small>`:''}`,s?`${pct(s.chance)}<small>of runs</small>`:'')}).join('')}</div>`;
+}
+function askAnswer(sp){
+  if(askGame){const a=ansOf(askGame);if(a)return `${askMsg}${ansBlock(a,askGame)}`}
+  return askMsg+askRows(sp);
+}
+function askHtml(sp){
+  if(!ANSWERS||!GAMES[sp].some(gm=>ansOf(gm)))return '';
+  if(askGame&&askGame.sport!==sp){askGame=null;askMsg=''}
+  if(askQ==='anytime'&&sp!=='nfl')askQ='first';
+  return `<section class="ask" id="ask" aria-label="Ask the sims"><h2>Ask the sims</h2><p class="sub">Questions answered straight from every game's 5,000 simulated runs.</p>
+    <form id="askf"><input id="askin" placeholder="${sp==='nba'?'Who scores first in Lakers Warriors?':'Who scores the first TD in Packers Panthers?'}" aria-label="Ask the sims a question" autocomplete="off"><button class="btn primary">Ask</button></form>
+    <div class="qchips" id="askchips">${QS[sp].map(([k,l])=>`<button type="button" data-q="${k}" aria-pressed="${!askGame&&k===askQ}">${l}</button>`).join('')}</div>
+    <div id="askans">${askAnswer(sp)}</div></section>`}
+function bindAsk(sp){
+  const f=document.getElementById('askf');if(!f)return;
+  const redraw=()=>{document.querySelectorAll('#askchips button').forEach(b=>b.setAttribute('aria-pressed',String(!askGame&&b.dataset.q===askQ)));document.getElementById('askans').innerHTML=askAnswer(sp)};
+  document.getElementById('askchips').onclick=e=>{const k=e.target.closest('button')?.dataset.q;if(!k)return;askQ=k;askGame=null;askMsg='';redraw()};
+  f.onsubmit=e=>{e.preventDefault();const q=document.getElementById('askin').value.trim();if(!q)return;
+    const k=askKind(q), gm=askFind(q,sp);askMsg='';
+    if(k==='anytime'&&sp!=='nfl'){askQ='first'}else if(k)askQ=k;
+    askGame=gm&&ansOf(gm)?gm:null;
+    if(!k&&!askGame)askMsg=`<p class="alead">I can answer who scores first${sp==='nfl'?', who scores a touchdown':''}, who wins, and the best pick, for every game or for one (name a team). Here is who scores first:</p>`;
+    if(!k&&!askGame)askQ='first';
+    redraw()};
+}
+function renderGameAnswers(gm){
+  const el=document.getElementById('vanswers'), a=ansOf(gm);
+  el.innerHTML=a?ansBlock(a,gm):'';
+}
 // warm every game in the background so cards show real win chances and open instantly
 let warmQ=[];
 function warm(){const gm=warmQ.shift();if(!gm)return;if(!gm.G){build(gm);if(!document.getElementById('hub').hidden)renderHub()}setTimeout(warm,30)}
@@ -999,7 +1122,7 @@ function openGame(gm){
   setPlaying(false);
   G=build(gm); if(G.sport==='nba')NBA=G;else NFL=G;
   posCache.nba=null;posCache.ballPrev=null;posCache.nflBall=null;posCache.nflLines=null;posCache.cur=null; idx=-1; phase=1;
-  document.getElementById('final').hidden=true; document.getElementById('after').hidden=true; G.drives=null; sizeCanvas(); winSeries(); renderMarks(); renderDrives(); renderDist(); renderHow(); renderIntro(); renderAll(); renderGameParlay(gm);
+  document.getElementById('final').hidden=true; document.getElementById('after').hidden=true; G.drives=null; sizeCanvas(); winSeries(); renderMarks(); renderDrives(); renderDist(); renderHow(); renderIntro(); renderAll(); renderGameParlay(gm); renderGameAnswers(gm);
 }
 
 document.getElementById('play').onclick=()=>{document.getElementById('intro').hidden=true;document.getElementById('final').hidden=true;playing?setPlaying(false):start()};
@@ -1019,6 +1142,8 @@ fetch('data/sims/games.json',{cache:'no-cache'}).then(r=>r.ok?r.json():Promise.r
 });
 fetch('data/sims/parlays.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PARLAYS=p;if(!p||!DATA)return;
   const gm=[...GAMES.nba,...GAMES.nfl].find(g=>g.key===location.hash.slice(1));if(gm)renderGameParlay(gm)});
+fetch('data/sims/answers.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(a=>{ANSWERS=a;if(!a||!DATA)return;
+  const gm=[...GAMES.nba,...GAMES.nfl].find(g=>g.key===location.hash.slice(1));if(gm)renderGameAnswers(gm);else if(!document.getElementById('hub').hidden)renderHub()});
 fetch('data/sims/grades.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GRADES=g;if(g&&DATA&&!document.getElementById('hub').hidden)renderHub()});
 requestAnimationFrame(frame);
 </script>

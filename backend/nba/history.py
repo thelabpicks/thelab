@@ -126,6 +126,8 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     t = team_games(d).sort_values(["team", "game_date"])
     t["pace"] = t.groupby("team").poss.transform(lambda s: s.ewm(halflife=10).mean())
     t["pts_for"] = t.groupby("team").pts.transform(lambda s: s.ewm(halflife=10).mean())
+    t = t.merge(t[["game_id", "team", "pts"]].rename(columns={"team": "opp", "pts": "pts_ag"}), on=["game_id", "opp"], how="left")
+    t["net"] = (t.pts - t.pts_ag).groupby(t.team).transform(lambda s: s.ewm(halflife=10).mean())
     played = p[p.played]
     allowed = played.groupby(["game_id", "game_date", "opp", "pos"], as_index=False)[
         ["points", "rebounds", "assists", "threes", "pra", "minutes"]].sum().sort_values(["opp", "pos", "game_date"])
@@ -140,11 +142,49 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     p = _asof(p, lg[["game_date", "pos"] + [f"lg_{m}" for m in MARKETS]], ["pos"])
     for m in MARKETS:
         p[f"opp_{m}"] = p[f"opp_{m}"] / p[f"lg_{m}"]
-    p = _asof(p, t[["game_date", "team", "pace", "pts_for"]], ["team"])
-    p = _asof(p, t[["game_date", "team", "pace"]].rename(columns={"team": "opp", "pace": "opp_pace"}), ["opp"])
+    p = _asof(p, t[["game_date", "team", "pace", "pts_for", "net"]], ["team"])
+    p = _asof(p, t[["game_date", "team", "pace", "net"]].rename(columns={"team": "opp", "pace": "opp_pace", "net": "opp_net"}), ["opp"])
+    # How lopsided the matchup looks (each team's recent scoring margin): starters lose about a minute in mismatches
+    p["net_diff"] = p.net - p.opp_net
+    p["gap"] = p.net_diff.abs()
+    p = p.drop(columns=["net", "opp_net"])
     p = p.drop(columns=[f"lg_{m}" for m in MARKETS])
     for m in SIMILAR_MARKETS:
         p = _similar_allowed(p, m)
+    return _vacated(p, d)
+
+
+# Teammates out: the minutes, assists and points per game of rotation players (15+ minutes in their recent games) who
+# are not playing, so a starter whose co-star or lead ballhandler sits takes on the work (Franz Wagner, 11 and 12 assists
+# against 6.5 lines with Orlando short-handed). Absent = on the box score but did not play for a reason other than the
+# coach's decision; for today's games, ruled out on the latest injury report (predict.project sets `ruled_out`).
+# Walk-forward 2024-25 to 2026-27 (2026-11-02, about 52,000 games each): deviance assists -0.77% (90% CI 0.50-1.09%),
+# points -1.30% (0.86-1.83%), PRA -1.95% (1.32-2.73%), rebounds -1.07% (0.75-1.47%), threes -0.45% (0.26-0.68%);
+# 65%+ leans assists 72.7% -> 73.0%, points 70.7% -> 71.3%, PRA 71.3% -> 71.9%, rebounds 71.6% -> 72.0%,
+# threes 77.8% -> 77.9%.
+VACATED = ["vac_min", "vac_ast", "vac_pts"]
+VACATED_MIN_MINUTES = 15
+VACATED_MARKETS = ("assists", "points", "pra", "rebounds", "threes")
+
+
+def _vacated(p: pd.DataFrame, d: pd.DataFrame) -> pd.DataFrame:
+    upcoming = d["upcoming"].fillna(False).astype(bool) if "upcoming" in d else pd.Series(False, index=d.index)
+    benched = d["benched"].fillna(False).astype(bool) if "benched" in d else pd.Series(False, index=d.index)
+    ruled_out = d["ruled_out"].fillna(False).astype(bool) if "ruled_out" in d else pd.Series(False, index=d.index)
+    absent = (~d.played.astype(bool) & ~benched & ~upcoming) | (upcoming & ruled_out)
+    ab = d.loc[absent, ["game_id", "game_date", "team", "player_id"]].sort_values("game_date")
+    pl = p[p.played][["player_id", "game_date", "min_l", "assists_pm_l", "points_pm_l"]].sort_values("game_date")
+    pl = pl.assign(ast_pg=pl.assists_pm_l * pl.min_l, pts_pg=pl.points_pm_l * pl.min_l)
+    p = p.drop(columns=[c for c in VACATED if c in p])
+    if ab.empty:
+        return p.assign(**{c: 0.0 for c in VACATED})
+    ab = pd.merge_asof(ab, pl[["game_date", "player_id", "min_l", "ast_pg", "pts_pg"]], on="game_date", by="player_id",
+                       allow_exact_matches=False)
+    ab = ab[ab.min_l >= VACATED_MIN_MINUTES]
+    vac = ab.groupby(["game_id", "team"]).agg(vac_min=("min_l", "sum"), vac_ast=("ast_pg", "sum"),
+                                              vac_pts=("pts_pg", "sum")).reset_index()
+    p = p.merge(vac, on=["game_id", "team"], how="left")
+    p[VACATED] = p[VACATED].fillna(0.0)
     return p
 
 
@@ -189,6 +229,13 @@ def _similar_allowed(p: pd.DataFrame, m: str) -> pd.DataFrame:
     return p.drop(columns=["_tier"])
 
 
+# Matchup mismatch (net_diff: team minus opponent recent scoring margin, gap: its size). Starters played 1.0 minute under
+# their usual in the most lopsided quarter of games vs 0.25 in the closest (2024-25 to 2026-27). Walk-forward 2024-25
+# to 2026-27 (2026-11-01, 52,004 games each): points deviance -0.14% (90% CI 0.04-0.23%), 65%+ leans 70.3% -> 70.6%; PRA,
+# assists, rebounds and threes no better on deviance, so left out.
+MISMATCH = ["net_diff", "gap"]
+MISMATCH_MARKETS = ("points",)
+
 FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_games", "season_min", "rest", "home",
             "pace", "opp_pace", "pts_for"]
 
@@ -196,4 +243,5 @@ FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_g
 def features_for(market: str) -> list[str]:
     own = [f"{market}_pm_s", f"{market}_pm_l"]
     shots = ["fga_pm_l", "threes_att_pm_l", "fta_pm_l"] if market in ("points", "threes", "pra") else []
-    return FEATURES + own + shots + [f"opp_{market}"] + ([f"sim_{market}"] if market in SIMILAR_MARKETS else [])
+    return FEATURES + own + shots + [f"opp_{market}"] + ([f"sim_{market}"] if market in SIMILAR_MARKETS else []) + \
+        (MISMATCH if market in MISMATCH_MARKETS else []) + (VACATED if market in VACATED_MARKETS else [])

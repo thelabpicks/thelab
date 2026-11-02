@@ -251,3 +251,23 @@ def test_rotation_lists_every_player_not_ruled_out_for_the_game_sims():
     rot = pipeline.rotation_json(pd.DataFrame(rows))
     assert rot == [{"player_id": "1", "player_name": "P1", "team": "BOS", "minutes": 20.0, "minutes_expected": 15.0,
                     "pts": 12.0, "reb": 4.0, "ast": 3.0, "tpm": 1.5}]
+
+
+def test_vacated_counts_injured_and_ruled_out_teammates_not_coach_decisions():
+    import pandas as pd
+    from nba import history
+    day1, day2 = pd.Timestamp("2026-10-30"), pd.Timestamp("2026-11-01")
+    d = pd.DataFrame([
+        # day 1: everyone plays (gives each a pregame line for day 2)
+        {"game_id": 1, "game_date": day1, "team": "ORL", "player_id": "a", "played": True},
+        {"game_id": 1, "game_date": day1, "team": "ORL", "player_id": "b", "played": True},
+        {"game_id": 1, "game_date": day1, "team": "ORL", "player_id": "c", "played": True},
+        # day 2 (upcoming): b is ruled out, c sits by the coach's decision
+        {"game_id": 2, "game_date": day2, "team": "ORL", "player_id": "a", "played": False, "upcoming": True},
+        {"game_id": 2, "game_date": day2, "team": "ORL", "player_id": "b", "played": False, "upcoming": True, "ruled_out": True},
+        {"game_id": 2, "game_date": day2, "team": "ORL", "player_id": "c", "played": False, "benched": True},
+    ])
+    p = d.assign(min_l=30.0, assists_pm_l=0.2, points_pm_l=0.5)
+    v = history._vacated(p, d).set_index(["game_id", "player_id"])
+    assert v.loc[(2, "a"), "vac_min"] == 30.0 and abs(v.loc[(2, "a"), "vac_ast"] - 6.0) < 1e-9
+    assert v.loc[(1, "a"), "vac_min"] == 0.0

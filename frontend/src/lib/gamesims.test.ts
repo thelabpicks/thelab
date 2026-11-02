@@ -65,17 +65,27 @@ describe("game sim inputs", () => {
     const out = nbaSimGames(slate);
     expect(out.games).toHaveLength(1);
     expect(out.players.H.reduce((s, p) => s + p.min, 0)).toBe(240);
-    // P9 plays 21 minutes when he plays but sits half the time: 10.5 expected minutes, half his line
+    // P9 plays 21 minutes when he plays but sits half the time: 10.5 expected minutes, half his line; the team's 226.5
+    // expected minutes are then scaled up to 240 (x1.06)
     const p9 = out.players.H.find((p) => p.name === "H P9")!;
-    expect(p9).toMatchObject({ min: 10.5, pts: 2.5, reb: 2.5 });
+    expect(p9).toMatchObject({ min: 11.13, pts: 2.65, reb: 2.65 });
   });
 
-  it("fills a short rotation with a reserves line, but not one missing more than 48 minutes", () => {
+  it("scales a short rotation up to 240 with stats in proportion, and no reserves line when it fits", () => {
     const list = [34, 32, 30, 28, 26, 24, 22, 20].map((min, i) => ({ name: `P${i}`, min, pts: min / 2, reb: 4, ast: 2, tpm: 1 }));
     const fit = fitRotation(list, "SAC");
-    expect(fit).toHaveLength(9);
-    expect(fit[8]).toEqual({ name: "SAC reserves", min: 24, pts: 10.08, reb: 4.32, ast: 2.16, tpm: 0.96, bench: true });
-    expect(fitRotation(list.slice(0, 6), "SAC")).toHaveLength(6);
+    expect(fit).toHaveLength(8);
+    expect(fit.reduce((s, p) => s + p.min, 0)).toBeCloseTo(240, 1);
+    expect(fit[0]).toMatchObject({ name: "P0", min: 37.78, pts: 18.89, reb: 4.44 });
+  });
+
+  it("caps scaled players at 42 minutes and fills the rest with a reserves line, but not one past 48 minutes", () => {
+    const list = [40, 40, 40, 40, 20, 10, 10].map((min, i) => ({ name: `P${i}`, min, pts: min / 2, reb: 4, ast: 2, tpm: 1 }));
+    const fit = fitRotation(list, "SAC");
+    expect(fit.map((p) => p.min)).toEqual([42, 42, 42, 42, 24, 12, 12, 24]);
+    expect(fit[4]).toMatchObject({ name: "P4", pts: 12, reb: 4.8 });
+    expect(fit[7]).toEqual({ name: "SAC reserves", min: 24, pts: 10.08, reb: 4.32, ast: 2.16, tpm: 0.96, bench: true });
+    expect(fitRotation(list.slice(0, 4), "SAC")).toHaveLength(4);
   });
 
   it("holds back an NBA game whose projections can't nearly fill 240 minutes or miss the book's points", () => {

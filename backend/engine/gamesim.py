@@ -66,6 +66,22 @@ def _dirichlet_multinomial(rng, n: np.ndarray, shares: np.ndarray, alpha: float)
 TEAM = "_team"
 
 
+def starting_qb(rows: pd.DataFrame):
+    """The quarterback who threw most of the team's passes in its previous game, or, when none of the listed ones did
+    (a new starter, or the season's first week), the one with the most attempts per game. 2026 W7-W8 frozen sims (65
+    backup rows): backups were given 1.8 carries and 7.7 rushing yards a game and ran 0.09 and 0.3; with only the
+    starter running, backs' rushing yards ran 3.1 low instead of 5.3 (carries -0.34 vs -0.86), and the passer picked was
+    the one who played in 96% of games vs 94% (passing yards miss 77.9 vs 80.8)."""
+    qbs = rows[rows.position == "QB"]
+    if not len(qbs):
+        return None
+    if "last_att_share" in qbs:
+        last = _num(qbs.last_att_share, np.nan)
+        if np.isfinite(last).any() and np.nanmax(last) > 0:
+            return qbs.iloc[int(np.nanargmax(last))].player_id
+    return qbs.iloc[int(np.argmax(_num(qbs.attempts_pg)))].player_id
+
+
 def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None = None,
                   with_team: bool = False) -> dict[str, dict[str, np.ndarray]]:
     """Simulate one team's game n times. rows: that team's players for the week (props.build_frame columns).
@@ -131,8 +147,10 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
         if i is not None:
             out[rows.iloc[i].player_id] = {"targets": t.astype(float), "receptions": rec.astype(float), "rec_yards": yds}
 
-    # Rushers: carries shared out among the backs and quarterback.
-    rush_idx = np.where(np.isin(pos, ["QB", "RB"]))[0]
+    # Rushers: carries shared out among the backs and the starting quarterback. Backup quarterbacks are on the roster
+    # but rarely play, and their own per-game shares (from the games they did play) took carries from the backs.
+    starter = starting_qb(rows)
+    rush_idx = np.where((pos == "RB") | ((pos == "QB") & (rows.player_id.to_numpy() == starter)))[0]
     car_share = _num(rows.carries_share.iloc[rush_idx])
     if P["last_car_w"] > 0 and "last_carries_share" in rows:
         last = _num(rows.last_carries_share.iloc[rush_idx], np.nan)
@@ -154,10 +172,9 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
         d = out.setdefault(r.player_id, {})
         d["carries"], d["rush_yards"] = c_.astype(float), yds
 
-    # Passer: the quarterback with the most attempts per game throws them all; his line is his receivers' total.
-    qbs = rows[rows.position == "QB"]
-    if len(qbs):
-        q = qbs.iloc[int(np.argmax(_num(qbs.attempts_pg)))]
+    # Passer: the starting quarterback throws them all; his line is his receivers' total.
+    if starter is not None:
+        q = rows[rows.player_id == starter].iloc[0]
         att_pg = max(_num([q.get("attempts_pg")], 30.0)[0], 10.0)
         int_rate = (_num([q.get("interceptions_pg")], 0.0)[0] * 8 + LEAGUE["int_rate"] * att_pg * 4) / (att_pg * 12)
         td_rate = (_num([q.get("pass_tds_pg")], 0.0)[0] * 8 + LEAGUE["td_rate"] * att_pg * 4) / (att_pg * 12)
@@ -427,6 +444,7 @@ def _postgame_rows(rows: pd.DataFrame, level: str) -> pd.DataFrame:
         r["targets_share"] = (num("targets") / num("team_targets").replace(0, np.nan)).fillna(0.0)
         r["carries_share"] = (num("carries") / num("team_carries").replace(0, np.nan)).fillna(0.0)
         r["last_carries_share"] = np.nan  # the real share replaces the pregame blend
+        r["last_att_share"] = np.nan  # the real attempts pick the passer
         r["attempts_pg"] = num("attempts").fillna(num("attempts_pg"))
         r["opp_targets_mult"] = 1.0
         r["opp_carries_mult"] = 1.0

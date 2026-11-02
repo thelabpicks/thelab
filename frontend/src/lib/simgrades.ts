@@ -27,7 +27,11 @@ export type SimGrade = {
   key: string; sport: Sport; start: string; away: string; home: string; espn_id: string;
   final: Record<string, number>; proj: Record<string, number>; book: Record<string, number> | null;
   winner_right: boolean; players: PlayerGrade[]; graded_at: string;
+  /** Who really scored first (NBA: the first field goal; NFL: the first touchdown), from ESPN's play-by-play. Left out
+   *  when the summary had no play-by-play to read. */
+  first?: FirstScore;
 };
+export type FirstScore = { team: string; name: string };
 export type SimArchive = { frozen: Record<string, FrozenSim>; grades: SimGrade[]; given_up?: string[] };
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
@@ -110,6 +114,26 @@ export function parseBox(sport: Sport, summary: Espn): { final: Record<string, n
     }
   }
   return { final, players };
+}
+
+/** The first field goal (NBA) or first touchdown (NFL) of a final ESPN summary, with our team abbreviation. ESPN names
+ *  the scorer at the start of the play's text ("Stephen Curry makes 26-foot three point jumper", "Josh Jacobs 3 Yd Run
+ *  (Brandon McManus Kick)"). Null when the summary has no such play to read. */
+export function parseFirst(sport: Sport, summary: Espn): FirstScore | null {
+  const ours = (abbr: string) => (sport === "nfl" ? Object.entries(ESPN_NFL).find(([, e]) => e === abbr)?.[0] ?? abbr : abbr);
+  const teams = new Map<string, string>((summary?.header?.competitions?.[0]?.competitors ?? []).map((c: Espn) => [String(c.team?.id), c.team?.abbreviation]));
+  const abbr = (p: Espn) => p.team?.abbreviation ?? teams.get(String(p.team?.id));
+  let play: Espn, name: string | undefined;
+  if (sport === "nba") {
+    play = (summary?.plays ?? []).find((p: Espn) => p.scoringPlay && !/free throw/i.test(p.text ?? ""));
+    name = play?.text?.match(/^(.+?) (?:makes|made)\b/i)?.[1];
+  } else {
+    const td = (p: Espn) => p.scoringType?.abbreviation === "TD" || p.type?.abbreviation === "TD" || /touchdown/i.test(p.scoringType?.name ?? p.type?.text ?? "");
+    play = (summary?.scoringPlays ?? []).find(td);
+    name = play?.text?.match(/^(.+?) \d+ (?:Yd|Yard)/i)?.[1];
+  }
+  const t = play && abbr(play);
+  return t && name ? { team: ours(t), name: name.trim() } : null;
 }
 
 /** Grades a frozen game on its box score. Players who did not appear are left out (a scratch is not a projection miss;

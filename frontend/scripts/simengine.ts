@@ -5,6 +5,7 @@ import path from "node:path";
 import vm from "node:vm";
 import type { NbaSimGame, NbaSimPlayer, NflSimGame } from "../src/lib/gamesims";
 import type { RunBox } from "../src/lib/simparlay";
+import type { RunFacts } from "../src/lib/simanswers";
 
 const ENGINE = fs.readFileSync(path.resolve(__dirname, "../public/sim-engine.js"), "utf8");
 // the page's own setup (build() in sim-player.html), minus drawing: a game's teams, tuned so the runs center on the projections
@@ -13,9 +14,12 @@ function __nba(g,players){DATA={nba:{players}};NBA={sport:'nba',runs:5000,teams:
   book:{total:g.total,spread:g.spread,fav:g.fav===g.home?1:0,favAbbr:g.fav}};setupNBA();return NBA}
 function __nfl(g){NFL={sport:'nfl',runs:5000,src:g,teams:[{abbr:g.away},{abbr:g.home}]};setupNFL();return NFL}
 function __run(G,seed){if(G.sport==='nba'){NBA=G;return boxOf(G,simNBA(seed,true))}NFL=G;return boxOf(G,simNFL(seed,true))}
+function __runX(G,seed){const nba=G.sport==='nba';if(nba)NBA=G;else NFL=G;const g=nba?simNBA(seed,true):simNFL(seed,true);
+  const e=g.ev.find(x=>nba?x.type==='made':x.td);
+  return {box:boxOf(G,g),score:[...g.score],first:e?[e.off,nba?String(e.p):(e.type==='comp'?e.t.id:e.p.id)]:null}}
 `;
 
-export type Engine = { nba: (g: NbaSimGame, players: Record<string, NbaSimPlayer[]>) => unknown; nfl: (g: NflSimGame) => unknown; run: (G: unknown, seed: number) => RunBox };
+export type Engine = { nba: (g: NbaSimGame, players: Record<string, NbaSimPlayer[]>) => unknown; nfl: (g: NflSimGame) => unknown; run: (G: unknown, seed: number) => RunBox; facts: (G: unknown, seed: number) => RunFacts };
 
 export function loadEngine(): Engine {
   const ctx = vm.createContext({ Math, Object, Array, Number, String, JSON });
@@ -25,6 +29,7 @@ export function loadEngine(): Engine {
     nba: (g, players) => call("__nba", g, players),
     nfl: (g) => call("__nfl", g),
     run: (G, seed) => call("__run", G, seed) as RunBox,
+    facts: (G, seed) => call("__runX", G, seed) as RunFacts,
   };
 }
 
@@ -32,5 +37,12 @@ export function loadEngine(): Engine {
 export function runBoxes(engine: Engine, G: unknown, n = 5000): RunBox[] {
   const out: RunBox[] = [];
   for (let i = 0; i < n; i++) out.push(engine.run(G, 100000 + i));
+  return out;
+}
+
+/** Each run's facts for runs 0..n-1 (the page's seeds). */
+export function runFacts(engine: Engine, G: unknown, n = 5000): RunFacts[] {
+  const out: RunFacts[] = [];
+  for (let i = 0; i < n; i++) out.push(engine.facts(G, 100000 + i));
   return out;
 }
