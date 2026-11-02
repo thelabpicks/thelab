@@ -111,6 +111,7 @@ def project(d: pd.DataFrame, slate: pd.DataFrame, calib: dict, season: int = sou
     inj = injuries()
     up["injury"] = up.player_name.map(lambda n: inj.get(_norm(n), {}).get("status", ""))
     up["injury_note"] = up.player_name.map(lambda n: inj.get(_norm(n), {}).get("detail", ""))
+    up["ruled_out"] = up.injury.str.lower().isin(OUT_STATUSES)   # their minutes go to teammates (history._vacated)
     allr = pd.concat([d, up], ignore_index=True)
     allr["upcoming"] = allr.upcoming.fillna(False).astype(bool)
     allr["played"] = allr.played.fillna(False).astype(bool)
