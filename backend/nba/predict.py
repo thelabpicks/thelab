@@ -17,7 +17,9 @@ from scipy import stats as st
 
 from . import history, props, sources, teamfit
 
-OUT_STATUSES = {"out", "injured reserve", "suspended", "out for season"}
+# Doubtful counts as out: he rarely plays, and picks and game sims need players sure to play (2026-10-30: Dallas's
+# Santi Aldama, doubtful and yet to debut, took 27 of the sim's minutes)
+OUT_STATUSES = {"out", "doubtful", "injured reserve", "suspended", "out for season"}
 
 
 def load_schedule(season: int = sources.CURRENT_SEASON) -> pd.DataFrame:

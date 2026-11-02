@@ -60,6 +60,9 @@ def team_games(d: pd.DataFrame) -> pd.DataFrame:
     return t
 
 
+# share of his career minutes a player gets in a season debut after his team has played twice
+DEBUT_SHARE = 0.6
+
 MARKETS = ("points", "rebounds", "assists", "threes", "pra")
 
 
@@ -100,7 +103,16 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     this = _ewm_prior(src.groupby(["player_id", "season"]).minutes, 2)
     k = src.groupby(["player_id", "season"]).cumcount()
     w = k / (k + 1)
-    p["min_exp"] = (w * this.fillna(0) + (1 - w) * career).reindex(p.index)
+    exp = w * this.fillna(0) + (1 - w) * career
+    # A season debut after his team has played twice: a new signing or a player back from a long injury, who plays
+    # about 0.6 of his career minutes in it (2025-2027 debuts after a team's 2nd game, career 20+ minutes: 29 expected,
+    # 18.6 played when he had no rows before and 11.9 when he sat listed before; average miss 12.2 -> 7.9 minutes at
+    # 0.6). Lakers signing Lawson Lovering was set for 26 minutes in his first game from last season's minutes.
+    tg = src.drop_duplicates(["season", "team", "game_id"])[["season", "team", "game_date"]].sort_values("game_date")
+    tg["team_n"] = tg.groupby(["season", "team"]).cumcount() + 1
+    prior = _asof(src[["season", "team", "game_date"]].reset_index(), tg, ["season", "team"]).set_index("index").team_n
+    debut = (k == 0) & (prior.reindex(src.index).fillna(0) >= 2)
+    p["min_exp"] = exp.where(~debut, DEBUT_SHARE * career).reindex(p.index)
     p["start_rate"] = _ewm_prior(gp.starter, 5)
     p["last_min"] = gp.minutes.shift(1)
     p["games_prior"] = gp.cumcount()
