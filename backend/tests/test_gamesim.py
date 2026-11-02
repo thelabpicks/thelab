@@ -70,3 +70,16 @@ def test_volume_noise_keeps_the_mean():
     flat = gamesim.simulate_team(_team(), np.random.default_rng(1), n=40000, params={"vol_sd": 0.0})
     assert abs(noisy["qb"]["attempts"].mean() - flat["qb"]["attempts"].mean()) < 0.15
     assert noisy["qb"]["attempts"].std() > flat["qb"]["attempts"].std()
+
+
+def test_only_the_starting_quarterback_runs_and_throws():
+    rows = _team()
+    # a backup with a big per-game line from the games he did play, who threw none of last week's passes
+    backup = {**rows.iloc[0].to_dict(), "player_id": "backup", "attempts_pg": 36.0, "carries_share": 0.15, "last_att_share": 0.0}
+    rows["last_att_share"] = np.where(rows.player_id == "qb", 1.0, np.nan)
+    rows = pd.concat([rows, pd.DataFrame([backup])], ignore_index=True)
+    assert gamesim.starting_qb(rows) == "qb"
+    out = gamesim.simulate_team(rows, np.random.default_rng(5), n=2000)
+    assert "backup" not in out and "attempts" in out["qb"] and out["qb"]["carries"].mean() > 0
+    # without last week's passes to go on, the one with the most attempts per game starts
+    assert gamesim.starting_qb(rows.drop(columns=["last_att_share"])) == "backup"
