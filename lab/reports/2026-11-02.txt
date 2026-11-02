@@ -2,18 +2,30 @@ The Lab daily report, Monday, Nov 2 (results from Sunday, Nov 1)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 10-2 +5.67u / 4-1 +2.20u
+  NFL: 17-5 +7.41u / 6-2 +2.10u
   CFB: 27-9 −1.07u / 7-0 +2.57u
   NBA: 21-7 +4.34u / 13-1 +3.50u
 
 NFL
   Picks
-    - 11 picks are waiting on a final stat line: Daniel Jones over 0.5 passing TDs; Garrett Wilson under 5.5 receptions; Deshaun Watson over 0.5 passing TDs; Cam Ward over 0.5 passing TDs; Drake London under 6.5 receptions; Justin Jefferson under 6.5 receptions; Jahmyr Gibbs to score a touchdown; Ladd McConkey under 47.5 receiving yards; Jonah Coleman under 44.5 rushing yards; Malik Willis over 0.5 passing TDs; Saquon Barkley under 54.5 rushing yards. They are graded on the next refresh after the result posts.
+    - Surest hit: Jonah Coleman under 44.5 rushing yards (79%), finished with 41.
+    - Miss: Ladd McConkey under 47.5 receiving yards at 85% (pick of the day). Finished with 86.
+    - Miss: Garrett Wilson under 5.5 receptions at 73%. Finished with 6.
+    - Miss: Deshaun Watson over 0.5 passing TDs at 73%. Finished with 0.
   How the model did
-    - Featured picks this season: 49 of 81 (60%).
+    - Every graded prop and TD lean on 12 games: 201-266 (43%). By confidence: 70%+ hit 55% of 22, 60-70% hit 55% of 94, under 60% hit 39% of 351.
+    - Featured picks this season: 89 of 159 (56%).
+    - Off calibration: TD Lean: running hot (46 of 119 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (75 of 133 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 26.7 to 15.7, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-3.0 passes over 52). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Team rush attempts keeps running above the pregame input (+2.2 carries over 52). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Expected players who sat out keeps running above the pregame input (+0.8 players over 52). Watching it; no automatic correction for this input.
+    - Biggest misses: Baker Mayfield pass yards (sim 210.8, had 0; team volume); Joe Burrow pass yards (sim 266.2, had 462; team volume); Harold Fannin Jr. rec yards (sim 15.5, had 154; efficiency).
   Model changes
-    - Tested and rejected (no reliable gain on recent weeks): catch rate (+0.0009), yards per target (−0.0010), yards per carry (−0.0004), volume (+0.0003).
-    - Team volume learned from the re-sims: passes x1.0292, runs x0.9969.
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0006), yards per carry (+0.0014), volume (+0.0003).
   Game sims vs the final
     - PHI 10-27 WAS (sims PHI 17-24 WAS, winner ✓); biggest misses: Treylon Burks 81 receiving yards (sims 27.1), Eli Stowers 53 receiving yards (sims 11)
     - KC 24-28 DEN (sims KC 21-20 DEN, winner ✗); biggest misses: Emmett Johnson 128 receiving yards (sims 14.1), Jonah Coleman 63 receiving yards (sims 16.2)
