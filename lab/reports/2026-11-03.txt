@@ -4,7 +4,7 @@ Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 18-5 +8.06u / 6-3 +1.10u
   CFB: 27-9 −1.07u / 7-0 +2.57u
-  NBA: 22-10 +3.34u / 14-2 +3.50u
+  NBA: 30-13 +3.34u / 16-3 +3.50u
 
 NFL
   Picks
@@ -43,13 +43,22 @@ CFB
 
 NBA
   Picks
-    - 13 picks are waiting on a final stat line: Shai Gilgeous-Alexander under 30.5 points; Caleb Wilson over 1.5 threes made; CJ McCollum under 2.5 threes made; Michael Porter Jr. over 1.5 assists; Cade Cunningham under 8.5 assists; Desmond Bane under 3.5 threes made; Trey Murphy III over 2.5 assists; Cameron Boozer over 8.5 rebounds; Keyonte George under 6.5 assists; Damian Lillard under 3.5 threes made; Yaxel Lendeborg over 1.5 threes made; Giannis Antetokounmpo under 48.5 pts + reb + ast; Immanuel Quickley under 28.5 pts + reb + ast. They are graded on the next refresh after the result posts.
+    - Surest hit: Yaxel Lendeborg over 1.5 threes made (76%), finished with 2.
+    - Miss: Immanuel Quickley under 28.5 pts + reb + ast at 72% (pick of the day). Finished with 33.
+    - Miss: Giannis Antetokounmpo under 48.5 pts + reb + ast at 70%. Finished with 49.
+    - Miss: Shai Gilgeous-Alexander under 30.5 points at 70%. Finished with 43.
+    - Miss: Desmond Bane under 3.5 threes made at 67%. Finished with 4.
+    - Graded since the last report: Scottie Barnes under 1.5 threes made (void).
+  How the model did
+    - Every lean the model made on 15 games: 693-466 (60%). By confidence: 70%+ hit 86% of 136, 60-70% hit 55% of 323, under 60% hit 57% of 700.
+    - Unders 64% (657), overs 54% (502).
+    - Furthest off among confident leans: Jaylin Williams pra (projected 18.5, had 8, line 9.5); Walter Clayton Jr. pra (projected 12.7, had 23, line 18.5); Kobe Brown pra (projected 13.8, had 23, line 21.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 991 of 2203 losing leans would have been right, so minutes caused 45% of the misses and production the rest (last 2 weeks).
-    - Minutes ran −1.4 per player vs the projection (typical miss 5.5).
-    - Team scoring: rotations scored −0.5 points per team vs projected (typical miss 12.3).
+    - Re-run with the minutes players really got, 1216 of 2669 losing leans would have been right, so minutes caused 46% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.2 per player vs the projection (typical miss 5.5).
+    - Team scoring: rotations scored −1.4 points per team vs projected (typical miss 12.6).
   Model changes
-    - Refit this morning on every box score through 2026-11-01; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Refit this morning on every box score through 2026-11-02; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
   Game sims vs the final
     - MIA 117-138 LAL (sims MIA 114-107 LAL, winner ✗); biggest misses: Klay Thompson 19 points (sims 10.8), Bobby Portis 2 points (sims 9.8)
