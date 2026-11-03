@@ -2,20 +2,28 @@ The Lab daily report, Tuesday, Nov 3 (results from Monday, Nov 2)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 17-5 +7.41u / 6-2 +2.10u
+  NFL: 18-5 +8.06u / 6-3 +1.10u
   CFB: 27-9 −1.07u / 7-0 +2.57u
   NBA: 22-10 +3.34u / 14-2 +3.50u
 
 NFL
   Picks
-    - 2 picks are waiting on a final stat line: AJ Barner under 3.5 receptions; D'Andre Swift under 64.5 rushing yards. They are graded on the next refresh after the result posts.
+    - Surest hit: AJ Barner under 3.5 receptions (67%), finished with 2.
+    - Miss: D'Andre Swift under 64.5 rushing yards at 74% (pick of the day). Finished with 69.
   How the model did
-    - Featured picks this season: 89 of 159 (56%).
-    - Off calibration: TD Lean: running hot (46 of 119 hit vs 26% expected).
-    - Off calibration: Props Strong: running cold (75 of 133 hit vs 70% expected).
+    - Every graded prop and TD lean on 1 game: 15-20 (43%). By confidence: 60-70% hit 60% of 5, under 60% hit 40% of 30.
+    - Featured picks this season: 92 of 162 (57%).
+    - Off calibration: TD Lean: running hot (47 of 124 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (76 of 134 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 26.0 to 15.4, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-2.7 passes over 54). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Team rush attempts keeps running above the pregame input (+2.1 carries over 54). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Expected players who sat out keeps running above the pregame input (+0.7 players over 54). Watching it; no automatic correction for this input.
+    - Biggest misses: Baker Mayfield pass yards (sim 210.8, had 0; team volume); Joe Burrow pass yards (sim 266.2, had 462; team volume); Harold Fannin Jr. rec yards (sim 15.5, had 154; efficiency).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
-    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0006), yards per carry (+0.0014), volume (+0.0003).
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0008), volume (−0.0000).
   Game sims vs the final
     - CHI 34-17 SEA (sims CHI 22-25 SEA, winner ✗); biggest misses: Rome Odunze 87 receiving yards (sims 36.2), Colston Loveland 65 receiving yards (sims 33.5)
     - Last 30 days: 14 games, winner right in 10 (71%); each team's points missed by 8.3 on average, running +0.4 vs projected. Furthest-leaning stat: rushing yards, +8.9 per player vs projected.
