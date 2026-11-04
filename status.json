@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-03",
-  "ran_at": "2026-11-03T23:11:00+00:00",
+  "date": "2026-11-04",
+  "ran_at": "2026-11-04T09:45:16+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -53,30 +53,30 @@
   },
   "espn": {
     "injuries": {
-      "saved": "2026-11-03.json",
-      "items": 28
+      "saved": "2026-11-04.json",
+      "items": 29
     },
     "scoreboard": {
-      "saved": "2026-11-03.json",
-      "items": 0
+      "saved": "2026-11-04.json",
+      "items": 14
     }
   },
   "official_injuries": {
-    "saved": "2026-11-03.json",
-    "players": 78,
-    "report": "Injury-Report_2026-11-03_06_00PM.pdf"
+    "saved": "2026-11-04.json",
+    "players": 118,
+    "report": "Injury-Report_2026-11-04_04_30AM.pdf"
   },
   "rosters": {
     "teams": 30,
     "errors": {}
   },
   "espn_props": {
-    "saved": "2026-11-03.json",
-    "lines": 0,
+    "saved": "2026-11-04.json",
+    "lines": 743,
     "errors": {}
   },
   "odds": {
-    "saved": "2026-11-03.json",
+    "saved": "2026-11-04.json",
     "game_lines": 0,
     "props": 0,
     "budget": {
@@ -85,10 +85,10 @@
       "reserve": 200.0,
       "remaining": 491.0,
       "game_lines": false,
-      "espn_lines": false,
+      "espn_lines": true,
       "props": false,
       "cost": 0,
-      "reason": "no games today"
+      "reason": "free plan: player props need a paid plan"
     },
     "credits_remaining": 491.0,
     "errors": []
