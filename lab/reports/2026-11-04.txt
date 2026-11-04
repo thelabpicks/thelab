@@ -1,0 +1,46 @@
+The Lab daily report, Wednesday, Nov 4 (results from Tuesday, Nov 3)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
+  NFL: 18-5 +8.06u / 6-3 +1.10u
+  CFB: 27-9 −1.07u / 7-0 +2.57u
+  NBA: 30-13 +3.34u / 16-3 +3.50u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 92 of 162 (57%).
+    - Off calibration: TD Lean: running hot (47 of 124 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (76 of 134 hit vs 70% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0008), volume (−0.0000).
+  Game sims vs the final
+    - Last 30 days: 14 games, winner right in 10 (71%); each team's points missed by 8.3 on average, running +0.4 vs projected. Furthest-leaning stat: rushing yards, +8.9 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+  How the model did
+    - Suggested college bets this season: 25-25 (50%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.3 to 7.6 points (98 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.78 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.16 vs the pregame input (typical miss 0.9).
+    - Turnovers ran +0.12 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 12.8 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - No NBA picks were played on this day.
+  Where it was off and why
+    - Re-run with the minutes players really got, 1216 of 2669 losing leans would have been right, so minutes caused 46% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.2 per player vs the projection (typical miss 5.5).
+    - Team scoring: rotations scored −1.4 points per team vs projected (typical miss 12.6).
+  Model changes
+    - Refit this morning on every box score through 2026-11-02; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - Last 30 days: 34 games, winner right in 24 (71%); each team's points missed by 12 on average (the book's line by 10.3), running +1.7 vs projected. Furthest-leaning stat: threes, +0.1 per player vs projected.
