@@ -23,11 +23,11 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
-    - Winners (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
-    - Spreads (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
-    - Totals (2 games): 2-0 (100%). By confidence: under 60% hit 100% of 2.
-    - Furthest off: Buffalo at Miami (OH) (projected 46.8 total, scored 65, +18.2); Ohio at Akron (projected 52.4 total, scored 48, −4.4).
-    - Suggested college bets this season: 26-25 (51%).
+    - Winners (5 games): 2-3 (40%). By confidence: 70%+ hit 100% of 1, under 60% hit 25% of 4.
+    - Spreads (5 games): 3-2 (60%). By confidence: under 60% hit 60% of 5.
+    - Totals (5 games): 4-1 (80%). By confidence: under 60% hit 80% of 5.
+    - Furthest off: Buffalo at Miami (OH) (projected 46.8 total, scored 65, +18.2); Toledo at Sacramento State (projected 54.6 total, scored 37, −17.6).
+    - Suggested college bets this season: 26-26 (50%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.3 to 7.7 points (99 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.78 vs the pregame input (typical miss 6.9).
