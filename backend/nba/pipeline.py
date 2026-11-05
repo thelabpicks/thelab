@@ -343,8 +343,8 @@ def book_rows(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["date", "market", "raw", "over"])
 
 
-# Which kinds of pick (market and side) have earned their place at real book lines: leans the model gave 60%+ that
-# hit 55%+ over 40+ graded picks. From 2026-10-26 to 11-04 every market's 60%+ unders hit 57-66% at book lines while
+# How each kind of pick (market and side) has done at real book lines: leans the model gave 60%+, and the kinds that
+# hit 55%+ over 40+ graded picks. Information for the reports only; picks are not filtered by kind (Andrew, 2026-11-05). From 2026-10-26 to 11-04 every market's 60%+ unders hit 57-66% at book lines while
 # its overs hit 42-50% (rebounds overs 68% the exception): books shade overs. Day by day (each day judged only on the
 # days before it) the top 10 from proven kinds hit 60% vs 53% for the top 10 of all kinds.
 SIDE_MIN_LEAN, SIDE_MIN_N, SIDE_MIN_RATE = 0.6, 40, 0.55
