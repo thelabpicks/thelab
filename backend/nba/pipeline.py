@@ -140,6 +140,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     # Due is shown only in markets where, in testing, such players beat their projection at least as often as others.
     due_markets = {m for m, v in due["markets"].items() if v["beat_projection"] >= v["others_beat_projection"]}
     book_cal = book_calibration(d, log=log)
+    sides = book_sides(d, log=log)
     rows = slate_json(proj, f, oos, reports, odds, due_markets, book_cal) if len(proj) else []
     # Free plan: buy real prop lines for the likeliest picks' games and markets, then rebuild the rows at those lines.
     if rows and not odds["props"] and len(slate) and str(slate.game_date.min().date()) == today and props_posted():
@@ -156,7 +157,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     rec = record(d)
 
     out.mkdir(parents=True, exist_ok=True)
-    _write(out, "slate.json", {"date": slate_date, "generated_at": utcnow(), "games": games, "rows": rows,
+    _write(out, "slate.json", {"date": slate_date, "generated_at": utcnow(), "games": games, "rows": rows, "book_sides": sides,
                                "rotation": rotation_json(proj) if len(proj) else [],
                                "odds": {"fetched_at": odds["fetched_at"], "plan": odds["plan"],
                                         "props_priced": bool(odds["props"] or odds.get("dk"))}})
@@ -337,8 +338,34 @@ def book_rows(d: pd.DataFrame) -> pd.DataFrame:
             if val == p["line"]:
                 continue
             raw = p.get("p_over_raw")
-            rows.append({"date": s["date"], "raw": float(p["p_over"] if raw is None else raw), "over": int(val > p["line"])})
-    return pd.DataFrame(rows, columns=["date", "raw", "over"])
+            rows.append({"date": s["date"], "market": p["market"], "raw": float(p["p_over"] if raw is None else raw),
+                         "over": int(val > p["line"])})
+    return pd.DataFrame(rows, columns=["date", "market", "raw", "over"])
+
+
+# Which kinds of pick (market and side) have earned their place at real book lines: leans the model gave 60%+ that
+# hit 55%+ over 40+ graded picks. From 2026-10-26 to 11-04 every market's 60%+ unders hit 57-66% at book lines while
+# its overs hit 42-50% (rebounds overs 68% the exception): books shade overs. Day by day (each day judged only on the
+# days before it) the top 10 from proven kinds hit 60% vs 53% for the top 10 of all kinds.
+SIDE_MIN_LEAN, SIDE_MIN_N, SIDE_MIN_RATE = 0.6, 40, 0.55
+
+
+def book_sides(d: pd.DataFrame, log=print) -> dict | None:
+    """The market:side kinds proven at book lines, or None until any kind has enough graded picks to judge."""
+    try:
+        r = book_rows(d)
+    except Exception as ex:  # noqa: BLE001
+        log(f"nba book sides: skipped ({ex})")
+        return None
+    r = r[np.maximum(r.raw, 1 - r.raw) >= SIDE_MIN_LEAN].assign(side=lambda x: np.where(x.raw >= 0.5, "over", "under"))
+    r["hit"] = (r.over == 1) == (r.side == "over")
+    rec = [{"market": m, "side": sd, "n": int(len(g)), "rate": round(float(g.hit.mean()), 4)}
+           for (m, sd), g in r.groupby(["market", "side"])]
+    proven = sorted(f"{x['market']}:{x['side']}" for x in rec if x["n"] >= SIDE_MIN_N and x["rate"] >= SIDE_MIN_RATE)
+    log(f"nba book sides: proven={proven}")
+    if not proven:
+        return None
+    return {"proven": proven, "record": rec, "min_lean": SIDE_MIN_LEAN, "min_n": SIDE_MIN_N, "min_rate": SIDE_MIN_RATE}
 
 
 def _fit_platt_book(r: pd.DataFrame) -> tuple[float, float]:

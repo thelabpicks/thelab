@@ -40,7 +40,9 @@ export type NbaGame = { game_id: number; date: string; time: string; home: strin
  *  usual minutes; minutes_expected also counts coach's-decision DNPs as 0. */
 export type RotationRow = { player_id: string; player_name: string; team: string; minutes: number | null; minutes_expected: number | null;
   pts: number | null; reb: number | null; ast: number | null; tpm: number | null };
-export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; rotation?: RotationRow[]; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
+/** Kinds of pick (market:side) whose 60%+ leans have hit 55%+ at real book lines; null until any kind has enough picks. */
+export type BookSides = { proven: string[]; record: { market: string; side: "over" | "under"; n: number; rate: number }[]; min_lean: number; min_n: number; min_rate: number };
+export type Slate = { date: string | null; generated_at: string; games: NbaGame[]; rows: NbaRow[]; rotation?: RotationRow[]; book_sides?: BookSides | null; odds: { fetched_at: string | null; plan: string | null; props_priced: boolean } };
 export type MarketReport = {
   market: string; label: string; validated: boolean; failed_checks: string[]; test_rows: number; test_months: number; first_season: number;
   crps_gain_pct: number; mae: number; baseline_mae: number; over_brier: number; baseline_over_brier: number; coin_brier: number;
