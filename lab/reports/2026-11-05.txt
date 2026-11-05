@@ -15,7 +15,7 @@ NFL
     - Off calibration: Props Strong: running cold (76 of 134 hit vs 70% expected).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
-    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0008), volume (−0.0000).
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0006), yards per carry (+0.0007), volume (−0.0001).
   Game sims vs the final
     - Last 30 days: 14 games, winner right in 10 (71%); each team's points missed by 8.3 on average, running +0.4 vs projected. Furthest-leaning stat: rushing yards, +8.9 per player vs projected.
 
