@@ -593,11 +593,100 @@ def save_odds(day: str, log=print, force: bool = False, now: datetime | None = N
 
 
 # --------------------------------------------------------------------------- run
+# --------------------------------------------------------------------------- last night's box scores from ESPN
+# The sportsdataverse box score file lags a day or two, so the morning grading had no stats for the night before. ESPN
+# posts each final's box score within minutes: the collector saves the finals of the last BOX_DAYS days, and
+# history.load_box adds any game the sportsdataverse file does not have yet (same ESPN ids and team abbreviations).
+BOX_DAYS = 3
+
+
+def _num(x) -> float:
+    try:
+        return float(str(x).split("-")[0]) if x not in (None, "", "--") else 0.0
+    except ValueError:
+        return 0.0
+
+
+def parse_espn_box(summary: dict, game_date: str) -> list[dict]:
+    """Player rows (history.COLS names) of a final ESPN summary; [] while the game is not final."""
+    comp = ((summary.get("header") or {}).get("competitions") or [{}])[0]
+    if not ((comp.get("status") or {}).get("type") or {}).get("completed"):
+        return []
+    teams = {c["team"]["abbreviation"]: c for c in comp.get("competitors", [])}
+    rows = []
+    for team in (summary.get("boxscore") or {}).get("players", []):
+        abbr = team["team"]["abbreviation"]
+        opp = next((a for a in teams if a != abbr), None)
+        me, them = teams.get(abbr, {}), teams.get(opp, {})
+        for cat in team.get("statistics", []):
+            keys = [str(k).lower() for k in (cat.get("keys") or [])]
+            labels = [str(k).upper() for k in (cat.get("labels") or cat.get("names") or [])]
+
+            def at(stats, key, label):
+                i = keys.index(key) if key in keys else (labels.index(label) if label in labels else -1)
+                return stats[i] if 0 <= i < len(stats) else None
+
+            for a in cat.get("athletes", []):
+                ath = a.get("athlete") or {}
+                st = a.get("stats") or []
+                fg = str(at(st, "fieldgoalsmade-fieldgoalsattempted", "FG") or "0-0").split("-")
+                tp = str(at(st, "threepointfieldgoalsmade-threepointfieldgoalsattempted", "3PT") or "0-0").split("-")
+                ft = str(at(st, "freethrowsmade-freethrowsattempted", "FT") or "0-0").split("-")
+                dnp = bool(a.get("didNotPlay")) or not st
+                rows.append({
+                    "game_id": int(comp.get("id") or summary.get("header", {}).get("id")), "season": sources.CURRENT_SEASON,
+                    "season_type": 2, "game_date": game_date, "game_date_time": comp.get("date"),
+                    "athlete_id": int(ath["id"]), "athlete_display_name": ath.get("displayName"),
+                    "athlete_headshot_href": (ath.get("headshot") or {}).get("href"),
+                    "athlete_position_abbreviation": (ath.get("position") or {}).get("abbreviation"),
+                    "team_abbreviation": abbr, "opponent_team_abbreviation": opp, "home_away": me.get("homeAway"),
+                    "minutes": 0.0 if dnp else _num(at(st, "minutes", "MIN")), "starter": bool(a.get("starter")),
+                    "did_not_play": dnp, "reason": a.get("reason"),
+                    "points": _num(at(st, "points", "PTS")), "rebounds": _num(at(st, "rebounds", "REB")),
+                    "offensive_rebounds": _num(at(st, "offensiverebounds", "OREB")), "assists": _num(at(st, "assists", "AST")),
+                    "three_point_field_goals_made": _num(tp[0]), "three_point_field_goals_attempted": _num(tp[-1]),
+                    "field_goals_made": _num(fg[0]), "field_goals_attempted": _num(fg[-1]), "free_throws_attempted": _num(ft[-1]),
+                    "turnovers": _num(at(st, "turnovers", "TO")), "steals": _num(at(st, "steals", "STL")),
+                    "blocks": _num(at(st, "blocks", "BLK")), "team_score": _num(me.get("score")),
+                    "opponent_team_score": _num(them.get("score"))})
+    return rows
+
+
+def save_espn_box(day: str, log=print, days: int = BOX_DAYS) -> dict:
+    """Finals of the last `days` days before `day` (US Eastern dates), saved as espn_box/{date}.json."""
+    out = {}
+    d0 = datetime.strptime(day, "%Y-%m-%d")
+    for k in range(1, days + 1):
+        dd = (d0 - timedelta(days=k)).strftime("%Y-%m-%d")
+        dest = sources.archive_dir() / "espn_box" / f"{dd}.json"
+        try:
+            board, _ = _get_json(f"{sources.ESPN}/scoreboard", {"dates": dd.replace("-", "")})
+            events = [e for e in board.get("events", [])  # type: ignore[union-attr]
+                      if ((e.get("status") or {}).get("type") or {}).get("completed")]
+            prev = json.loads(dest.read_text()) if dest.exists() else {"games": {}}
+            games = prev.get("games", {})
+            for e in events:
+                if str(e["id"]) in games:
+                    continue
+                summary, _ = _get_json(f"{sources.ESPN}/summary", {"event": e["id"]})
+                rows = parse_espn_box(summary, dd)  # type: ignore[arg-type]
+                if rows:
+                    games[str(e["id"])] = rows
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps({"date": dd, "fetched_at": utcnow(), "games": games}))
+            out[dd] = {"finals": len(events), "saved": len(games)}
+            log(f"nba: ESPN box scores {dd}: {len(games)} of {len(events)} finals saved")
+        except Exception as ex:  # noqa: BLE001 - the sportsdataverse file still arrives later
+            out[dd] = {"error": str(ex)}
+            log(f"nba: ESPN box scores {dd} not saved ({ex})")
+    return out
+
+
 def run(log=print, force_odds: bool = False, force_files: bool = False) -> dict:
     day = today_et()
     files = download_files(log=log, force=force_files)
     status = {"date": day, "ran_at": utcnow(), "files": files, "box_scores": summarize_box(),
-              "espn": save_espn(day, log), "official_injuries": save_official_injuries(day, log), "rosters": save_rosters(day, log), "espn_props": save_espn_props(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
+              "espn": save_espn(day, log), "espn_box": save_espn_box(day, log), "official_injuries": save_official_injuries(day, log), "rosters": save_rosters(day, log), "espn_props": save_espn_props(day, log), "odds": save_odds(day, log, force_odds), "license": sources.LICENSE_NOTE}
     arch = sources.archive_dir()
     arch.mkdir(parents=True, exist_ok=True)
     (arch / "status.json").write_text(json.dumps(status, indent=2))
