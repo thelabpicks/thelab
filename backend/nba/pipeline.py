@@ -139,14 +139,15 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
     odds = book_odds(today)
     # Due is shown only in markets where, in testing, such players beat their projection at least as often as others.
     due_markets = {m for m, v in due["markets"].items() if v["beat_projection"] >= v["others_beat_projection"]}
-    rows = slate_json(proj, f, oos, reports, odds, due_markets) if len(proj) else []
+    book_cal = book_calibration(d, log=log)
+    rows = slate_json(proj, f, oos, reports, odds, due_markets, book_cal) if len(proj) else []
     # Free plan: buy real prop lines for the likeliest picks' games and markets, then rebuild the rows at those lines.
     if rows and not odds["props"] and len(slate) and str(slate.game_date.min().date()) == today and props_posted():
         teams = {g.game_id: (g.home_abbreviation, g.away_abbreviation) for g in slate.itertuples()}
         got = collect.fetch_props(today, prop_targets(rows, teams), log=log)
         if got.get("prices"):
             odds = book_odds(today)
-            rows = slate_json(proj, f, oos, reports, odds, due_markets)
+            rows = slate_json(proj, f, oos, reports, odds, due_markets, book_cal)
     games = [{"game_id": g.game_id, "date": str(g.game_date.date()), "time": g.game_date_time, "home": g.home_abbreviation,
               "away": g.away_abbreviation, **odds["games"].get((g.home_abbreviation, g.away_abbreviation), {})}
              for g in slate.itertuples()]
@@ -177,7 +178,7 @@ def run(out: Path, log=print, today: str | None = None) -> dict:
               "slate_date": slate_date, "slate_games": len(games), "projected_players": len({r["player_id"] for r in rows}),
               "validated_markets": sorted(validated), "recency_half_life_seasons": props.RECENCY_HALF_LIFE,
               "team_check": {k: v for k, v in team_fit.items() if k != "fit_on_earlier"},
-              "frozen": frozen, "license": sources.LICENSE_NOTE,
+              "frozen": frozen, "book_calibration": book_cal, "license": sources.LICENSE_NOTE,
               "injuries_as_of": next(iter(predict.injuries().values()), {}).get("as_of")}
     _write(out, "status.json", status)
     log(f"nba: wrote site data for {slate_date} ({len(rows)} rows, {len(players)} player pages) in {status['seconds']:.0f}s")
@@ -228,7 +229,8 @@ def plausible_line(line: float, mean: float) -> bool:
     return abs(line - mean) <= max(3.0, 0.3 * mean)
 
 
-def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, odds: dict, due_markets: set[str]) -> list[dict]:
+def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, odds: dict, due_markets: set[str],
+               book_cal: dict | None = None) -> list[dict]:
     played = f[f.played].sort_values("game_date")
     last = {m: played.groupby("player_id")[m].apply(lambda s: s.tail(10).tolist()[::-1]) for m in props.MARKETS}
     mins = played.groupby("player_id").minutes.apply(lambda s: s.tail(10).tolist()[::-1])
@@ -248,6 +250,9 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
         dist = r.dist
         validated = reports[m]["validated"]
         po = p_over_dist(dist, line) if validated else None
+        po_raw = po
+        if po is not None and book_line is not None and book_cal:
+            po = apply_book_cal(po, book_cal)
         recent = last[m].get(r.player_id, [])
         rows.append({
             "player_id": str(int(r.player_id)), "player_name": r.player_name, "team": r.team, "opp": r.opp, "pos": r.pos,
@@ -255,7 +260,7 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
             "injury_note": r.injury_note or None, "out": bool(r.out), "market": m, "mean": r.mu, "q10": r.q10, "q90": r.q90,
             "line": line, "line_source": "book" if book_line is not None else "usual", "usual_line": r.line, "dk_line": dk_line,
             "milestones": collect.pick_ladder(odds.get("dk_ladder", {}).get((str(int(r.player_id)), m), {}), dk_line),
-            "dist": dist if validated else None, "p_over": po,
+            "dist": dist if validated else None, "p_over": po, "p_over_raw": po_raw,
             "offers": [o for o in offers if o["line"] == line] if book_line is not None else [],
             "recent": recent, "recent_minutes": mins.get(r.player_id, []),
             "evidence": {"minutes": r.min_s, "minutes_long": r.min_l, "minutes_expected": _num(r.min_exp),
@@ -296,6 +301,90 @@ def p_over_dist(dist: dict, line: float) -> float:
     return min(0.995, max(0.005, 1 / (1 + math.exp(-z))))
 
 
+# --------------------------------------------------------------------------- chances at real book lines
+# The model's chances are calibrated on each player's usual line (median of his last 10), where it has years of games.
+# Book lines are sharper: from 2026-10-26 to 11-04, leans it called 65%+ at a posted line hit about 58%, not 70%. So
+# chances at a book line are re-fitted (Platt: logit-linear, which keeps every pick's rank) on the frozen leans at book
+# lines already graded, and used only while that refit beats the raw chances on each later day it never saw.
+BOOK_CAL_MIN_ROWS = 1000
+BOOK_CAL_MIN_DAYS = 5
+BOOK_CAL_FIRST_FIT_DAYS = 3
+
+
+def _logit1(p: float) -> float:
+    p = min(1 - 1e-4, max(1e-4, p))
+    return math.log(p / (1 - p))
+
+
+def apply_book_cal(p: float, cal: dict) -> float:
+    z = cal["a"] * _logit1(p) + cal["b"]
+    return min(0.995, max(0.005, 1 / (1 + math.exp(-z))))
+
+
+def book_rows(d: pd.DataFrame) -> pd.DataFrame:
+    """Every frozen lean at a book line whose result is in: date, the model's raw chance of the over, and the outcome."""
+    box = d[d.played].set_index(["game_id", "player_id"])
+    rows = []
+    for fp in sorted((sources.archive_dir() / "picks").glob("*.json")):
+        s = json.loads(fp.read_text())
+        for p in s["picks"]:
+            if p.get("line_source") != "book":
+                continue
+            key = (int(float(p["game_id"])), int(float(p["player_id"])))
+            if key not in box.index:
+                continue
+            val = float(box.loc[key, p["market"]])
+            if val == p["line"]:
+                continue
+            raw = p.get("p_over_raw")
+            rows.append({"date": s["date"], "raw": float(p["p_over"] if raw is None else raw), "over": int(val > p["line"])})
+    return pd.DataFrame(rows, columns=["date", "raw", "over"])
+
+
+def _fit_platt_book(r: pd.DataFrame) -> tuple[float, float]:
+    from sklearn.linear_model import LogisticRegression  # noqa: PLC0415
+    x = r.raw.clip(1e-4, 1 - 1e-4)
+    lr = LogisticRegression(C=1e3).fit(np.log(x / (1 - x)).to_numpy()[:, None], r.over.to_numpy())
+    return float(lr.coef_[0][0]), float(lr.intercept_[0])
+
+
+def _logloss(y: np.ndarray, p: np.ndarray) -> float:
+    p = np.clip(p, 1e-4, 1 - 1e-4)
+    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+
+
+def book_calibration(d: pd.DataFrame, log=print) -> dict | None:
+    """Platt refit of the chances at book lines, or None while there are too few graded days or it does not beat the
+    raw chances walk-forward (each day predicted from a fit on earlier days only)."""
+    try:
+        r = book_rows(d)
+    except Exception as ex:  # noqa: BLE001 - the site still builds on the raw chances
+        log(f"nba book calibration: skipped ({ex})")
+        return None
+    days = sorted(r.date.unique())
+    if len(r) < BOOK_CAL_MIN_ROWS or len(days) < BOOK_CAL_MIN_DAYS:
+        log(f"nba book calibration: not used ({len(r)} graded book leans over {len(days)} days)")
+        return None
+    raw_ll, cal_ll, n_test, better = 0.0, 0.0, 0, 0
+    for day in days[BOOK_CAL_FIRST_FIT_DAYS:]:
+        a, b = _fit_platt_book(r[r.date < day])
+        t = r[r.date == day]
+        y = t.over.to_numpy()
+        pc = np.array([apply_book_cal(p, {"a": a, "b": b}) for p in t.raw])
+        lr, lc = _logloss(y, t.raw.to_numpy()), _logloss(y, pc)
+        raw_ll += lr * len(t)
+        cal_ll += lc * len(t)
+        n_test += len(t)
+        better += int(lc < lr)
+    a, b = _fit_platt_book(r)
+    out = {"a": round(a, 4), "b": round(b, 4), "rows": int(len(r)), "days": len(days), "test_rows": n_test,
+           "test_days": len(days) - BOOK_CAL_FIRST_FIT_DAYS, "days_better": better,
+           "log_loss_raw": round(raw_ll / n_test, 4), "log_loss_refit": round(cal_ll / n_test, 4)}
+    use = cal_ll < raw_ll
+    log(f"nba book calibration: use={use} {out}")
+    return out if use else None
+
+
 # --------------------------------------------------------------------------- frozen leans and the live record
 def freeze(day: str, rows: list[dict], tips: dict | None = None, now: datetime | None = None) -> dict:
     """Save the day's leans before tip-off. A later run the same day (the pre-tip refresh with the latest injury news)
@@ -308,6 +397,7 @@ def freeze(day: str, rows: list[dict], tips: dict | None = None, now: datetime |
         return {"date": day, "kept": True}
     picks = [{"player_id": r["player_id"], "player_name": r["player_name"], "team": r["team"], "game_id": r["game_id"],
               "market": r["market"], "line": r["line"], "line_source": r["line_source"], "p_over": round(r["p_over"], 4),
+              "p_over_raw": round(r["p_over_raw"], 4) if r.get("p_over_raw") is not None else None,
               "mean": round(float(r["mean"]), 2) if r.get("mean") is not None else None,
               "proj_minutes": round(float((r.get("evidence") or {}).get("minutes") or 0), 1) or None, "injury": r.get("injury"), "frozen_at": utcnow(), "offers": r["offers"]}
              for r in rows if r["p_over"] is not None and not r["out"] and r["line"] >= report.MIN_LINE and r["game_id"] not in started]
