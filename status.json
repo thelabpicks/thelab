@@ -1,6 +1,6 @@
 {
   "date": "2026-11-05",
-  "ran_at": "2026-11-05T09:45:46+00:00",
+  "ran_at": "2026-11-05T16:52:36+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -37,19 +37,19 @@
     {
       "file": "player_box_2027.csv",
       "status": "downloaded",
-      "bytes": 1477054
+      "bytes": 1669076
     },
     {
       "file": "nba_schedule_2027.csv",
       "status": "downloaded",
-      "bytes": 2666476
+      "bytes": 2743434
     }
   ],
   "box_scores": {
     "season": 2027,
-    "games": 107,
-    "player_rows": 2414,
-    "last_game_date": "2026-11-02"
+    "games": 121,
+    "player_rows": 2730,
+    "last_game_date": "2026-11-04"
   },
   "espn": {
     "injuries": {
@@ -61,10 +61,24 @@
       "items": 2
     }
   },
+  "espn_box": {
+    "2026-11-04": {
+      "finals": 14,
+      "saved": 14
+    },
+    "2026-11-03": {
+      "finals": 0,
+      "saved": 0
+    },
+    "2026-11-02": {
+      "finals": 15,
+      "saved": 15
+    }
+  },
   "official_injuries": {
     "saved": "2026-11-05.json",
     "players": 9,
-    "report": "Injury-Report_2026-11-05_04_30AM.pdf"
+    "report": "Injury-Report_2026-11-05_11_45AM.pdf"
   },
   "rosters": {
     "teams": 30,
@@ -72,26 +86,11 @@
   },
   "espn_props": {
     "saved": "2026-11-05.json",
-    "lines": 86,
+    "lines": 116,
     "errors": {}
   },
   "odds": {
-    "saved": "2026-11-05.json",
-    "game_lines": 0,
-    "props": 0,
-    "budget": {
-      "plan": "free",
-      "allowance": 500.0,
-      "reserve": 200.0,
-      "remaining": 488.0,
-      "game_lines": false,
-      "espn_lines": true,
-      "props": false,
-      "cost": 0,
-      "reason": "free plan: player props need a paid plan"
-    },
-    "credits_remaining": 488.0,
-    "errors": []
+    "kept": "2026-11-05.json"
   },
   "license": "NBA box scores and schedules: sportsdataverse / hoopR (ESPN data), https://github.com/sportsdataverse/sportsdataverse-data. Injuries and scoreboard: ESPN public site feed."
 }
