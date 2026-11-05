@@ -142,6 +142,11 @@ describe("nbaCandidates", () => {
     expect(c[0].tier).toBe("Strong");
     expect(c[0].sections.length).toBeGreaterThan(2);
     expect(c[0].kickoff).toBe("2026-10-24T23:30:00Z");
+    // once kinds of pick are proven at book lines, only those kinds stay (these rows are points overs)
+    const sides = { record: [], min_lean: 0.6, min_n: 40, min_rate: 0.55 };
+    expect(nbaCandidates({ ...slate, book_sides: { ...sides, proven: ["points:under"] } }, { conf })).toEqual([]);
+    expect(nbaCandidates({ ...slate, book_sides: { ...sides, proven: ["points:over"] } }, { conf }).length).toBe(5);
+    expect(nbaCandidates({ ...slate, book_sides: null }, { conf }).length).toBe(5);
   });
 });
 

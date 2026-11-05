@@ -59,3 +59,19 @@ def test_refit_uses_the_raw_chance_saved_with_each_lean(tmp_path, monkeypatch):
     f.write_text(json.dumps(s))
     r = pipeline.book_rows(d)
     assert r.raw.std() > 0.1 and (r.raw != 0.5).all()
+
+
+def test_only_kinds_of_pick_that_won_at_book_lines_are_proven(tmp_path, monkeypatch):
+    d = _archive(tmp_path, monkeypatch, overconfident=True)
+    s = pipeline.book_sides(d, log=lambda *a: None)
+    # every lean is points; overconfident leans of 60%+ hit about 56-60% on both sides here
+    assert s is not None and set(s["proven"]) <= {"points:over", "points:under"}
+    assert all(x["n"] >= 40 for x in s["record"] if f"{x['market']}:{x['side']}" in s["proven"])
+    # unders that always lose are never proven
+    for fp in (tmp_path / "archive" / "picks").glob("*.json"):
+        js = json.loads(fp.read_text())
+        for p in js["picks"]:
+            p["p_over"] = 0.2
+        fp.write_text(json.dumps(js))
+    d.loc[:, "points"] = 12.0
+    assert pipeline.book_sides(d, log=lambda *a: None) is None
