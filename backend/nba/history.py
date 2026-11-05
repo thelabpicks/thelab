@@ -5,6 +5,8 @@ and same-day games never see each other). Seasons are named by the year they end
 """
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -29,6 +31,8 @@ def load_box(first: int | None = None, last: int = sources.CURRENT_SEASON) -> pd
     if not frames:
         raise FileNotFoundError(f"No NBA box scores in {sources.raw_dir()}; run python -m nba.collect first")
     d = pd.concat(frames, ignore_index=True)
+    if last == sources.CURRENT_SEASON:
+        d = add_espn_box(d)
     d = d[d.team_abbreviation.isin(sources.NBA_TEAMS) & d.opponent_team_abbreviation.isin(sources.NBA_TEAMS)]
     d = d.rename(columns={"athlete_id": "player_id", "athlete_display_name": "player_name", "team_abbreviation": "team",
                           "opponent_team_abbreviation": "opp", "three_point_field_goals_made": "threes",
@@ -49,6 +53,23 @@ def load_box(first: int | None = None, last: int = sources.CURRENT_SEASON) -> pd
     d["starter"] = d.starter.fillna(False).astype(bool).astype(int)
     d = d.drop_duplicates(["game_id", "player_id"]).sort_values(["game_date", "game_id", "team", "player_id"])
     return d.reset_index(drop=True)
+
+
+def add_espn_box(d: pd.DataFrame) -> pd.DataFrame:
+    """Games the sportsdataverse file does not have yet, from the ESPN finals the collector saves (espn_box/), so last
+    night's games are graded and learned from the next morning instead of a day or two later."""
+    rows = []
+    for f in sorted((sources.archive_dir() / "espn_box").glob("*.json")):
+        try:
+            for g in json.loads(f.read_text()).get("games", {}).values():
+                rows.extend(g)
+        except (OSError, ValueError):
+            continue
+    if not rows:
+        return d
+    e = pd.DataFrame(rows)
+    e = e[~e.game_id.isin(set(pd.to_numeric(d.game_id, errors="coerce").dropna().astype(int)))]
+    return d if e.empty else pd.concat([d, e[[c for c in COLS if c in e.columns]]], ignore_index=True)
 
 
 def team_games(d: pd.DataFrame) -> pd.DataFrame:
