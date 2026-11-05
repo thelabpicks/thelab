@@ -107,9 +107,8 @@ export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
     if (r.injury && !/probable/i.test(r.injury)) continue;
     const lean = leanOf(r);
     if (!lean) continue;
-    // Only kinds of pick proven at book lines (backend nba/pipeline.py book_sides): overs have lost there while unders won.
-    const proven = slate.book_sides?.proven;
-    if (proven?.length && !proven.includes(`${r.market}:${lean.side}`)) continue;
+    // No rule by kind of pick (Andrew, 2026-11-05): every line stands on its own chance, which the pipeline re-fits
+    // to how leans at real book lines have done (nba/pipeline.py book_calibration).
     const t = nbaTier(ctx.conf, lean.p);
     if (!t || t.tier === "Coin flip" || t.rate == null || t.rate < 0.5) continue;
     out.push(nbaPick(r, lean.side, lean.p, t, games.get(r.game_id)!, ctx));
