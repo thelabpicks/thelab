@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, cfbCandidates, chooseDaily, grade, nbaCandidates, publish, rankBoard, tally, type LabPick } from "./lab";
+import { advance, cfbCandidates, chooseDaily, confidenceOf, grade, nbaCandidates, publish, rankBoard, tally, type LabPick } from "./lab";
 import type { AltLine, CfbGame } from "./cfb";
 import type { NbaConfidence, NbaRow, Slate } from "./nba";
 
@@ -11,15 +11,16 @@ const pick = (o: Partial<LabPick>): LabPick => ({
 const sports = { nfl: { loaded: true, candidates: 0 }, nba: { loaded: true, candidates: 0 }, cfb: { loaded: true, candidates: 0 } };
 
 describe("rankBoard", () => {
-  it("ranks the likeliest to hit first, one per game and per player, numbered from 1", () => {
-    const b = rankBoard([
+  const six = () => [
       pick({ id: "a", chance: 0.70, game_id: "1", player_id: "p1" }),
       pick({ id: "b", chance: 0.82, game_id: "1", player_id: "p2" }),
       pick({ id: "c", sport: "cfb", chance: 0.66, score: 9.7, game_id: "1" }),
       pick({ id: "d", chance: 0.75, game_id: "2", player_id: "p2" }),
       pick({ id: "e", chance: 0.74, game_id: "3", player_id: "p3", line_source: "usual" }),
       pick({ id: "f", chance: 0.74, game_id: "4", player_id: "p4" }),
-    ]);
+  ];
+  it("ranks the likeliest to hit first, one per game and per player, numbered from 1", () => {
+    const b = rankBoard(six(), 10, false);
     // a high college value rating does not lift a 66% pick above more likely ones
     expect(b.map((p) => [p.id, p.rank])).toEqual([["b", 1], ["f", 2], ["e", 3], ["c", 4]]);
   });
@@ -31,6 +32,17 @@ describe("rankBoard", () => {
       expect(l.map((p) => p.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       expect(l[0].id).toBe(`${sp}11`);
     }
+  });
+  it("fills a short list from the same games and players, still ranked by chance (Andrew, 2026-11-06: always 10)", () => {
+    expect(rankBoard(six()).map((p) => [p.id, p.rank])).toEqual([["b", 1], ["d", 2], ["f", 3], ["e", 4], ["a", 5], ["c", 6]]);
+    // a two-game night still lists 10, spread over both games' players first
+    const two = Array.from({ length: 12 }, (_, i) => pick({ id: `x${i}`, game_id: String(i % 2), player_id: `p${i}`, chance: 0.5 + i / 100 }));
+    const b = rankBoard(two);
+    expect(b.length).toBe(10);
+    expect(b[0].id).toBe("x11");
+  });
+  it("tags each pick with how much to trust it", () => {
+    expect([0.72, 0.62, 0.57, 0.52].map((c) => confidenceOf(c).label)).toEqual(["Top confidence", "Bet", "Lean", "Risky"]);
   });
   it("stops at 10 and returns fewer when fewer qualify", () => {
     expect(rankBoard(Array.from({ length: 14 }, (_, i) => pick({ game_id: String(i), player_id: String(i) }))).length).toBe(10);
@@ -113,7 +125,7 @@ describe("frozen NBA picks at whole-number lines", () => {
 });
 
 describe("nbaCandidates", () => {
-  it("keeps proven leans of stars sure to play at lines DraftKings posts, each with a write-up", () => {
+  it("keeps every lean at a posted line for players sure to play; picks of the day only from proven stars at DraftKings lines", () => {
     const dk = (line: number) => (["over", "under"] as const).map((side) => ({ book: "draftkings", side, line, price: -110 }));
     // each row its own team, so each is that team's top scorer unless a test says otherwise
     const at = (id: string, mu: number, line: number, extra: Partial<NbaRow> = {}) =>
@@ -136,15 +148,17 @@ describe("nbaCandidates", () => {
         // a bench player is no star either
         at("14", 25.5, 21.5, { evidence: { ...nbaRow("14", 1, 1, 1).evidence, start_rate: 0.1 } })] };
     const c = nbaCandidates(slate, { conf });
-    // row 2 is a coin flip (an unproven tier), so it stays off even without a chance floor
-    expect(c.map((p) => p.player_id)).toEqual(["1", "8", "10", "11", "12"]);
+    // the top 10 takes every posted line (row 2 is a coin flip and shows as risky; 9, 13 and 14 are not stars at
+    // DraftKings lines); picks of the day only take proven stars
+    expect(c.map((p) => p.player_id)).toEqual(["1", "2", "8", "9", "10", "11", "12", "13", "14"]);
+    expect(c.filter((p) => p.potd).map((p) => p.player_id)).toEqual(["1", "8", "10", "11", "12"]);
     expect(c[0].chance).toBeGreaterThanOrEqual(0.7);
     expect(c[0].tier).toBe("Strong");
     expect(c[0].sections.length).toBeGreaterThan(2);
     expect(c[0].kickoff).toBe("2026-10-24T23:30:00Z");
     // the book-line record by kind of pick is information only: no kind is filtered out (points overs stay)
     const sides = { record: [], min_lean: 0.6, min_n: 40, min_rate: 0.55 };
-    expect(nbaCandidates({ ...slate, book_sides: { ...sides, proven: ["points:under"] } }, { conf }).length).toBe(5);
+    expect(nbaCandidates({ ...slate, book_sides: { ...sides, proven: ["points:under"] } }, { conf }).length).toBe(9);
   });
 });
 
@@ -163,7 +177,8 @@ describe("cfbCandidates", () => {
     const g = game({ alts: [alt({ price: -900, chance: 0.95, implied: 0.9 }), alt({}), alt({ line: -7.5, price: -250, chance: 0.8, implied: 0.71 }),
       alt({ market: "total", side: "over", line: 38.5, chance: 0.9, implied: 0.92, price: -500 })] });
     const c = cfbCandidates({ generated_at: "", games: [g], picks: [], odds: { books_games: 1, espn_games: 0, no_line: 0 } }, {});
-    expect(c.map((p) => [p.bet, p.price, p.tier])).toEqual([["Alabama -3.5 (alt spread)", -350, "Alt line"]]);
+    // the less likely favorite stays as a top 10 fill-in only, never a pick of the day
+    expect(c.map((p) => [p.bet, p.price, p.tier, p.potd])).toEqual([["Alabama -3.5 (alt spread)", -350, "Alt line", undefined], ["Alabama to win (ML -700)", -700, "Favorite", false]]);
     expect(grade(c[0], { cfb: { "7": [24, 20] } })?.result).toBe("won");
     // no alternate lines loaded: the favorite stands
     expect(cfbCandidates({ generated_at: "", games: [game()], picks: [], odds: { books_games: 1, espn_games: 0, no_line: 0 } }, {})[0].tier).toBe("Favorite");

@@ -5,7 +5,7 @@
    frozen as shown and graded after the final, so the record is never written with hindsight. */
 import { ALT_MIN_PRICE, altPool, anyPool, gameLabel, isProven, answerWhy, type AskData, type Pick } from "./ask";
 import { easternToUtc } from "./static";
-import { bestOffer, leanOf, marketLabel, MIN_LINE, nbaTier, starsOf, suggestable, type NbaRow, type Slate } from "./nba";
+import { bestOffer, leanOf, marketLabel, MIN_LINE, nbaTier, plausibleLine, starsOf, suggestable, surePlay, type NbaRow, type Slate } from "./nba";
 import type { AskContext as NbaCtx } from "./nbaAsk";
 import { explainRow } from "./nbaAsk";
 import { bookName as cfbBook, fmtPrice, pickText, tierOf, type Backtest, type CfbPick, type PropRow as CfbPropRow, type Team, type Week } from "./cfb";
@@ -31,12 +31,23 @@ export type LabPick = {
   tier: string | null; tier_rate: number | null; tier_n: number | null;
   headline: string; sections: Section[]; link: string;
   rank?: number; frozen_at?: string; result?: LabResult; actual?: string;
+  /** false: on the top 10 only, never a pick of the day (NBA non-stars or unproven tiers). */
+  potd?: boolean;
 };
 
-/** Each sport lists its 10 likeliest picks; 70%+ is called out as top confidence. Picks are still limited to each
- *  sport's own pool (proven NFL and NBA tiers; college: favorites to win outright and bets rated 7+). */
+/** Each sport always lists its 10 likeliest picks (Andrew, 2026-11-06), each tagged with how much to trust it. The
+ *  chance is the calibrated one (NBA: re-fit to how leans at real book lines have done), so the tag reads straight off it. */
 export const SURE = 0.7;
 export const BOARD_SIZE = 10;
+/** 60%+ is a bet (the picks-of-the-day floor), 55-60% a lean, under 55% close to a coin flip. */
+export const BET = 0.6, LEAN = 0.55;
+export type Confidence = { label: string; tone: "ok" | "accent" | "warn" | "danger"; advice: string };
+export function confidenceOf(chance: number): Confidence {
+  if (chance >= SURE) return { label: "Top confidence", tone: "ok", advice: "The strongest plays: bet it." };
+  if (chance >= BET) return { label: "Bet", tone: "accent", advice: "Passes the 60% bar: a normal-size bet." };
+  if (chance >= LEAN) return { label: "Lean", tone: "warn", advice: "Slight edge: a small bet, or leave it." };
+  return { label: "Risky", tone: "danger", advice: "Close to a coin flip: only as a long shot, or lean away." };
+}
 /** No pick shorter than this price: a -5000 favorite risks 50 to win 1, so one loss erases a month of wins and bettors
  *  read it as a padded record. At -500 a pick needs 83% to break even, which the calibrated favorites clear. */
 export const BOARD_MIN_PRICE = -500;
@@ -90,41 +101,39 @@ function nflPick(d: AskData, p: Pick, kickoff: string): LabPick {
 
 /* ------------------------------------------------------------------ NBA */
 
-/** The NBA's strongest leans (the home page list): 20+ minute players not listed Out, proven tier, 6.0+. */
+/** Every NBA lean at a line a book really posts, for players sure to play (20+ usual minutes, not on the injury report
+ *  bar probable). Stars in a tier proven 50%+ can also be picks of the day; the rest are top 10 only. */
 export function nbaCandidates(slate: Slate, ctx: NbaCtx): LabPick[] {
   const games = new Map(slate.games.map((g) => [g.game_id, g]));
   const out: LabPick[] = [];
   const stars = starsOf(slate.rows);
   for (const r of slate.rows) {
     if (r.out || r.evidence.minutes_long < 20 || r.line < MIN_LINE || !games.has(r.game_id)) continue;
-    // stars only, at a line DraftKings posts (nba.ts suggestable: the same rule as the NBA home's leans)
-    if (!suggestable(r, stars)) continue;
-    // Without a book line the line is the player's usual one. When this game's projection sits far from it (a role or
-    // minutes change), no book will post that line, so a near-certain under against it is not a real pick.
-    // Only lines a book really posts (the pipeline buys them for the likeliest picks' games), and only players sure to
-    // play: anyone on the injury report (bar probable) is out of the list.
-    if (r.line_source !== "book") continue;
-    if (r.injury && !/probable/i.test(r.injury)) continue;
+    // Only lines a book really posts, near what the player normally does (a whole-number line is a milestone or
+    // in-game line, never a pregame one: advance() voids those)
+    if (r.line_source !== "book" || !plausibleLine(r.line, r.mean) || Number.isInteger(r.line)) continue;
+    if (!surePlay(r)) continue;
     const lean = leanOf(r);
     if (!lean) continue;
     // No rule by kind of pick (Andrew, 2026-11-05): every line stands on its own chance, which the pipeline re-fits
     // to how leans at real book lines have done (nba/pipeline.py book_calibration).
     const t = nbaTier(ctx.conf, lean.p);
-    if (!t || t.tier === "Coin flip" || t.rate == null || t.rate < 0.5) continue;
-    out.push(nbaPick(r, lean.side, lean.p, t, games.get(r.game_id)!, ctx));
+    const proven = !!t && t.tier !== "Coin flip" && t.rate != null && t.rate >= 0.5;
+    // picks of the day: stars only, at a line DraftKings posts (nba.ts suggestable), from proven tiers
+    out.push({ ...nbaPick(r, lean.side, lean.p, t, games.get(r.game_id)!, ctx), potd: proven && suggestable(r, stars) });
   }
   return out;
 }
 
-function nbaPick(r: NbaRow, side: "over" | "under", p: number, t: NonNullable<ReturnType<typeof nbaTier>>, g: Slate["games"][number], ctx: NbaCtx): LabPick {
+function nbaPick(r: NbaRow, side: "over" | "under", p: number, t: ReturnType<typeof nbaTier>, g: Slate["games"][number], ctx: NbaCtx): LabPick {
   const off = bestOffer(r, side);
   const label = marketLabel(r.market);
   return {
     id: `nba:${r.game_id}:${r.player_id}:${r.market}`, sport: "nba", game_id: String(r.game_id), kickoff: g.time, matchup: `${g.away} at ${g.home}`,
     bet: `${r.player_name} ${side} ${r.line} ${label.toLowerCase()}`, who: r.player_name, player_id: r.player_id, market: r.market, market_label: label,
     side, line: r.line, line_source: r.line_source, price: off?.price ?? null, book: off ? cfbBook(off.book) : null,
-    score: r1(p * 10), chance: p, tier: t.tier, tier_rate: t.rate, tier_n: t.n,
-    headline: `Projects ${r.mean.toFixed(1)} against a line of ${r.line}; ${t.tier} leans have hit ${pct0(t.rate)} of ${t.n.toLocaleString()} unseen games.`,
+    score: r1(p * 10), chance: p, tier: t?.tier ?? null, tier_rate: t?.rate ?? null, tier_n: t?.n ?? null,
+    headline: `Projects ${r.mean.toFixed(1)} against a line of ${r.line}${t?.rate != null ? `; ${t.tier} leans have hit ${pct0(t.rate)} of ${t.n.toLocaleString()} unseen games` : ""}.`,
     sections: explainRow(r, side, ctx), link: `/nba/players/${r.player_id}`,
   };
 }
@@ -138,16 +147,21 @@ export type CfbCtx = { teams?: Team[]; bt?: Backtest; props?: CfbPropRow[] };
  *  favorites usually win out. */
 export function cfbCandidates(week: Week, ctx: CfbCtx): LabPick[] {
   const best = new Map<number, LabPick>();
-  const keep = (x: LabPick) => { const b = best.get(Number(x.game_id)); if (!b || x.chance > b.chance) best.set(Number(x.game_id), x); };
+  const rest: LabPick[] = [];
+  const keep = (x: LabPick) => { const b = best.get(Number(x.game_id)); if (!b || x.chance > b.chance) { if (b) rest.push({ ...b, potd: false }); best.set(Number(x.game_id), x); } else rest.push({ ...x, potd: false }); };
   for (const g of week.games) {
     const f = cfbFavorite(g, ctx); if (f) keep(f);
     const a = cfbAlt(g, ctx); if (a) keep(a);
   }
   for (const p of week.picks) {
     const g = week.games.find((x) => x.game_id === p.game_id);
-    if (g && cfbIsPick(p)) keep(cfbPick(p, g, ctx));
+    if (!g) continue;
+    // bets rated 7+ compete for the game's best pick; the game's other bets only fill out a short top 10
+    if (cfbIsPick(p)) keep(cfbPick(p, g, ctx));
+    else rest.push({ ...cfbPick(p, g, ctx), potd: false });
   }
-  return [...best.values()];
+  // each game's best pick first, so a thin night lists every game before a second bet on any of them
+  return [...best.values(), ...rest];
 }
 
 /** The model's favorite to win outright, at the best posted moneyline. The model's win chances are calibrated: the
@@ -245,19 +259,24 @@ export function byStrength(a: LabPick, b: LabPick): number {
     || (b.tier_rate ?? 0) - (a.tier_rate ?? 0) || b.score - a.score;
 }
 
-/** One sport's top picks, one per game and one per player, numbered 1 (most likely to hit) down. Fewer than n when fewer qualify. */
-export function rankBoard(cands: LabPick[], n = BOARD_SIZE): LabPick[] {
-  const games = new Set<string>(), players = new Set<string>();
-  const out: LabPick[] = [];
-  for (const c of [...cands].sort(byStrength)) {
-    const g = `${c.sport}:${c.game_id}`, pl = c.player_id ? `${c.sport}:${c.player_id}` : "";
-    if (games.has(g) || (pl && players.has(pl))) continue;
-    games.add(g);
-    if (pl) players.add(pl);
-    out.push({ ...c, rank: out.length + 1 });
-    if (out.length === n) break;
+/** One sport's top picks, numbered 1 (most likely to hit) down. Picks are spread out first (one per game and per
+ *  player); with fill, a short list is then topped up to n with more picks from the same games (still one per player,
+ *  then any pick), so a two-game night still lists 10. Ordered by chance either way. Fewer than n only when fewer exist. */
+export function rankBoard(cands: LabPick[], n = BOARD_SIZE, fill = true): LabPick[] {
+  const games = new Set<string>(), players = new Set<string>(), ids = new Set<string>();
+  const chosen: LabPick[] = [];
+  const sorted = [...cands].sort(byStrength);
+  for (const pass of fill ? [0, 1, 2] : [0]) {
+    for (const c of sorted) {
+      if (chosen.length === n) break;
+      const g = `${c.sport}:${c.game_id}`, pl = c.player_id ? `${c.sport}:${c.player_id}` : "";
+      if (ids.has(c.id) || (pass === 0 && games.has(g)) || (pass < 2 && pl && players.has(pl))) continue;
+      games.add(g); ids.add(c.id);
+      if (pl) players.add(pl);
+      chosen.push(c);
+    }
   }
-  return out;
+  return chosen.sort(byStrength).map((c, i) => ({ ...c, rank: i + 1 }));
 }
 
 /* ------------------------------------------------------------------ grading */
@@ -351,8 +370,8 @@ export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): Dail
       if (have.length >= DAILY_SIZE) continue;
       const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
       const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now && listable(p)
-        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && beatsPrice(p) && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
-      rankBoard(pool, DAILY_SIZE - have.length).forEach((p, i) => {
+        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && beatsPrice(p) && p.potd !== false && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
+      rankBoard(pool, DAILY_SIZE - have.length, false).forEach((p, i) => {
         const { frozen_at: _f, ...rest } = p;
         out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: now.toISOString() });
       });
@@ -412,7 +431,7 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): 
     // candidates counts qualifying picks before started games are dropped: some, but none left, means they have all started
     return n >= BOARD_SIZE ? null : !n && sports[sp]?.candidates ? "Every pick that qualified has already started. The next list posts with this sport's next refresh."
       : !n ? "No games with posted lines are left on the board right now."
-      : `Only ${n} ${n === 1 ? "pick is" : "picks are"} on the board right now (one per game and per player, from games that have not started).`
+      : `Only ${n} ${n === 1 ? "pick is" : "picks are"} on the board right now (only lines a book has posted, from games that have not started).`
         + (sp === "nba" ? " NBA picks use only prop lines a book really posts, bought late each morning (about 11 am Central) for the games of the day's likeliest picks." : "");
   };
   return {
