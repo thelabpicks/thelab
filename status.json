@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-05",
-  "ran_at": "2026-11-05T15:47:47+00:00",
+  "date": "2026-11-06",
+  "ran_at": "2026-11-06T15:38:01+00:00",
   "files": [
     {
       "file": "cfb_schedules_2010.csv",
@@ -159,8 +159,7 @@
     },
     {
       "file": "cfb_line_odds.csv.gz",
-      "status": "downloaded",
-      "bytes": 7047701
+      "status": "kept"
     },
     {
       "file": "pbp_stats_2014.csv",
@@ -212,27 +211,26 @@
     },
     {
       "file": "play_by_play_2026.parquet",
-      "status": "downloaded",
-      "bytes": 84755570
+      "status": "kept"
     }
   ],
   "espn": {
     "scoreboard": {
-      "saved": "2026-11-05.json",
-      "items": 66
+      "saved": "2026-11-06.json",
+      "items": 67
     },
     "rankings": {
-      "saved": "2026-11-05.json",
+      "saved": "2026-11-06.json",
       "items": 6
     },
     "finals": {
-      "games": 5,
-      "saved": "2026-11-05.json"
+      "games": 7,
+      "saved": "2026-11-06.json"
     }
   },
   "odds": {
     "skipped": "not a line day (Tuesday and Saturday)",
-    "credits_remaining": 482.0
+    "credits_remaining": 480.0
   },
   "license": "College football scores, schedules, closing lines and player stats: cfbfastR / CollegeFootballData.com, https://github.com/sportsdataverse/cfbfastR-data. Scoreboard: ESPN public site feed. Prices: The Odds API."
 }
