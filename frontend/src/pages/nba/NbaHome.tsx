@@ -1,8 +1,9 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Dices, MessageCircleQuestion } from "lucide-react";
-import { num, pct } from "@/lib/format";
-import { edgeOf, leanOf, marketLabel, nbaTier, score10, starsOf, suggestable, useNba, type NbaConfidence, type NbaStatus, type Slate } from "@/lib/nba";
+import { cn, num, pct } from "@/lib/format";
+import { edgeOf, leanOf, marketLabel, nbaTier, plausibleLine, score10, starsOf, suggestable, surePlay, useNba, type NbaConfidence, type NbaRow, type NbaStatus, type Slate } from "@/lib/nba";
+import { confidenceOf } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Button, Card, CardBody, CardHeader, Input, LoadingBlock, Notice, TeamBadge } from "@/components/ui";
 import { TierBadge } from "@/components/shared";
@@ -23,6 +24,16 @@ export default function NbaHome() {
     .map((r) => ({ r, lean: leanOf(r) })).filter((x) => x.lean && x.lean.p >= 0.6)
     .map((x) => ({ ...x, edge: edgeOf(x.r, x.lean), tier: nbaTier(conf.data, x.lean!.p) }))
     .sort((a, b) => b.lean!.p - a.lean!.p).slice(0, 12);
+  // Never an empty list on a game day (Andrew, 2026-11-06): under 5 star leans at 60%+, the next likeliest leans at real
+  // book lines for players sure to play fill it out, one per player, each tagged by confidence (Lean / Risky).
+  const used = new Set(picks.map((x) => x.r.player_id));
+  const fill = (d?.rows ?? []).filter((r) => r.line_source === "book" && surePlay(r) && plausibleLine(r.line, r.mean) && !Number.isInteger(r.line) && !used.has(r.player_id))
+    .map((r) => ({ r, lean: leanOf(r) })).filter((x) => x.lean)
+    .sort((a, b) => b.lean!.p - a.lean!.p)
+    .filter((x) => !used.has(x.r.player_id) && (used.add(x.r.player_id), true))
+    .slice(0, Math.max(0, 5 - picks.length))
+    .map((x) => ({ ...x, edge: edgeOf(x.r, x.lean), tier: nbaTier(conf.data, x.lean!.p), fill: true }));
+  const shown = [...picks.map((x) => ({ ...x, fill: false })), ...fill];
   const strong = conf.data?.props?.tiers.find((t) => t.tier === "Strong");
   return (
     <div className="space-y-5">
@@ -45,11 +56,11 @@ export default function NbaHome() {
           ))}
         </div>
       )}
-      {d && !!picks.length && (
+      {d && !!shown.length && (
         <Card>
           <CardHeader title="Strongest leans today" subtitle={strong?.rate != null ? `Leans of 6.5+ out of 10 hit ${pct(strong.rate, 0)} of ${strong.n.toLocaleString()} unseen games in testing` : "Each team's top scorers, at the line DraftKings posts"} />
           <div className="divide-y divide-line/60">
-            {picks.map(({ r, lean, edge, tier }) => (
+            {shown.map(({ r, lean, edge, tier, fill }) => (
               <Link key={`${r.player_id}-${r.market}`} to={`/nba/players/${r.player_id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-raised/50">
                 <Headshot src={r.headshot} name={r.player_name} size={32} />
                 <div className="min-w-0 flex-1">
@@ -58,14 +69,15 @@ export default function NbaHome() {
                 </div>
                 <div className="text-right">
                   <div className="font-semibold">{lean!.side === "over" ? "Over" : "Under"} {r.line} {marketLabel(r.market)}</div>
-                  <div className="flex items-center justify-end gap-1.5 text-xs text-muted"><span className="font-bold text-fg">{score10(lean!.p)}</span>/10 <TierBadge tier={tier} compact /></div>
+                  <div className="flex items-center justify-end gap-1.5 text-xs text-muted"><span className="font-bold text-fg">{score10(lean!.p)}</span>/10 {fill ? <FillTag r={r} p={lean!.p} /> : <TierBadge tier={tier} compact />}</div>
                 </div>
               </Link>
             ))}
           </div>
         </Card>
       )}
-      {d && d.games.length > 0 && !picks.length && <Notice title="No strong leans yet">{d.odds.props_priced ? "No star with a DraftKings line reaches 6.0 out of 10 today." : "Star picks appear once DraftKings posts player props, about 10 AM Eastern."} See all players on the props page.</Notice>}
+      {d && !!fill.length && <p className="-mt-3 px-1 text-xs text-muted">Fewer than 5 stars reach 6.0 today, so the list is filled with the next likeliest leans at real book lines, tagged by confidence. Lean and Risky plays are small bets at most.</p>}
+      {d && d.games.length > 0 && !shown.length && <Notice title="No strong leans yet">{d.odds.props_priced ? "No star with a DraftKings line reaches 6.0 out of 10 today." : "Star picks appear once DraftKings posts player props, about 10 AM Eastern."} See all players on the props page.</Notice>}
       {status.data && (
         <Card><CardBody className="text-xs text-muted">
           Built from {status.data.history.games.toLocaleString()} games since {status.data.history.first_season - 1}-{String(status.data.history.first_season).slice(2)} (the last two seasons count most; a game's weight halves every {status.data.recency_half_life_seasons} seasons).
@@ -75,4 +87,11 @@ export default function NbaHome() {
       )}
     </div>
   );
+}
+
+const TONE = { ok: "text-ok", accent: "text-accent", warn: "text-warn", danger: "text-danger" } as const;
+/** A fill-in lean's confidence tag (lab.ts confidenceOf: Top confidence 70%+, Bet 60%+, Lean 55-60%, Risky under 55%). */
+function FillTag({ p }: { r: NbaRow; p: number }) {
+  const c = confidenceOf(p);
+  return <span className={cn("font-semibold", TONE[c.tone])} title={c.advice}>{c.label}</span>;
 }

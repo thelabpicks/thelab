@@ -319,7 +319,10 @@ export function grade(p: LabPick, res: Results): { result: LabResult; actual: st
 /* ------------------------------------------------------------------ the weekly state */
 
 /** A pick of the day: locked once chosen, graded after the final, never swapped. */
-export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string; withdrawn?: boolean };
+export type DailyPick = LabPick & { date: string; slot: number; chosen_at: string; withdrawn?: boolean;
+  /** Shown only to fill a day with fewer than 3 real picks of the day: the sport's next likeliest top 10 picks, tagged by
+   *  confidence, never locked and never counted in the picks-of-the-day record (they are graded with the top 10). */
+  fill?: boolean };
 export type LabState = { updated_at: string | null; board: LabPick[]; frozen: LabPick[]; daily?: DailyPick[] };
 /** n/won/lost count only picks at a line a book posted. units: profit risking 1 unit a pick at the price shown (priced
  *  picks only; anytime-TD picks shown before Saturday's prices have none), roi = units / priced. unbooked: settled picks
@@ -448,9 +451,42 @@ function dailyBoard(s: LabState) {
   const all = s.daily ?? [];
   const settled = all.filter((d) => d.result);
   const order = (a: DailyPick, b: DailyPick) => SPORTS.indexOf(a.sport) - SPORTS.indexOf(b.sport) || a.slot - b.slot;
+  const picks = all.filter((d) => d.date >= today);
   return {
-    today, picks: all.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date) || order(a, b)),
+    today, picks: [...picks, ...fillDaily(s, picks, today)].sort((a, b) => a.date.localeCompare(b.date) || order(a, b)),
     recent: all.filter((d) => d.date < today).sort((a, b) => b.date.localeCompare(a.date) || order(a, b)).slice(0, 45),
     record: { ...tally(settled), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp))])) as Record<Sport, LabRecord> },
   };
+}
+
+/** Picks of the day are never left empty on a day a sport plays (Andrew, 2026-11-06). When fewer than 3 picks pass the
+ *  pick-of-the-day bar, the rest of the day's slots show that sport's next likeliest top 10 picks on that date (one per
+ *  game and per player, games already started included so the day does not empty out at tip-off). They carry fill: true,
+ *  are labelled by confidence on the page, are not locked, and never count toward the picks-of-the-day record. */
+export function fillDaily(s: LabState, real: DailyPick[], today: string): DailyPick[] {
+  const live = real.filter((d) => !d.withdrawn);
+  const out: DailyPick[] = [];
+  const pool = [...s.board, ...s.frozen.filter((p) => playDate(p.kickoff) >= today)];
+  for (const sp of SPORTS) {
+    const dates = [...new Set(pool.filter((p) => p.sport === sp).map((p) => playDate(p.kickoff)))].filter((d) => d >= today).sort();
+    for (const date of dates) {
+      const have = live.filter((d) => d.sport === sp && d.date === date);
+      if (have.length >= DAILY_SIZE) continue;
+      const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
+      const bets = new Set(have.map((d) => `${d.game_id}|${d.bet}`)), ids = new Set<string>();
+      const cands = pool.filter((p) => p.sport === sp && playDate(p.kickoff) === date && listable(p) && !bets.has(`${p.game_id}|${p.bet}`)
+        && !(p.player_id && players.has(p.player_id)) && !ids.has(p.id) && (ids.add(p.id), true));
+      // new games first; a one- or two-game night then tops up from the same games (rankBoard's fill passes)
+      const fresh = cands.filter((p) => !games.has(p.game_id));
+      const need = DAILY_SIZE - have.length;
+      const first = rankBoard(fresh, need);
+      const picked = new Set(first.map((p) => p.id));
+      const chosen = [...first, ...rankBoard(cands.filter((p) => !picked.has(p.id) && !first.some((f) => f.player_id && f.player_id === p.player_id)), need - first.length)];
+      chosen.slice(0, need).forEach((p, i) => {
+        const { frozen_at: _f, rank: _r, ...rest } = p;
+        out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: s.updated_at ?? new Date().toISOString(), fill: true });
+      });
+    }
+  }
+  return out;
 }

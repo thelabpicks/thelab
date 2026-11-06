@@ -245,6 +245,21 @@ describe("picks of the day", () => {
     expect(b.daily.recent[0].result).toBe("won");
     expect(b.daily.today).toBe("2026-10-25");
   });
+  it("fills a thin day with the next likeliest picks, labelled fill-ins that never count toward the record", () => {
+    // one real pick of the day (62%); the rest are under the 60% bar
+    const cands = [at(1, { chance: 0.62 }), at(2, { chance: 0.57 }), at(3, { chance: 0.53 }), at(4, { chance: 0.5 })];
+    const s = advance({ updated_at: null, board: [], frozen: [] }, cands, {}, now);
+    const b = publish(s, sports);
+    const today = b.daily.picks.filter((x) => x.date === "2026-10-24");
+    expect(today.map((x) => [x.id, x.slot, !!x.fill])).toEqual([["p1", 1, false], ["p2", 2, true], ["p3", 3, true]]);
+    // fill-ins are not locked into the state
+    expect(s.daily!.map((x) => x.id)).toEqual(["p1"]);
+    // a two-game night still shows 3, topping up from the same games with another player
+    const two = [at(1, { chance: 0.55 }), at(2, { chance: 0.54 }), pick({ id: "q", game_id: "1", player_id: "9", kickoff: "2026-10-25T00:00:00Z", chance: 0.52 })];
+    const b2 = publish(advance({ updated_at: null, board: [], frozen: [] }, two, {}, now), sports);
+    expect(b2.daily.picks.map((x) => x.id)).toEqual(["p1", "p2", "q"]);
+    expect(b2.daily.record.n).toBe(0);
+  });
 });
 
 describe("records", () => {
