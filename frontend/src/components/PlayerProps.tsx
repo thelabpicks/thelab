@@ -5,7 +5,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { estimatedLine, underReasons, overReasons, type PropRow } from "@/lib/ask";
-import { tierFor, useConfidence } from "@/lib/confidence";
+import { bookCal, tierFor, useConfidence } from "@/lib/confidence";
 import { feedLine, type Feed } from "@/lib/feed";
 import { cn, num, pct } from "@/lib/format";
 import { playable } from "@/lib/hitrates";
@@ -18,6 +18,7 @@ type MarketMeta = { market: string; label: string; validated: boolean };
 
 /** His validated markets this week with the line in play (book line, else his usual or projected line), strongest lean first. */
 export function usePlayerPropRows(playerId: string, season: number, week: number, feed: Feed) {
+  const conf = useConfidence();
   const markets = useQuery({ queryKey: ["props-markets"], queryFn: () => api.get<{ markets: MarketMeta[] }>("/props/markets") });
   const validated = (markets.data?.markets ?? []).filter((m) => m.validated);
   const props = useQueries({ queries: validated.map((m) => ({ queryKey: ["props", season, week, m.market],
@@ -28,7 +29,8 @@ export function usePlayerPropRows(playerId: string, season: number, week: number
     const book = feedLine(feed, m.market, playerId);
     const est = estimatedLine(r, m.market);
     const line = book ?? est.line;
-    const over = pOver(r.dist!, line);
+    // at a line a book posts, the chance is re-fit to how leans at book lines have really done (same as the picks)
+    const over = book != null ? bookCal(pOver(r.dist!, line), conf.data?.props?.book_calibration) : pOver(r.dist!, line);
     const lean = over >= 0.5 ? "over" as const : "under" as const;
     const leanP = Math.max(over, 1 - over);
     const rec = (r.recent ?? []).slice(0, 8);
