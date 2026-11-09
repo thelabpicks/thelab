@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -135,7 +135,7 @@ const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("
 
 /** The text of one sport's picks of the day, ready to post. */
 function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
-  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit`);
+  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our 60% bar)` : ""}`);
   return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines,
     r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }
@@ -153,6 +153,9 @@ function DailyCard({ b }: { b: LabBoard }) {
     <Card>
       <CardHeader title="Picks of the day" icon={<Trophy className="h-4 w-4 text-accent" />}
         subtitle={`Each sport's 3 likeliest picks for the day, locked when chosen and graded after the final. Record: ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}${unitsText(rec) ? `, ${unitsText(rec)}` : ""}`} />
+      {b.daily.picks.some((p) => p.fill) && <CardBody className="pb-0"><p className="text-xs text-muted">
+        On a day with fewer than 3 picks that clear the bar ({DAILY_MIN_CHANCE * 100}%+ and beating the price), the rest are the sport's next likeliest plays, tagged by confidence.
+        Those fill-ins can change until their game starts and aren't counted in the picks-of-the-day record (they're graded with the top 10).</p></CardBody>}
       {!groups.size && <CardBody><p className="text-sm text-muted">Today's picks post once the sport's games have lines; they stay put once chosen.</p></CardBody>}
       {[...groups.entries()].map(([key, ps]) => {
         const sport = ps[0].sport, date = ps[0].date;
@@ -170,7 +173,7 @@ function DailyCard({ b }: { b: LabBoard }) {
                   <span className="w-5 shrink-0 text-center font-display font-bold text-accent">{p.slot}</span>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium leading-snug">{p.bet}</div>
-                    <div className="text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
+                    <div className="text-xs text-muted">{p.fill && <span className={cn("font-semibold", TONE_CLASS[confidenceOf(p.chance).tone])} title={confidenceOf(p.chance).advice}>{confidenceOf(p.chance).label} · not counted · </span>}{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold">{pct(p.chance, 0)}</div>
@@ -210,7 +213,7 @@ function RecordCard({ b, sport: shown }: { b: LabBoard; sport: Sport }) {
   const r = b.record.by_sport[sport];
   const dr = b.daily?.record.by_sport[sport];
   const recent = b.recent.filter((p) => p.sport === sport);
-  const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => d.sport === sport).map((d) => [`${d.game_id}|${d.bet}`, d]));
+  const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => d.sport === sport && !d.fill).map((d) => [`${d.game_id}|${d.bet}`, d]));
   // picks of the day that never made the top 10 still belong in the results
   const rows: (LabPick & { day?: number })[] = [...recent];
   const seen = new Set(recent.map((p) => `${p.game_id}|${p.bet}`));
