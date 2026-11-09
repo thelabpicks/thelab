@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BOARD_MIN_PRICE, DAILY_MIN_EDGE, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -36,8 +36,10 @@ export default function LabPicks() {
     <div className="space-y-5">
       <PageTitle kicker={b ? `Updated ${chicago(b.generated_at)}` : "Every sport"} title={`The Lab's top 10: ${SPORT_LABEL[sport]}`} />
       <p className="-mt-3 max-w-3xl text-sm text-muted">
-        Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the likeliest. Picks at 70%+
-        are marked top confidence. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer. Tap a pick for the full write-up.
+        Each sport's 10 plays most likely to win, ranked by their chance to hit from 5,000-game simulations: #1 is the likeliest. Every pick is tagged
+        with how much to trust it: <b className="text-ok">Top confidence</b> {SURE * 100}%+, <b className="text-accent">Bet</b> {BET * 100}%+,{" "}
+        <b className="text-warn">Lean</b> {LEAN * 100}–{BET * 100}% (small bet or leave it), <b className="text-danger">Risky</b> under {LEAN * 100}% (a long shot; lean away).
+        Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer. Tap a pick for the full write-up.
       </p>
       {b && stale(b.generated_at) && <Notice tone="warn" title="These picks haven't refreshed in over a day">
         The last refresh was {chicago(b.generated_at)}. Check injury news and your book's line before betting; the list updates on the next refresh.</Notice>}
@@ -61,11 +63,14 @@ export default function LabPicks() {
       {b && <RecordCard b={b} sport={sport} />}
 
       <Card><CardBody className="space-y-1.5 text-xs text-muted">
-        <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws only on the picks that sport already features: NFL and NBA props from confidence tiers that hit 50%+ on unseen games (NBA only at prop lines a book really posts),
-          and in college, each game's favorite to win outright plus bets rated 7+. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer:
+        <p><b className="text-fg">How the list is made.</b> Each sport has its own list. It draws on NFL props from confidence tiers that hit 50%+ on unseen games, every NBA prop at a line a book really posts for players sure to play,
+          and in college, each game's favorite to win outright, bets rated 7+ and, on a thin night, the game's other bets. Only lines a sportsbook has posted, priced {BOARD_MIN_PRICE} or longer:
           a heavier favorite risks too much to win too little. Picks of the day are the likeliest picks the sims rate at least {DAILY_MIN_EDGE * 100} points more likely than the book's price implies,
           so each is something the data says happens more often than the market thinks. The 10 with the best chance to hit make the list (simulated, then calibrated against how similar
-          picks really did), highest first, and 70%+ picks are marked top confidence. Ties go to the tier's tested record. One pick per game and per player.
+          picks really did), highest first. NBA chances are also re-fit to how the model's leans have really done at book lines, which pulls overconfident chances toward 50%.
+          Every list is filled to 10, so a thin slate shows weaker picks too: the tag on each says how much to trust it ({SURE * 100}%+ top confidence, {BET * 100}%+ bet,
+          {" "}{LEAN * 100}–{BET * 100}% lean, under {LEAN * 100}% risky). Ties go to the tier's tested record. Picks are spread one per game and per player first; a short list is then filled from the same games.
+          Picks of the day stay stricter: {BET * 100}%+, beating the price, NBA stars and proven tiers only.
           When the books' feed carries alternate lines (a paid odds plan), they count too: only lines a book posts, priced -500 or longer, that the sims give a better chance than the price implies.
           College spreads and totals are set near 50/50, so they top out around 55%; the likeliest college picks are favorites to win outright. Even a 90% pick loses 1 time in 10: the "tested" figure on each pick is how often its tier actually hit on games the models never saw.</p>
         <p>The list refreshes with each sport's data (latest box scores, injury reports and lines). A pick on the list when its game starts is frozen exactly as shown and graded after the final.
@@ -92,7 +97,7 @@ function PickRow({ p, open, onToggle }: { p: LabPick; open: boolean; onToggle: (
         </div>
         <div className="shrink-0 text-right">
           <div><span className="font-display text-xl font-bold">{pct(p.chance, 0)}</span> <span className="text-xs text-muted">to hit</span></div>
-          {p.chance >= SURE && !p.result && <div className="text-[11px] font-semibold text-accent">Top confidence</div>}
+          {!p.result && <ConfidenceTag chance={p.chance} />}
           {p.price != null && <div className="text-xs text-muted">{price(p.price)}{p.book ? ` ${p.book}` : ""}</div>}
           {p.result ? <ResultBadge p={p} /> : p.tier && <div className="text-[11px] text-muted">{p.tier}{p.tier_rate != null ? ` · ${pct(p.tier_rate, 0)} tested` : ""}</div>}
         </div>
@@ -107,6 +112,12 @@ function PickRow({ p, open, onToggle }: { p: LabPick; open: boolean; onToggle: (
       )}
     </li>
   );
+}
+
+const TONE_CLASS = { ok: "text-ok", accent: "text-accent", warn: "text-warn", danger: "text-danger" } as const;
+function ConfidenceTag({ chance }: { chance: number }) {
+  const c = confidenceOf(chance);
+  return <div className={cn("text-[11px] font-semibold", TONE_CLASS[c.tone])} title={c.advice}>{c.label}</div>;
 }
 
 const SPORT_TONE: Record<Sport, "accent" | "info" | "warn"> = { nfl: "accent", cfb: "info", nba: "warn" };

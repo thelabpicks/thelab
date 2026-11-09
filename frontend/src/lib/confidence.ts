@@ -3,11 +3,21 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export type Tier = { tier: string; lo: number; hi: number; n: number; hits: number; rate: number | null; avg_chance: number | null; ci: [number | null, number | null] };
+export type BookCal = { a: number; b: number; rows: number; weeks: number; test_weeks: number; log_loss_raw: number; log_loss_refit: number };
+/** The chance of the over at a book line, after the live book-line refit. */
+export const bookCal = (pOver: number, c: BookCal | null | undefined) => {
+  if (!c) return pOver;
+  const x = Math.min(1 - 1e-4, Math.max(1e-4, pOver));
+  return Math.min(0.995, Math.max(0.005, 1 / (1 + Math.exp(-(c.a * Math.log(x / (1 - x)) + c.b)))));
+};
+
 export type Confidence = {
   td: { model: string; weeks: number; first_season: number; tiers: Tier[] } | null;
   props: { weeks: number; first_season: number; tiers: Tier[]; note: string; by_side?: { over: Tier[]; under: Tier[] };
     line_history?: Record<string, { lo: number; hi: number; n: number; avg_line: number; avg_actual: number; over_rate: number; avg_p_over: number }[]>;
-    unders_by_market?: { market: string; label: string; n: number; hits: number; rate: number; avg_chance: number; strong_n: number; strong_rate: number | null }[] } | null;
+    unders_by_market?: { market: string; label: string; n: number; hits: number; rate: number; avg_chance: number; strong_n: number; strong_rate: number | null }[];
+    /** Chances at book lines re-fit to how leans at book lines have done live (engine/picklog.py); null until it beats the raw chances on unseen weeks. */
+    book_calibration?: BookCal | null } | null;
 };
 
 export function useConfidence() {
