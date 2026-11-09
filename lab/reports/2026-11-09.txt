@@ -1,0 +1,66 @@
+The Lab daily report, Monday, Nov 9 (results from Sunday, Nov 8)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
+  NFL: 24-9 +8.94u / 7-3 +1.98u
+  CFB: 36-10 +0.43u / 7-0 +2.57u
+  NBA: 39-25 +3.91u / 19-4 +3.50u
+
+NFL
+  Picks
+    - Surest hit: Jahmyr Gibbs to score a touchdown (63%), scored.
+    - Miss: D'Andre Swift to score a touchdown at 58%. No touchdown.
+    - Miss: Kyren Williams to score a touchdown at 56%. No touchdown.
+    - Miss: Jaxon Smith-Njigba to score a touchdown at 52%. No touchdown.
+    - Miss: Chuba Hubbard to score a touchdown at 52%. No touchdown.
+    - Graded since the last report: Derrick Henry under 67.5 rushing yards ✓.
+  How the model did
+    - Every graded prop and TD lean on 13 games: 45-154 (23%). By confidence: 60-70% hit 100% of 1, under 60% hit 22% of 198.
+    - Featured picks this season: 100 of 179 (56%).
+    - Off calibration: TD Lean: running hot (64 of 185 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (77 of 137 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 23.9 to 14.7, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-2.2 passes over 82). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Team rush attempts keeps running above the pregame input (+1.4 carries over 82). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Expected players who sat out keeps running above the pregame input (+1.0 players over 82). Watching it; no automatic correction for this input.
+    - Target share keeps running above the pregame input (+0.7 pct pts over 605). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.8 pct pts over 268). Watching it; no automatic correction for this input.
+    - Biggest misses: Joe Fagnano pass yards (sim 230.3, had 60; team volume); C.J. Stroud pass yards (sim 223.5, had 384; efficiency); CeeDee Lamb rec yards (sim 60.2, had 195; efficiency).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0008), volume (−0.0000).
+  Game sims vs the final
+    - Last 30 days: 15 games, winner right in 11 (73%); each team's points missed by 8.2 on average, running +0.5 vs projected. Furthest-leaning stat: rushing yards, +8.8 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+    - Graded since the last report: Houston to win (ML -410) ✓; Georgia Southern to win (ML -395) ✓; San José State to win (ML -380) ✓; Baylor to win (ML -355) ✓; Auburn to win (ML -395) ✓; UAB to win (ML -340) ✓; Ohio State to win (ML -305) ✗; New Mexico to win (ML -395) ✓; Hawai'i to win (ML -345) ✓; Navy to win (ML -270) ✓.
+  How the model did
+    - Winners (15 games): 5-10 (33%). By confidence: 70%+ hit 50% of 4, 60-70% hit 33% of 3, under 60% hit 25% of 8.
+    - Spreads (15 games): 7-8 (47%). By confidence: under 60% hit 47% of 15.
+    - Totals (15 games): 6-9 (40%). By confidence: under 60% hit 40% of 15.
+    - Furthest off: West Virginia at Texas Tech (projected 64.7 total, scored 101, +36.3); Wyoming at UNLV (projected 50.5 total, scored 76, +25.5).
+    - Suggested college bets this season: 37-45 (45%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.7 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 13 points vs 12.9 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - No NBA picks were played on this day.
+    - Graded since the last report: Shai Gilgeous-Alexander under 2.5 threes made ✗; Austin Reaves under 2.5 threes made ✓; RJ Barrett under 6.5 rebounds ✗; Cooper Flagg under 1.5 threes made ✓; Brandon Miller under 30.5 pts + reb + ast ✓; Donovan Mitchell under 5.5 assists ✗; Trae Young under 3.5 rebounds ✓; LaMelo Ball under 33.5 pts + reb + ast ✓; Dylan Harper under 1.5 threes made ✓.
+  Where it was off and why
+    - Re-run with the minutes players really got, 1638 of 3539 losing leans would have been right, so minutes caused 46% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.2 per player vs the projection (typical miss 5.4).
+    - Team scoring: rotations scored −2.7 points per team vs projected (typical miss 12.9).
+  Model changes
+    - Refit this morning on every box score through 2026-11-08; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - Last 30 days: 57 games, winner right in 37 (65%); each team's points missed by 10.6 on average (the book's line by 9.1), running +0.6 vs projected. Furthest-leaning stat: points, +0.1 per player vs projected.
