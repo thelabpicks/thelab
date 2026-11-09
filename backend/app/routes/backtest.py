@@ -149,7 +149,7 @@ def confidence(c: sqlite3.Connection = Depends(get_db)):
     import numpy as np  # noqa: PLC0415
     import pandas as pd  # noqa: PLC0415
 
-    from engine import props  # noqa: PLC0415
+    from engine import picklog, props  # noqa: PLC0415
 
     wf = latest_walk_forward(c)
     out = {"td": None, "props": None}
@@ -187,4 +187,7 @@ def confidence(c: sqlite3.Connection = Depends(get_db)):
                             "line_history": {mk: _line_history(g) for mk, g in pb.groupby("market")},
                             "note": "Prop tiers use the side the model favored at a reference line (the player's recent median), "
                                     "because past sportsbook lines are not available."}
+            # chances at book lines re-fit to how leans at book lines have done live (engine/picklog.py); None until it
+            # tests better on unseen weeks
+            out["props"]["book_calibration"] = picklog.latest().get("book_calibration")
     return out

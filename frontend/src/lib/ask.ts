@@ -2,7 +2,7 @@
    in an answer comes from the published data (rankings, prop projections, sportsbook feed); nothing is invented.
    The same functions back the optional AI mode, which may only call them as tools. */
 import type { Confidence, Tier } from "@/lib/confidence";
-import { PROVEN_NOTE, proven, tierFor } from "@/lib/confidence";
+import { bookCal, PROVEN_NOTE, proven, tierFor } from "@/lib/confidence";
 import type { Feed, OddsRow } from "@/lib/feed";
 import { feedLine } from "@/lib/feed";
 import { pOver, type PropDist } from "@/lib/props";
@@ -113,9 +113,11 @@ export function tdPick(d: AskData, r: RankingRow): Pick {
 }
 
 function propPick(d: AskData, market: string, r: PropRow, line: number, side: "over" | "under"): Pick {
-  const over = pOver(r.dist as PropDist, line);
-  const p = side === "over" ? over : 1 - over;
   const b = bestOf(d.feed.get(market, r.player_id, side).filter((x) => x.line === line));
+  // at a line a book posts, the chance is re-fit to how the model's leans at book lines have really done
+  const raw = pOver(r.dist as PropDist, line);
+  const over = b ? bookCal(raw, d.conf?.props?.book_calibration) : raw;
+  const p = side === "over" ? over : 1 - over;
   const label = `${side === "over" ? "Over" : "Under"} ${line} ${lc(d.props[market]?.label ?? market)}`;
   return withTier(d, {
     id: `${market}:${r.player_id}`, player_id: r.player_id, name: r.player_name, team: r.team, opp: r.opponent, pos: r.position, game_id: r.game_id,
@@ -199,7 +201,8 @@ export function anyPool(d: AskData, f: Filters = {}, markets?: string[], onePerP
       // Books set lines near the projection. A usual line far from this week's projection (a role change, a backup
       // starting) is not a line anyone will offer, so it can't count as a "safe" pick.
       if (book == null && Math.abs(r.median - line) > Math.max(1.5, 0.2 * Math.max(line, r.median))) continue;
-      const over = pOver(r.dist, line);
+      // the side the model leans at this line, after the book-line refit when a book posts it
+      const over = book != null ? bookCal(pOver(r.dist, line), d.conf?.props?.book_calibration) : pOver(r.dist, line);
       all.push({ ...propPick(d, m, r, line, over >= 0.5 ? "over" : "under"), lineSource: book != null ? "book" : "usual" });
     }
   }
@@ -428,7 +431,7 @@ function explainProp(d: AskData, r: PropRow, m: string, forceSide?: "over" | "un
   const label = d.props[m]?.label ?? m;
   const book = feedLine(d.feed, m, r.player_id);
   const line = book ?? usualLine(r, m) ?? Math.floor(r.median) + 0.5;
-  const over = pOver(r.dist as PropDist, line);
+  const over = book != null ? bookCal(pOver(r.dist as PropDist, line), d.conf?.props?.book_calibration) : pOver(r.dist as PropDist, line);
   const side = forceSide ?? (over >= 0.5 ? "over" : "under");
   const pick = { ...propPick(d, m, r, line, side), lineSource: book != null ? "book" as const : "usual" as const };
   const pro = (side === "under" ? underReasons : overReasons)(r, m, label, line);

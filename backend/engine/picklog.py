@@ -28,6 +28,11 @@ MIN_SNAP = 0.3       # same rule as the site's "who plays" filter (frontend/src/
 DRIFT_MIN_N = 100    # picks in a tier before its live record can flag drift
 TD_TIERS = [("Strong", 0.50), ("Solid", 0.35), ("Lean", 0.20), ("Long shot", 0.0)]
 PROP_TIERS = [("Strong", 0.65), ("Solid", 0.58), ("Lean", 0.53), ("Coin flip", 0.0)]
+# Prop chances re-fit to how the model's leans have really done at sportsbook lines (the same Platt refit the NBA uses,
+# nba/pipeline.py book_calibration). The tiers were tested at each player's usual line; books set sharper lines, so
+# from 2026 Weeks 7-9 the 65%+ leans hit 55% at book lines while those under 65% held up. Used only once enough weeks
+# are graded and the refit beats the raw chances on weeks it never saw.
+BOOK_CAL_MIN_ROWS, BOOK_CAL_MIN_WEEKS, BOOK_CAL_FIRST_FIT_WEEKS = 300, 3, 1
 
 
 def picks_dir() -> Path:
@@ -303,6 +308,7 @@ def report(c) -> dict:
     drift = [f"{'TD' if kind == 'td' else 'Props'} {t['tier']}: {t['drift']} ({t['hits']} of {t['n']} hit vs {t['avg_chance']:.0%} expected)"
              for kind, ts in tiers.items() for t in ts if t["drift"]]
     out = {"available": True, "created_at": utcnow(), "graded": len(graded), "overall": _summary(graded),
+           "book_calibration": book_calibration(graded, log=lambda *_: None),
            "featured": _summary([r for r in graded if r["featured"]]), "tiers": tiers,
            "by_market": [{"market": m, "label": "Anytime TD" if m == "td" else props.MARKETS[m]["label"],
                           **_summary([r for r in graded if r["market"] == m])} for m in by(lambda r: r["market"])],
@@ -321,6 +327,59 @@ def report(c) -> dict:
     return out
 
 
+def _logit(p: float) -> float:
+    p = min(1 - 1e-4, max(1e-4, p))
+    return math.log(p / (1 - p))
+
+
+def apply_book_cal(p_over: float, cal: dict) -> float:
+    z = cal["a"] * _logit(p_over) + cal["b"]
+    return min(0.995, max(0.005, 1 / (1 + math.exp(-z))))
+
+
+def _fit_platt(x: list[float], y: list[int]) -> tuple[float, float]:
+    import numpy as np  # noqa: PLC0415
+    from sklearn.linear_model import LogisticRegression  # noqa: PLC0415
+    lr = LogisticRegression(C=1e3).fit(np.array([_logit(v) for v in x])[:, None], np.array(y))
+    return float(lr.coef_[0][0]), float(lr.intercept_[0])
+
+
+def _logloss(y: list[int], p: list[float]) -> float:
+    return -sum(math.log(min(1 - 1e-4, max(1e-4, q if v else 1 - q))) for v, q in zip(y, p)) / len(y)
+
+
+def book_calibration(graded: list[dict], log=print) -> dict | None:
+    """Platt refit of prop chances (of the over) at book lines, or None while too few weeks are graded or it does not
+    beat the raw chances walk-forward (each week predicted from a fit on earlier weeks only)."""
+    rows = [{"wk": (r["season"], r["week"]), "p_over": r["p"] if r["side"] == "over" else 1 - r["p"],
+             "over": int(r["result"]) if r["side"] == "over" else 1 - int(r["result"])}
+            for r in graded if r["kind"] == "props" and r.get("line_source") == "book" and r["result"] is not None]
+    weeks = sorted({r["wk"] for r in rows})
+    if len(rows) < BOOK_CAL_MIN_ROWS or len(weeks) < BOOK_CAL_MIN_WEEKS:
+        log(f"picklog book calibration: not used ({len(rows)} graded book leans over {len(weeks)} weeks)")
+        return None
+    raw_ll = cal_ll = 0.0
+    n_test = better = 0
+    for wk in weeks[BOOK_CAL_FIRST_FIT_WEEKS:]:
+        tr = [r for r in rows if r["wk"] < wk]
+        te = [r for r in rows if r["wk"] == wk]
+        a, b = _fit_platt([r["p_over"] for r in tr], [r["over"] for r in tr])
+        y = [r["over"] for r in te]
+        lr = _logloss(y, [r["p_over"] for r in te])
+        lc = _logloss(y, [apply_book_cal(r["p_over"], {"a": a, "b": b}) for r in te])
+        raw_ll += lr * len(te)
+        cal_ll += lc * len(te)
+        n_test += len(te)
+        better += int(lc < lr)
+    a, b = _fit_platt([r["p_over"] for r in rows], [r["over"] for r in rows])
+    out = {"a": round(a, 4), "b": round(b, 4), "rows": len(rows), "weeks": len(weeks), "test_rows": n_test,
+           "test_weeks": len(weeks) - BOOK_CAL_FIRST_FIT_WEEKS, "weeks_better": better,
+           "log_loss_raw": round(raw_ll / n_test, 4), "log_loss_refit": round(cal_ll / n_test, 4)}
+    use = cal_ll < raw_ll
+    log(f"picklog book calibration: use={use} {out}")
+    return out if use else None
+
+
 def run(c, season: int, log=print) -> dict:
     week = status.current_week(c, season)
     if week:
@@ -331,6 +390,7 @@ def run(c, season: int, log=print) -> dict:
     rep = report(c)
     paths.results_dir().mkdir(parents=True, exist_ok=True)
     (paths.results_dir() / "live_record.json").write_text(json.dumps(rep, indent=2, default=float))
+    log(f"picklog: book-line calibration {rep.get('book_calibration') or 'not used'}")
     if rep.get("available"):
         o = rep["overall"]
         log(f"picklog: {o['hits']} of {o['n']} graded picks hit ({o['rate']:.1%}, site gave {o['avg_chance']:.1%})")

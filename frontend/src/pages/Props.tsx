@@ -10,7 +10,7 @@ import { useLinkSuffix, useSeasonWeek } from "@/lib/state";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, ErrorState, Input, LoadingBlock, Segmented, Select, TableWrap, Td, Th } from "@/components/ui";
 import { Flags, NoDataState, TierBadge } from "@/components/shared";
-import { useConfidence, tierFor } from "@/lib/confidence";
+import { bookCal, useConfidence, tierFor } from "@/lib/confidence";
 import { estimatedLine, overReasons, PLAYABLE_NOTE, underReasons, type Recent } from "@/lib/ask";
 import { likelyToPlay, starterQbs } from "@/lib/playing";
 import { ladder, playable, type Playable } from "@/lib/hitrates";
@@ -143,7 +143,8 @@ export default function PropsPage() {
     const est = estimatedLine(r, market);
     const line = typed.line != null && typed.line !== "" ? Number(typed.line) : fl ?? est.line;
     const source = typed.line ? "yours" : fl != null ? "book" : est.kind;
-    const over = r.dist && Number.isFinite(line) ? pOver(r.dist, line) : null;
+    // at a line a book posts, the chance is re-fit to how leans at book lines have really done (same as the picks)
+    const over = r.dist && Number.isFinite(line) ? (source === "book" ? bookCal(pOver(r.dist, line), conf.data?.props?.book_calibration) : pOver(r.dist, line)) : null;
     const lean: "over" | "under" | null = over == null ? null : over > 0.5 ? "over" : "under";
     const leanP = over == null ? null : Math.max(over, 1 - over);
     const prices = lean ? feed.get(market, r.player_id, lean).filter((o) => o.line === line).map((o) => o.price) : [];
