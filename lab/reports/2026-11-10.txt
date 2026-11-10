@@ -56,7 +56,7 @@ NBA
     - Unders 61% (425), overs 50% (208).
     - Furthest off among confident leans: Tre Johnson pra (projected 18.2, had 4, line 10.5); Will Riley pra (projected 12.8, had 1, line 2.5); Braden Smith pra (projected 11.2, had 0, line 2.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 1783 of 3810 losing leans would have been right, so minutes caused 47% of the misses and production the rest (last 2 weeks).
+    - Re-run with the minutes players really got, 1782 of 3809 losing leans would have been right, so minutes caused 47% of the misses and production the rest (last 2 weeks).
     - Minutes ran −1.2 per player vs the projection (typical miss 5.4).
     - Team scoring: rotations scored −2.9 points per team vs projected (typical miss 13).
   Model changes
