@@ -155,7 +155,7 @@ function DailyCard({ b }: { b: LabBoard }) {
         subtitle={`Each sport's 3 likeliest picks for the day, locked when chosen and graded after the final. Record: ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}${unitsText(rec) ? `, ${unitsText(rec)}` : ""}`} />
       {b.daily.picks.some((p) => p.fill) && <CardBody className="pb-0"><p className="text-xs text-muted">
         On a day with fewer than 3 picks that clear the bar ({DAILY_MIN_CHANCE * 100}%+ and beating the price), the rest are the sport's next likeliest plays, tagged by confidence.
-        Those fill-ins can change until their game starts and aren't counted in the picks-of-the-day record (they're graded with the top 10).</p></CardBody>}
+        Those extra picks are marked, can change until their game starts, and stay out of the picks-of-the-day record (they're graded with the top 10 instead).</p></CardBody>}
       {!groups.size && <CardBody><p className="text-sm text-muted">Today's picks post once the sport's games have lines; they stay put once chosen.</p></CardBody>}
       {[...groups.entries()].map(([key, ps]) => {
         const sport = ps[0].sport, date = ps[0].date;
@@ -173,7 +173,7 @@ function DailyCard({ b }: { b: LabBoard }) {
                   <span className="w-5 shrink-0 text-center font-display font-bold text-accent">{p.slot}</span>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium leading-snug">{p.bet}</div>
-                    <div className="text-xs text-muted">{p.fill && <span className={cn("font-semibold", TONE_CLASS[confidenceOf(p.chance).tone])} title={confidenceOf(p.chance).advice}>{confidenceOf(p.chance).label} · not counted · </span>}{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
+                    <div className="text-xs text-muted">{p.fill && <span className={cn("font-semibold", TONE_CLASS[confidenceOf(p.chance).tone])} title={confidenceOf(p.chance).advice}>{confidenceOf(p.chance).label} · extra pick, under the {DAILY_MIN_CHANCE * 100}% bar · </span>}{p.matchup} · {when(p.kickoff)}{p.line_source === "usual" ? " · usual line, check your book" : ""}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold">{pct(p.chance, 0)}</div>
