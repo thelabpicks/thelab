@@ -5,7 +5,7 @@
 # and on demand from the Actions tab. Sportsbook prices are fetched on Saturday and manual runs, and on Thursday for
 # the Thursday night game only.
 # After the daily NBA and college football runs ("Collect NBA data", "Collect college football data") it republishes
-# with their fresh numbers and reuses the NFL pages from the last full run, so the NFL pipeline is not repeated daily.
+# (each collector starts it with quick=true) with their fresh numbers and reuses the NFL pages from the last full run, so the NFL pipeline is not repeated daily.
 name: Refresh data and publish site
 
 on:
@@ -27,11 +27,13 @@ on:
         description: "Buy prices only for games kicking off within this many hours (empty: the whole week)"
         required: false
         default: ""
+      quick:
+        description: "Reuse the NFL pages from the last full run (the NBA and college collectors start these)"
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [main]
-  workflow_run:
-    workflows: ["Collect NBA data", "Collect college football data"]
-    types: [completed]
 
 permissions:
   contents: write   # saves the weekly pick log to the nfl-data branch
@@ -64,7 +66,7 @@ jobs:
       - name: Decide whether the NFL model needs to run
         run: |
           quick=false
-          if [ "${{ github.event_name }}" = workflow_run ]; then quick=true
+          if [ "${{ github.event_name }}" = workflow_dispatch ] && [ "${{ inputs.quick }}" = true ]; then quick=true
           elif [ "${{ github.event_name }}" = schedule ] && case "${{ github.event.schedule }}" in "0 12 * * *"|"0 14 * * 1-6"|"0 15 * * 0,1,2,3,5") true;; *) false;; esac; then
             quick=true; echo "Game-day simulation posting: reusing the NFL pages from the last full run"
           elif [ "${{ github.event_name }}" = push ] && changed=$(git diff --name-only HEAD^1 HEAD) && [ -n "$changed" ] \
@@ -151,7 +153,7 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           # Fetch prices on the Saturday run and on manual runs (free plan: 500 credits a month). Thursday's run buys only
           # the games kicking off within 36 hours (the Thursday night game, about 6 credits) so it gets real lines too.
-          FG_ODDS_FETCH: ${{ github.event.schedule == '0 15 * * 6' || github.event.schedule == '0 15 * * 4' || github.event_name == 'workflow_dispatch' }}
+          FG_ODDS_FETCH: ${{ github.event.schedule == '0 15 * * 6' || github.event.schedule == '0 15 * * 4' || (github.event_name == 'workflow_dispatch' && !inputs.quick) }}
           FG_ODDS_WITHIN_HOURS: ${{ github.event.schedule == '0 15 * * 4' && '36' || inputs.odds_within_hours }}
           FG_PICKS_DIR: ${{ github.workspace }}/pick-archive/picks
         run: python -m engine.cli all --download
