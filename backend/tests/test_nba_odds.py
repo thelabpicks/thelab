@@ -178,3 +178,17 @@ def test_the_full_game_ladder_is_the_one_near_the_main_line():
     assert collect.pick_ladder({"a": quarter, "b": full, "c": jumbled}, 23.5) == full
     assert collect.pick_ladder({"a": quarter, "c": jumbled}, 23.5) == []
     assert collect.pick_ladder({"b": full}, None) == []
+
+
+def test_two_ladders_under_one_name_stay_apart():
+    def item(name, x, american):
+        return {"athlete": {"$ref": "http://x/athletes/7?lang=en"}, "type": {"name": name},
+                "odds": {"american": {"value": american}}, "current": {"target": {"value": x}}}
+    # Booker 10/30: the full-game rebounds ladder, then a short ladder under the same name whose 2+ and 3+ overwrote it
+    full = [(2.0, "-900"), (3.0, "-400"), (4.0, "-182"), (5.0, "+115"), (6.0, "+224")]
+    short = [(2.0, "+143"), (3.0, "+467")]
+    rows = collect.parse_espn_milestones([item("Rebounds Milestones", x, a) for x, a in full + short])
+    ladders: dict = {}
+    for r in rows:
+        ladders.setdefault(r["type"], []).append([r["x"], r["price"]])
+    assert collect.pick_ladder(ladders, 4.5) == [[x, int(a)] for x, a in full]

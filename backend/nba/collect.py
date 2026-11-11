@@ -218,7 +218,9 @@ def espn_milestone_market(type_name: str) -> str | None:
 
 def parse_espn_milestones(items: list[dict]) -> list[dict]:
     """DraftKings' "X+" ladders ('Points Milestones': 15+ at -446), one priced item per rung, per player, market and
-    ESPN type (kept so a stray ladder can be told apart from the full-game one)."""
+    ESPN type (kept so a stray ladder can be told apart from the full-game one). ESPN can list two ladders under one
+    type name (Booker's 'Rebounds Milestones' on 10/30 had a short ladder's 2+ and 3+ inside the full game's); a rung
+    seen again starts a second ladder ('Rebounds Milestones #2') instead of overwriting the first one's price."""
     import re  # noqa: PLC0415
     out: dict = {}
     for it in items:
@@ -231,7 +233,11 @@ def parse_espn_milestones(items: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             continue
         if m and aid and x is not None and float(x) >= 1:
-            out[(aid.group(1), m, name, float(x))] = price
+            n, t = 1, name
+            while (aid.group(1), m, t, float(x)) in out:
+                n += 1
+                t = f"{name} #{n}"
+            out[(aid.group(1), m, t, float(x))] = price
     return [{"player_id": pid, "market": m, "type": t, "x": x, "price": price} for (pid, m, t, x), price in sorted(out.items())]
 
 
