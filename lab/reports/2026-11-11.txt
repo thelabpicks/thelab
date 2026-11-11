@@ -1,0 +1,59 @@
+The Lab daily report, Wednesday, Nov 11 (results from Tuesday, Nov 10)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
+  NFL: 31-11 +12.92u / 8-3 +2.84u
+  CFB: 36-10 +0.43u / 7-0 +2.57u
+  NBA: 50-34 +4.58u / 21-8 +3.50u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 106 of 187 (57%).
+    - Off calibration: TD Lean: running hot (64 of 194 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (82 of 144 hit vs 69% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0007), volume (−0.0000).
+  Game sims vs the final
+    - Last 30 days: 16 games, winner right in 12 (75%); each team's points missed by 8.2 on average, running 0 vs projected. Furthest-leaning stat: rushing yards, +7.5 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+  How the model did
+    - Suggested college bets this season: 37-45 (45%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.7 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 13 points vs 12.9 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - Surest hit: Brayden Burries under 3.5 assists (61%), finished with 3.
+    - Miss: Franz Wagner under 38.5 pts + reb + ast at 63% (pick of the day). Finished with 47.
+    - Miss: Pelle Larsson under 1.5 threes made at 61%. Finished with 2.
+    - Miss: Shai Gilgeous-Alexander under 4.5 rebounds at 60% (pick of the day). Finished with 8.
+    - Miss: Brice Sensabaugh under 3.5 rebounds at 60%. Finished with 4.
+  How the model did
+    - Every lean the model made on 6 games: 293-198 (60%). By confidence: 70%+ hit 67% of 42, 60-70% hit 67% of 66, under 60% hit 58% of 383.
+    - Unders 62% (354), overs 55% (137).
+    - Furthest off among confident leans: Jordan Goodwin points (projected 6.6, had 18, line 10.5); Jevon Carter pra (projected 11.2, had 0, line 2.5); Jamal Cain pra (projected 18.6, had 9, line 10.5).
+  Where it was off and why
+    - Re-run with the minutes players really got, 1872 of 4007 losing leans would have been right, so minutes caused 47% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.2 per player vs the projection (typical miss 5.4).
+    - Team scoring: rotations scored −3.2 points per team vs projected (typical miss 12.9).
+  Model changes
+    - Refit this morning on every box score through 2026-11-10; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - ORL 107-100 SAC (sims ORL 108-111 SAC, winner ✗); biggest misses: Domantas Sabonis 0 points (sims 15.1), Zach LaVine 31 points (sims 17.2)
+    - LAC 110-133 PHX (sims LAC 109-114 PHX, winner ✓); biggest misses: Luke Kennard 14 points (sims 6), Gradey Dick 10 points (sims 2.6)
+    - MIA 115-109 UTAH (sims MIA 114-122 UTAH, winner ✗); biggest misses: Isaiah Collier 17 points (sims 9.7)
+    - BOS 123-101 PHI (sims BOS 110-113 PHI, winner ✗); biggest misses: Paul George 36 points (sims 16.8), Anfernee Simons 17 points (sims 7.1)
+    - MIL 85-117 NY (sims MIL 95-120 NY, winner ✓); biggest misses: Brayden Burries 3 points (sims 10.6), Andre Drummond 14 rebounds (sims 6.6)
+    - Last 30 days: 69 games, winner right in 44 (64%); each team's points missed by 10.2 on average (the book's line by 9.1), running +0.3 vs projected. Furthest-leaning stat: points, +0.1 per player vs projected.
