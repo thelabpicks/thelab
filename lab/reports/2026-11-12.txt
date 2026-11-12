@@ -23,11 +23,11 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
-    - Winners (3 games): 1-2 (33%). By confidence: 60-70% hit 100% of 1, under 60% hit 0% of 2.
-    - Spreads (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
-    - Totals (3 games): 3-0 (100%). By confidence: under 60% hit 100% of 3.
-    - Furthest off: Kent State at Bowling Green (projected 44.9 total, scored 61, +16.1); Western Michigan at Akron (projected 51 total, scored 56, +5.0).
-    - Suggested college bets this season: 38-45 (46%).
+    - Winners (6 games): 3-3 (50%). By confidence: 70%+ hit 100% of 2, 60-70% hit 100% of 1, under 60% hit 0% of 3.
+    - Spreads (6 games): 3-3 (50%). By confidence: under 60% hit 50% of 6.
+    - Totals (6 games): 3-3 (50%). By confidence: under 60% hit 50% of 6.
+    - Furthest off: Massachusetts at Toledo (projected 52.5 total, scored 24, −28.5); Buffalo at Ball State (projected 52.9 total, scored 35, −17.9).
+    - Suggested college bets this season: 38-46 (45%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.6 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
