@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-11",
-  "ran_at": "2026-11-11T15:36:17+00:00",
+  "date": "2026-11-12",
+  "ran_at": "2026-11-12T15:44:57+00:00",
   "files": [
     {
       "file": "cfb_schedules_2010.csv",
@@ -218,21 +218,21 @@
   ],
   "espn": {
     "scoreboard": {
-      "saved": "2026-11-11.json",
-      "items": 69
+      "saved": "2026-11-12.json",
+      "items": 67
     },
     "rankings": {
-      "saved": "2026-11-11.json",
+      "saved": "2026-11-12.json",
       "items": 6
     },
     "finals": {
-      "games": 54,
-      "saved": "2026-11-11.json"
+      "games": 6,
+      "saved": "2026-11-12.json"
     }
   },
   "odds": {
     "skipped": "not a line day (Tuesday and Saturday)",
-    "credits_remaining": 462.0
+    "credits_remaining": 459.0
   },
   "license": "College football scores, schedules, closing lines and player stats: cfbfastR / CollegeFootballData.com, https://github.com/sportsdataverse/cfbfastR-data. Scoreboard: ESPN public site feed. Prices: The Odds API."
 }
