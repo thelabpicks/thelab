@@ -50,6 +50,7 @@ NBA
     - Re-run with the minutes players really got, 2068 of 4345 losing leans would have been right, so minutes caused 48% of the misses and production the rest (last 2 weeks).
     - Minutes ran −1.2 per player vs the projection (typical miss 5.3).
     - Team scoring: rotations scored −3.3 points per team vs projected (typical miss 12.8).
+    - Pts + Reb + Ast has run below the projections for 7 days (−1.50 per player). If it holds, that's a skewed input to correct.
   Model changes
     - Refit this morning on every box score through 2026-11-11; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
