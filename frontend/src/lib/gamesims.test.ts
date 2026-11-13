@@ -36,6 +36,20 @@ describe("game sim inputs", () => {
     expect(out.games[1].teams.A.players.map((p) => p.name)).toEqual(["Q B", "R B", "W R"]);
   });
 
+  it("holds an NFL game whose inputs were made before the final injury report", () => {
+    const week: FrozenWeek = { season: 2026, week: 9, games: {
+      // Thursday's inputs for a Sunday game (2026 W9): before Friday's report
+      "2026_09_NYG_PHI": { game_id: "2026_09_NYG_PHI", kickoff: "2026-11-08T18:00:00Z", frozen_at: "2026-11-05T16:51:42Z", teams: { NYG: team(20), PHI: team(24) } },
+      "2026_09_JAX_BAL": { game_id: "2026_09_JAX_BAL", kickoff: "2026-11-06T01:15:00Z", frozen_at: "2026-11-05T16:51:42Z", teams: { JAX: team(20), BAL: team(24) } },
+      "2026_09_GB_NE": { game_id: "2026_09_GB_NE", kickoff: "2026-11-08T21:25:00Z", frozen_at: "2026-11-08T14:40:00Z", teams: { GB: team(20), NE: team(24) } },
+    } };
+    const held: HeldGame[] = [];
+    const out = nflSimGames(week, held);
+    expect(out.games.map((g) => g.id)).toEqual(["2026_09_JAX_BAL", "2026_09_GB_NE"]);
+    expect(held.map((h) => h.game)).toEqual(["2026_09_NYG_PHI"]);
+    expect(held[0].reasons[0]).toMatch(/before the final injury report/);
+  });
+
   it("builds NBA games from the slate with the favorite and spread from the home line", () => {
     const rows = ["H", "V"].flatMap((t) => Array.from({ length: 9 }, (_, i) => ["points", "rebounds"].map((market) => ({
       player_id: `${t}${i}`, player_name: `${t} Player ${i}`, team: t, market, mean: market === "points" ? 19 - i : 5, out: i === 8,

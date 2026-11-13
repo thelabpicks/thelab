@@ -138,6 +138,7 @@ def build_frame(c: sqlite3.Connection, upcoming: pd.DataFrame | None = None) -> 
     t = t.join(_defense(hist, t))
     t = t.join(_defense_similar(t))
     t = t.join(_last_carries_share(hist, t))
+    t = t.join(_role_shares(hist, t))
     return t
 
 
@@ -312,6 +313,103 @@ def _last_carries_share(hist: pd.DataFrame, t: pd.DataFrame) -> pd.DataFrame:
             out[idx] = {"last_carries_share": v[0] / car_tot if car_tot > 0 else np.nan,
                         "last_att_share": v[1] / att_tot if att_tot > 0 else np.nan}
     return pd.DataFrame.from_dict(out, orient="index", columns=cols) if out else pd.DataFrame(index=t.index[:0], columns=cols)
+
+
+# Role shares: who carries and who is targeted when this week's lineup is on the field. ROLE_MIN_PG: per-game carries
+# (backs) or targets (backs, receivers, tight ends) that make a player part of the lineup a past game must match;
+# ROLE_PART: a player "played a real part" in a game if he got a carry/target or at least this share of the snaps.
+ROLE_GAMES = 3
+ROLE_LOOKBACK = 17
+ROLE_MIN_PG = {"carries": 4.0, "targets": 4.0}
+ROLE_PART = 0.3
+
+
+def _role_shares(hist: pd.DataFrame, t: pd.DataFrame, k: int = ROLE_GAMES) -> pd.DataFrame:
+    """role_carries_share / role_targets_share: each player's share of his team's carries (targets) over the team's last
+    k games in which every player with a real role on this week's list (ROLE_MIN_PG in his window) played a real part.
+
+    Found in 2026 W10 WAS-NYG: Skattebo (back from injury) and Singletary were simulated as a near even split (11.6 vs
+    10.0 carries) and Skattebo got 18 to Singletary's 1. Both inputs were skewed by games one of them did not finish or
+    did not play: the last-game share was Singletary's 21-carry game with Skattebo out, and Skattebo's 8-game share was
+    pulled down by the game he left after 8% of the snaps. In the games both played, Skattebo had about three times
+    Singletary's carries. Prior-season games count at PRIOR_SEASON_WEIGHT; NaN when no past game had this lineup."""
+    cols = ["role_carries_share", "role_targets_share"]
+    if t.empty or hist.empty:
+        return pd.DataFrame(index=t.index[:0], columns=cols)
+    h = hist[["season", "week", "team", "player_id", "carries", "targets", "offense_pct"]].copy()
+    h["real"] = (h.carries.fillna(0) > 0) | (h.targets.fillna(0) > 0) | (pd.to_numeric(h.offense_pct, errors="coerce").fillna(0) >= ROLE_PART)
+    games = {}   # team -> [(season, week, {pid: (carries, targets, real)}, team carries, team targets)] oldest first
+    for (tm, s, w), g in h.sort_values(["season", "week"]).groupby(["team", "season", "week"], sort=False):
+        games.setdefault(tm, []).append((s, w, {p: (c, tg, r) for p, c, tg, r in zip(g.player_id, g.carries.fillna(0), g.targets.fillna(0), g.real)},
+                                        float(g.carries.fillna(0).sum()), float(g.targets.fillna(0).sum())))
+    out = {}
+    need_cols = [c_ for c_ in ("carries_pg", "targets_pg") if c_ in t]
+    for (tm, s, w), rows in t.groupby(["team", "season", "week"], sort=False):
+        past = [g for g in games.get(tm, []) if (g[0], g[1]) < (s, w)][-ROLE_LOOKBACK:]
+        if not past:
+            continue
+        seen = set().union(*(g[2].keys() for g in past))
+        pos = rows.position.to_numpy()
+        res = {}
+        for j, (stat, col) in enumerate((("carries", "carries_pg"), ("targets", "targets_pg"))):
+            if col not in need_cols:
+                continue
+            ok_pos = np.isin(pos, ["RB"] if stat == "carries" else ["RB", "WR", "TE"])
+            vol = pd.to_numeric(rows[col], errors="coerce").fillna(0).to_numpy()
+            # lineup: the players with a real role who have played for this team in the lookback (a new arrival has no
+            # past game with it to match)
+            core = [p for p, ok, v in zip(rows.player_id, ok_pos, vol) if ok and v >= ROLE_MIN_PG[stat] and p in seen]
+            picked = [g for g in reversed(past) if all(g[2].get(p, (0, 0, False))[2] for p in core)][:k]
+            if not picked:
+                continue
+            wts = np.array([1.0 if g[0] == s else PRIOR_SEASON_WEIGHT for g in picked])
+            den = float(sum(wt * g[3 + j] for wt, g in zip(wts, picked)))
+            if den <= 0:
+                continue
+            for idx, p, ok in zip(rows.index, rows.player_id, ok_pos):
+                if not ok or not any(p in g[2] for g in picked):
+                    continue   # quarterbacks keep their own share (starters change); no game with this lineup
+                num = float(sum(wt * g[2].get(p, (0, 0, False))[j] for wt, g in zip(wts, picked)))
+                res.setdefault(idx, {})[f"role_{stat}_share"] = num / den
+        out.update(res)
+    return pd.DataFrame.from_dict(out, orient="index", columns=cols) if out else pd.DataFrame(index=t.index[:0], columns=cols)
+
+
+# Players who sat out the team's last SAT_GAMES games (on its roster, not listed Out) and had a small role when they last
+# played: backs, receivers and tight ends not listed Out or Doubtful, with 3 or fewer carries + targets a game in their
+# last 3 games, who missed the team's last 2 games, played in 40% of the next games (2021-2024: 1,101 rows; 2025-26: 346),
+# against 94% for players who played the team's last game. With 3-6 a game it was 53-56% and with 6-10, 52-70%, so those
+# stay in. 2026 W7-W9 frozen sims gave such depth players carries and targets in games they never dressed for.
+SAT_GAMES = 2
+SAT_MAX_TOUCHES = 3.0
+
+
+def sat_out_recently(frame: pd.DataFrame, rows: pd.DataFrame) -> pd.Series:
+    """True for each backs/receivers/tight-end row of an upcoming week whose player missed his team's last SAT_GAMES
+    finished games and had a small role in his last 3 games (SAT_MAX_TOUCHES carries + targets a game)."""
+    out = pd.Series(False, index=rows.index)
+    if rows.empty or "last_week" not in rows:
+        return out
+    lab = frame[frame.labelled == 1][["season", "week", "team"]].drop_duplicates()
+    order = {tm: sorted(zip(g.season, g.week)) for tm, g in lab.groupby("team")}
+    for idx, r in rows.iterrows():
+        if r.get("position") not in ("RB", "WR", "TE") or r.get("labelled", 0) == 1 or r.get("changed_team", 0) == 1:
+            continue
+        past = [g for g in order.get(r.team, []) if g < (r.season, r.week)]
+        if len(past) < SAT_GAMES or not np.isfinite(_f(r.get("last_week"))):
+            continue
+        last = (int(r.last_season), int(r.last_week))
+        touches = _f(r.get("carries_l3"), 0.0) + _f(r.get("targets_l3"), 0.0)
+        out[idx] = last < past[-SAT_GAMES] and touches <= SAT_MAX_TOUCHES
+    return out
+
+
+def _f(x, default=np.nan) -> float:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return default
+    return v if np.isfinite(v) else default
 
 
 def population(t: pd.DataFrame, market: str) -> pd.Series:
@@ -683,6 +781,7 @@ def project_week(c: sqlite3.Connection, frame: pd.DataFrame, season: int, week: 
     rows = frame[(frame.season == season) & (frame.week == week)]
     lab = frame[(frame.labelled == 1) & ((frame.season < season) | ((frame.season == season) & (frame.week < week)))]
     out, summary = [], {}
+    sat = sat_out_recently(frame, rows)
     for market, mrep in rep["markets"].items():
         gate = mrep["gate"]
         name = gate["promoted"] or gate["research_model"]
@@ -704,6 +803,8 @@ def project_week(c: sqlite3.Connection, frame: pd.DataFrame, season: int, week: 
                 exclusion = f"Roster status {status}"
             elif isinstance(rep_status, str) and rep_status in PASS_ON:
                 exclusion = f"Injury report: {rep_status}"
+            elif sat.get(idx, False):
+                exclusion = f"Sat out the team's last {SAT_GAMES} games"
             flags = []
             if isinstance(rep_status, str) and rep_status == "Questionable":
                 flags.append("Questionable on the injury report")

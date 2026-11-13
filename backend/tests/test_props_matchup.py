@@ -58,3 +58,29 @@ def test_sim_blends_the_last_game_share():
     without = gamesim.simulate_team(rows, np.random.default_rng(3), n=3000, params={"last_car_w": 0.0})
     assert with_last["a"]["carries"].mean() > without["a"]["carries"].mean()
     assert with_last["b"]["carries"].mean() < without["b"]["carries"].mean()
+
+
+def test_role_shares_use_games_with_this_weeks_lineup():
+    """2026 W10 NYG: the starter missed the last game (the backup got 21 carries) and left an earlier one early. His
+    role share comes from the games both backs played in full."""
+    g = lambda w, rows: [{"season": 2026, "week": w, "team": "NYG", "player_id": p, "carries": c, "targets": 0, "offense_pct": s}  # noqa: E731
+                         for p, c, s in rows]
+    hist = pd.DataFrame(g(5, [("cam", 17, 0.6), ("dev", 5, 0.3), ("qb", 4, 1.0)]) + g(6, [("cam", 0, 0.08), ("dev", 4, 0.4), ("qb", 3, 1.0)])
+                        + g(7, [("dev", 21, 0.9), ("qb", 2, 1.0)]))
+    t = pd.DataFrame([{"season": 2026, "week": 8, "team": "NYG", "player_id": p, "position": pos, "carries_pg": pg, "targets_pg": 0.0}
+                      for p, pos, pg in (("cam", "RB", 13.0), ("dev", "RB", 8.0), ("qb", "QB", 3.0), ("new", "RB", 5.0))])
+    f = t.join(props._role_shares(hist, t))
+    share = dict(zip(f.player_id, f.role_carries_share))
+    assert abs(share["cam"] - 17 / 26) < 1e-9 and abs(share["dev"] - 5 / 26) < 1e-9   # only week 5 had both backs
+    assert np.isnan(share["qb"]) and np.isnan(share["new"])   # quarterbacks and new arrivals keep their own share
+
+
+def test_sat_out_recently_drops_depth_players_who_missed_two_games():
+    lab = pd.DataFrame([{"season": 2026, "week": w, "team": "NYG", "labelled": 1} for w in (5, 6, 7)])
+    up = pd.DataFrame([{"season": 2026, "week": 8, "team": "NYG", "labelled": 0, "changed_team": 0, "player_id": p, "position": pos,
+                        "last_season": 2026, "last_week": lw, "carries_l3": c, "targets_l3": tg}
+                       for p, pos, lw, c, tg in (("depth", "WR", 5, 0.0, 1.0), ("star", "WR", 5, 0.0, 8.0), ("rotation", "WR", 6, 0.0, 1.0),
+                                                 ("qb", "QB", 5, 1.0, 0.0))])
+    frame = pd.concat([lab, up], ignore_index=True)
+    sat = props.sat_out_recently(frame, frame[frame.labelled == 0])
+    assert dict(zip(frame.player_id[sat.index], sat)) == {"depth": True, "star": False, "rotation": False, "qb": False}

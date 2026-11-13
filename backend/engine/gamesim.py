@@ -41,11 +41,20 @@ LEAGUE = {"catch_rate": 0.65, "ypr": 10.8, "ypc": 4.3, "int_rate": 0.023, "td_ra
 # into his last-8-games share. Found when Jacobs returned (2026 W8 GB: shares summed to 149%); tuned on 2021 (0.3 beat
 # 0.2, 0.5 and 1.0), then on 2022-26 carries log loss -0.0068 (week-bootstrap 90% CI -0.0037..-0.0098), rushing yards
 # -0.0021 (CI +0.0002..-0.0047); 65%+ carries picks 72.6% -> 73.5%.
+# role_car_w / role_tgt_w: weight on each player's share in the team's last 3 games in which this week's lineup all played
+# a real part (props._role_shares), blended into the shares above. Found in 2026 W10 WAS-NYG (sim split Skattebo 11.3 /
+# Singletary 9.6 carries; real 18 / 1; with these weights 12.7 / 8.5). Share test, 2022-2026 team-weeks (players who
+# played, each team's real carries and targets): backs' carries miss per player 2.578 -> 2.551 at 0.3 (week-bootstrap 90%
+# CI of the gain +0.016..+0.037; 0.5 tuned best on 2021 but gained less after), 3.088 -> 3.051 on the 408 team-weeks where
+# a back with a real role missed the team's previous game; 1.0 (role games alone) was worse. Targets 1.426 -> 1.418 at 0.3
+# (CI +0.005..+0.011; 0.3 beat 0.5 and 0.7 on 2021). Full simulations 2024-2026 (800 runs a game, same draws): carries
+# CRPS -0.19%, rushing yards +0.02%, targets -0.20%, receptions -0.22% (CI +0.0001..+0.0032), receiving yards -0.18%.
 # catch_adj / ypt_adj / ypc_adj: league-wide efficiency correction (catch rate, yards per target, yards per carry) learned
 # from recent finished weeks (efficiency_factor); used only where run() found it beat the uncorrected simulation.
 PARAMS = {"alpha_tgt": 12.0, "alpha_car": 10.0, "k_rec": 0.6, "k_rush": 0.5, "vol_sd": 0.2, "pass_slope": 0.0, "rush_slope": 0.0,
           "script_sd": 0.0, "other_min_tgt": 0.02, "other_min_car": 0.04, "pass_adj": 1.0, "rush_adj": 1.0,
-          "fill_car": 1.0, "fill_tgt": 1.0, "catch_adj": 1.0, "ypt_adj": 1.0, "ypc_adj": 1.0, "last_car_w": 0.3}
+          "fill_car": 1.0, "fill_tgt": 1.0, "catch_adj": 1.0, "ypt_adj": 1.0, "ypc_adj": 1.0, "last_car_w": 0.3,
+          "role_car_w": 0.3, "role_tgt_w": 0.3}
 
 SIM_MARKETS = ["pass_yards", "pass_attempts", "completions", "pass_tds", "interceptions", "rush_yards", "carries",
                "rec_yards", "receptions", "rush_rec_yards"]
@@ -80,6 +89,44 @@ def starting_qb(rows: pd.DataFrame):
         if np.isfinite(last).any() and np.nanmax(last) > 0:
             return qbs.iloc[int(np.nanargmax(last))].player_id
     return qbs.iloc[int(np.argmax(_num(qbs.attempts_pg)))].player_id
+
+
+def _blend(rows: pd.DataFrame, idx, share: np.ndarray, col: str, w: float) -> np.ndarray:
+    """share with w of the way moved to rows[col] where that is known."""
+    if w <= 0 or col not in rows:
+        return share
+    v = _num(rows[col].iloc[idx], np.nan)
+    return np.where(np.isfinite(v), w * v + (1 - w) * share, share)
+
+
+def _with_other(share: np.ndarray, P: dict, kind: str) -> np.ndarray:
+    """The listed players' shares plus one "other" share for players outside the frame, summing to 1. Shares left by
+    players who are not playing go to those who are (fill_*)."""
+    gap = 1.0 - P[f"other_min_{kind}"] - share.sum()
+    if P[f"fill_{kind}"] > 0 and gap > 0 and share.sum() > 0:
+        share = share * (1.0 + P[f"fill_{kind}"] * gap / share.sum())
+    other = max(P[f"other_min_{kind}"], 1.0 - share.sum())
+    out = np.append(share, other)
+    return out / out.sum()
+
+
+def target_shares(rows: pd.DataFrame, P: dict) -> tuple[np.ndarray, np.ndarray]:
+    """(row positions of the receivers, expected share of the team's targets for each, plus "other" last)."""
+    pos = rows.position.to_numpy()
+    rec_idx = np.where(np.isin(pos, ["RB", "WR", "TE"]))[0]
+    share = _blend(rows, rec_idx, _num(rows.targets_share.iloc[rec_idx]), "role_targets_share", P["role_tgt_w"])
+    return rec_idx, _with_other(share * _num(rows.opp_targets_mult.iloc[rec_idx], 1.0), P, "tgt")
+
+
+def rush_shares(rows: pd.DataFrame, P: dict, starter=None) -> tuple[np.ndarray, np.ndarray]:
+    """(row positions of the ball carriers: the backs and the starting quarterback, expected share of the team's carries
+    for each, plus "other" last). Backup quarterbacks are on the roster but rarely play, and their own per-game shares
+    (from the games they did play) took carries from the backs."""
+    pos = rows.position.to_numpy()
+    rush_idx = np.where((pos == "RB") | ((pos == "QB") & (rows.player_id.to_numpy() == starter)))[0]
+    share = _blend(rows, rush_idx, _num(rows.carries_share.iloc[rush_idx]), "last_carries_share", P["last_car_w"])
+    share = _blend(rows, rush_idx, share, "role_carries_share", P["role_car_w"])
+    return rush_idx, _with_other(share * _num(rows.opp_carries_mult.iloc[rush_idx], 1.0), P, "car")
 
 
 def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None = None,
@@ -118,14 +165,7 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
     out: dict[str, dict[str, np.ndarray]] = {}
 
     # Receivers: targets shared out, then catches and yards from each player's efficiency vs this defense.
-    rec_idx = np.where(np.isin(pos, ["RB", "WR", "TE"]))[0]
-    tgt_share = _num(rows.targets_share.iloc[rec_idx]) * _num(rows.opp_targets_mult.iloc[rec_idx], 1.0)
-    gap = 1.0 - P["other_min_tgt"] - tgt_share.sum()
-    if P["fill_tgt"] > 0 and gap > 0 and tgt_share.sum() > 0:
-        tgt_share = tgt_share * (1.0 + P["fill_tgt"] * gap / tgt_share.sum())
-    other = max(P["other_min_tgt"], 1.0 - tgt_share.sum())
-    shares = np.append(tgt_share, other)
-    shares /= shares.sum()
+    rec_idx, shares = target_shares(rows, P)
     tgts = _dirichlet_multinomial(rng, np.round(att * team_tgt_ratio), shares, P["alpha_tgt"])
     tot_rec = np.zeros(n)
     tot_yds = np.zeros(n)
@@ -150,18 +190,7 @@ def simulate_team(rows: pd.DataFrame, rng, n: int = N_SIMS, params: dict | None 
     # Rushers: carries shared out among the backs and the starting quarterback. Backup quarterbacks are on the roster
     # but rarely play, and their own per-game shares (from the games they did play) took carries from the backs.
     starter = starting_qb(rows)
-    rush_idx = np.where((pos == "RB") | ((pos == "QB") & (rows.player_id.to_numpy() == starter)))[0]
-    car_share = _num(rows.carries_share.iloc[rush_idx])
-    if P["last_car_w"] > 0 and "last_carries_share" in rows:
-        last = _num(rows.last_carries_share.iloc[rush_idx], np.nan)
-        car_share = np.where(np.isfinite(last), P["last_car_w"] * last + (1 - P["last_car_w"]) * car_share, car_share)
-    car_share = car_share * _num(rows.opp_carries_mult.iloc[rush_idx], 1.0)
-    gap = 1.0 - P["other_min_car"] - car_share.sum()
-    if P["fill_car"] > 0 and gap > 0 and car_share.sum() > 0:  # carries left by backs who are not playing go to those who are
-        car_share = car_share * (1.0 + P["fill_car"] * gap / car_share.sum())
-    other = max(P["other_min_car"], 1.0 - car_share.sum())
-    shares = np.append(car_share, other)
-    shares /= shares.sum()
+    rush_idx, shares = rush_shares(rows, P, starter)
     cars = _dirichlet_multinomial(rng, car, shares, P["alpha_car"])
     for j, i in enumerate(rush_idx):
         r = rows.iloc[i]
@@ -444,6 +473,8 @@ def _postgame_rows(rows: pd.DataFrame, level: str) -> pd.DataFrame:
         r["targets_share"] = (num("targets") / num("team_targets").replace(0, np.nan)).fillna(0.0)
         r["carries_share"] = (num("carries") / num("team_carries").replace(0, np.nan)).fillna(0.0)
         r["last_carries_share"] = np.nan  # the real share replaces the pregame blend
+        r["role_carries_share"] = np.nan
+        r["role_targets_share"] = np.nan
         r["last_att_share"] = np.nan  # the real attempts pick the passer
         r["attempts_pg"] = num("attempts").fillna(num("attempts_pg"))
         r["opp_targets_mult"] = 1.0
@@ -533,7 +564,10 @@ def attach(c, frame: pd.DataFrame, season: int, week: int, run_id: str, log=prin
     st_ = rows["status"] if "status" in rows else pd.Series(index=rows.index, dtype=object)
     rs_ = rows["report_status"] if "report_status" in rows else pd.Series(index=rows.index, dtype=object)
     out_ = (st_.notna() & st_.ne("ACT")) | rs_.isin(props.PASS_ON)
-    rows = rows[~out_]
+    # and so do depth players who sat out the team's last 2 games (props.sat_out_recently): fewer than half play
+    sat = props.sat_out_recently(frame, rows[~out_])
+    log(f"gamesim: {int(sat.sum())} players left out for sitting the team's last {props.SAT_GAMES} games")
+    rows = rows[~out_].drop(index=sat[sat].index)
     adj = week_params(frame, season, week, adopted_corrections(rep))
     sims = simulate_week(rows, n, seed=season * 100 + week, params=adj)
     log(f"gamesim: corrections from recent weeks: " + ", ".join(f"{k} x{v}" for k, v in adj.items()))

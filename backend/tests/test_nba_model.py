@@ -271,3 +271,15 @@ def test_vacated_counts_injured_and_ruled_out_teammates_not_coach_decisions():
     v = history._vacated(p, d).set_index(["game_id", "player_id"])
     assert v.loc[(2, "a"), "vac_min"] == 30.0 and abs(v.loc[(2, "a"), "vac_ast"] - 6.0) < 1e-9
     assert v.loc[(1, "a"), "vac_min"] == 0.0
+
+
+def test_sims_leave_out_questionable_players():
+    import pandas as pd
+    from nba import pipeline
+    rows = []
+    for pid, name, inj, out in ((1, "Sure", "", False), (2, "Q", "Questionable", False), (3, "DTD", "Day-To-Day", False), (4, "Out", "Out", True)):
+        for m in ("points", "rebounds", "assists", "threes"):
+            rows.append({"player_id": pid, "player_name": name, "team": "NY", "market": m, "mu": 5.0, "injury": inj, "out": out,
+                         "min_s": 30.0, "min_exp": 28.0})
+    names = {r["player_name"] for r in pipeline.rotation_json(pd.DataFrame(rows))}
+    assert names == {"Sure", "DTD"}
