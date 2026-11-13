@@ -9,7 +9,7 @@ import type { Slate } from "./nba";
 type Summary = { mean: number };
 export type FrozenWeek = {
   season: number; week: number; updated_at?: string;
-  games: Record<string, { game_id: string; kickoff: string | null; teams: Record<string, {
+  games: Record<string, { game_id: string; kickoff: string | null; frozen_at?: string; teams: Record<string, {
     inputs: { player_id: string; player_name: string; position: string; team_implied_total: number | null; status?: string | null }[];
     players: Record<string, Record<string, Summary>>;
   }> }>;
@@ -197,12 +197,25 @@ export function repairNba(g: NbaSimGame, players: SimGames["nba"]["players"]): s
   return fixes;
 }
 
+/** How recent a game's inputs must be: made after the final injury report (Friday afternoon for a Sunday game, two days
+ *  before any game). Week 9 of 2026 kept the Thursday inputs of every Sunday game (no full run could finish until
+ *  Monday), so the sims gave carries and targets to 18 players ruled out on Friday, Skattebo's 20 carries among them. */
+export const NFL_INPUTS_MAX_AGE_H = 44;
+export function staleInputs(g: { kickoff: string | null; frozen_at?: string }): boolean {
+  if (!g.kickoff || !g.frozen_at) return false;
+  return Date.parse(g.frozen_at) < Date.parse(g.kickoff) - NFL_INPUTS_MAX_AGE_H * 3600e3;
+}
+
 export function nflSimGames(week: FrozenWeek | null, held: HeldGame[] = [], fixed: FixedGame[] = []): SimGames["nfl"] {
   if (!week) return { season: null, week: null, games: [] };
   const games: NflSimGame[] = [];
   for (const [id, g] of Object.entries(week.games)) {
     const [, , away, home] = id.split("_");
     if (!away || !home || !g.teams[away] || !g.teams[home]) continue;
+    if (staleInputs(g)) {
+      held.push({ sport: "nfl", game: id, reasons: [`inputs from ${g.frozen_at}, before the final injury report (${NFL_INPUTS_MAX_AGE_H} hours before kickoff)`] });
+      continue;
+    }
     const a = nflTeam(g.teams[away]), h = nflTeam(g.teams[home]);
     if (!a || !h) { held.push({ sport: "nfl", game: id, reasons: ["missing a passer, ball carriers, targets or implied total"] }); continue; }
     const game: NflSimGame = { id, away, home, kickoff: g.kickoff, teams: { [away]: a, [home]: h } };
