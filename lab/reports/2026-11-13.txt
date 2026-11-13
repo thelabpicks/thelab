@@ -2,20 +2,29 @@ The Lab daily report, Friday, Nov 13 (results from Thursday, Nov 12)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 31-11 +12.92u / 8-3 +2.84u
+  NFL: 32-12 +12.44u / 8-4 +1.84u
   CFB: 36-10 +0.43u / 7-0 +2.57u
   NBA: 62-42 +5.50u / 24-8 +3.50u
 
 NFL
   Picks
-    - 2 picks are waiting on a final stat line: J.J. McCarthy under 1.5 passing TDs; Antonio Williams under 38.5 receiving yards. They are graded on the next refresh after the result posts.
+    - Surest hit: J.J. McCarthy under 1.5 passing TDs (67%), finished with 1.
+    - Miss: Antonio Williams under 38.5 receiving yards at 62% (pick of the day). Finished with 42.
   How the model did
-    - Featured picks this season: 106 of 187 (57%).
-    - Off calibration: TD Lean: running hot (64 of 194 hit vs 26% expected).
-    - Off calibration: Props Strong: running cold (82 of 144 hit vs 69% expected).
+    - Every graded prop and TD lean on 1 game: 20-25 (44%). By confidence: 70%+ hit 100% of 1, 60-70% hit 50% of 8, under 60% hit 42% of 36.
+    - Featured picks this season: 107 of 189 (57%).
+    - Off calibration: TD Lean: running hot (66 of 199 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (83 of 146 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 23.4 to 14.4, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-2.0 passes over 86). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Expected players who sat out keeps running above the pregame input (+1.0 players over 86). Watching it; no automatic correction for this input.
+    - Target share keeps running above the pregame input (+0.6 pct pts over 634). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.6 pct pts over 282). Watching it; no automatic correction for this input.
+    - Biggest misses: Isaiah Likely rec yards (sim 48.9, had 127; efficiency); Jayden Daniels pass yards (sim 184.5, had 249; efficiency); Stefon Diggs rec yards (sim 28.7, had 83; his role).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
-    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0007), volume (+0.0000).
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0010), volume (+0.0002).
   Game sims vs the final
     - WAS 24-21 NYG (sims WAS 19-22 NYG, winner ✗); biggest misses: Isaiah Likely 127 receiving yards (sims 62.3), Stefon Diggs 83 receiving yards (sims 40.2)
     - Last 30 days: 17 games, winner right in 12 (71%); each team's points missed by 7.9 on average, running +0.1 vs projected. Furthest-leaning stat: rushing yards, +7 per player vs projected.
@@ -24,11 +33,11 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
-    - Winners (3 games): 2-1 (67%). By confidence: 70%+ hit 100% of 2, under 60% hit 0% of 1.
-    - Spreads (3 games): 2-1 (67%). By confidence: under 60% hit 67% of 3.
-    - Totals (3 games): 0-3 (0%). By confidence: under 60% hit 0% of 3.
-    - Furthest off: Massachusetts at Toledo (projected 52.5 total, scored 24, −28.5); Buffalo at Ball State (projected 52.9 total, scored 35, −17.9).
-    - Suggested college bets this season: 38-46 (45%).
+    - Winners (5 games): 2-3 (40%). By confidence: 70%+ hit 100% of 2, under 60% hit 0% of 3.
+    - Spreads (5 games): 3-2 (60%). By confidence: under 60% hit 60% of 5.
+    - Totals (5 games): 2-3 (40%). By confidence: under 60% hit 40% of 5.
+    - Furthest off: Memphis at South Florida (projected 52 total, scored 93, +41.0); Massachusetts at Toledo (projected 52.5 total, scored 24, −28.5).
+    - Suggested college bets this season: 39-46 (46%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.6 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
