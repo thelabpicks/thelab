@@ -26,6 +26,7 @@ from sklearn.linear_model import PoissonRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from . import weather
 from .util import utcnow
 
 WINDOW = 8
@@ -683,6 +684,7 @@ def project_week(c: sqlite3.Connection, frame: pd.DataFrame, season: int, week: 
     rows = frame[(frame.season == season) & (frame.week == week)]
     lab = frame[(frame.labelled == 1) & ((frame.season < season) | ((frame.season == season) & (frame.week < week)))]
     out, summary = [], {}
+    winds = weather.game_winds(c, season, week, log=log)
     for market, mrep in rep["markets"].items():
         gate = mrep["gate"]
         name = gate["promoted"] or gate["research_model"]
@@ -694,6 +696,9 @@ def project_week(c: sqlite3.Connection, frame: pd.DataFrame, season: int, week: 
         train = lab[population(lab, market)]
         m, dist = fit_market_model(name, market, train)
         mu = m.predict(cand)
+        if winds and market in weather.RATE:
+            # unplayed outdoor games only (game_winds skips finished games); see engine/weather.py
+            mu = mu * cand.game_id.map(lambda g: weather.factor(market, winds.get(g))).to_numpy(dtype=float)
         q = dist.quantiles(mu)
         st = MARKETS[market]["stat"]
         for i, (idx, r) in enumerate(cand.iterrows()):
