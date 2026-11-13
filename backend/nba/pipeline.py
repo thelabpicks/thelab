@@ -275,12 +275,24 @@ def slate_json(proj: pd.DataFrame, f: pd.DataFrame, oos: dict, reports: dict, od
     return rows
 
 
+# Players a game simulation leaves out besides those ruled out: listed Questionable on the league's report. Of the
+# players Questionable on the report the noon refresh read (Nov 2-12, 2026: 102 on teams that played), 38 played (37%);
+# Probable 79%, Doubtful 6%. The posted sims of Nov 10-12 gave full minutes to 8 Questionable players who sat (Herro, Hart,
+# Markkanen, Vassell, Powell, Grimes, Traore, LeBron James). The picks already leave them out (frontend surePlay).
+SIM_SITS = {"questionable"}
+
+
+def sim_sits(proj: pd.DataFrame) -> pd.Series:
+    inj = proj["injury"] if "injury" in proj else pd.Series("", index=proj.index)
+    return inj.fillna("").astype(str).str.lower().isin(SIM_SITS)
+
+
 def rotation_json(proj: pd.DataFrame) -> list[dict]:
     """Every projected player not ruled out, for the game simulations: the site's rows leave out players under 15
     minutes, and a team's rotation must add up to its whole game. Means are the same projections the picks use
     (conditional on playing his usual minutes, min_s); minutes_expected also counts coach's-decision DNPs as 0."""
     keep = {"points": "pts", "rebounds": "reb", "assists": "ast", "threes": "tpm"}
-    p = proj[~proj.out & proj.market.isin(keep)]
+    p = proj[~proj.out & ~sim_sits(proj) & proj.market.isin(keep)]
     w = p.pivot_table(index=["player_id", "player_name", "team"], columns="market", values="mu").rename(columns=keep)
     info = p.drop_duplicates("player_id").set_index("player_id")[["min_s", "min_exp"]]
     out = []
