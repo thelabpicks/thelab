@@ -1,6 +1,6 @@
 {
   "date": "2026-11-13",
-  "ran_at": "2026-11-13T16:40:40+00:00",
+  "ran_at": "2026-11-13T23:09:08+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -77,8 +77,8 @@
   },
   "official_injuries": {
     "saved": "2026-11-13.json",
-    "players": 88,
-    "report": "Injury-Report_2026-11-13_11_30AM.pdf"
+    "players": 112,
+    "report": "Injury-Report_2026-11-13_06_00PM.pdf"
   },
   "rosters": {
     "teams": 30,
@@ -86,7 +86,7 @@
   },
   "espn_props": {
     "saved": "2026-11-13.json",
-    "lines": 523,
+    "lines": 555,
     "errors": {}
   },
   "odds": {
