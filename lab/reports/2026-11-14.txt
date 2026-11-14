@@ -3,7 +3,7 @@ The Lab daily report, Saturday, Nov 14 (results from Friday, Nov 13)
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 32-12 +12.44u / 8-4 +1.84u
-  CFB: 36-10 +0.43u / 7-0 +2.57u
+  CFB: 37-10 +0.68u / 7-0 +2.57u
   NBA: 65-49 +6.24u / 25-9 +3.50u
 
 NFL
@@ -21,13 +21,13 @@ NFL
 
 CFB
   Picks
-    - 1 pick is waiting on a final stat line: UCLA to win (ML -395). It is graded on the next refresh after the result posts.
+    - Surest hit: UCLA to win (ML -395) (76%), final 14–22.
   How the model did
-    - Winners (2 games): 0-2 (0%). By confidence: under 60% hit 0% of 2.
-    - Spreads (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
-    - Totals (2 games): 2-0 (100%). By confidence: under 60% hit 100% of 2.
-    - Furthest off: Memphis at South Florida (projected 52 total, scored 93, +41.0); Louisiana at UL Monroe (projected 49.5 total, scored 63, +13.5).
-    - Suggested college bets this season: 39-46 (46%).
+    - Winners (5 games): 1-4 (20%). By confidence: 60-70% hit 0% of 1, under 60% hit 25% of 4.
+    - Spreads (5 games): 2-3 (40%). By confidence: under 60% hit 40% of 5.
+    - Totals (5 games): 3-2 (60%). By confidence: under 60% hit 60% of 5.
+    - Furthest off: Memphis at South Florida (projected 52 total, scored 93, +41.0); Florida State at Pittsburgh (projected 54.3 total, scored 26, −28.3).
+    - Suggested college bets this season: 41-48 (46%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.6 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
