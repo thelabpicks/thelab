@@ -1,0 +1,64 @@
+The Lab daily report, Sunday, Nov 15 (results from Saturday, Nov 14)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
+  NFL: 32-12 +12.44u / 8-4 +1.84u
+  CFB: 37-10 +0.68u / 7-0 +2.57u
+  NBA: 70-54 +5.24u / 25-10 +3.50u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 107 of 189 (57%).
+    - Off calibration: TD Lean: running hot (66 of 199 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (83 of 146 hit vs 70% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0010), volume (+0.0002).
+  Game sims vs the final
+    - Last 30 days: 17 games, winner right in 12 (71%); each team's points missed by 7.9 on average, running +0.1 vs projected. Furthest-leaning stat: rushing yards, +7 per player vs projected.
+
+CFB
+  Picks
+    - 19 picks are waiting on a final stat line: Wisconsin to win (ML -320); East Carolina to win (ML -430); Kennesaw State to win (ML -285); Rice to win (ML -135); Virginia to win (ML -450); Oregon to win (ML -390); BYU to win (ML -284); Indiana to win (ML -330); Texas State to win (ML -350); Kentucky to win (ML -145); Penn State to win (ML -420); South Alabama to win (ML -145); LSU to win (ML -194); South Carolina to win (ML -300); Oklahoma State to win (ML -160); Utah State to win (ML -147); Wyoming to win (ML -270); Washington State to win (ML -335); North Dakota State to win (ML -270). They are graded on the next refresh after the result posts.
+  How the model did
+    - Winners (3 games): 1-2 (33%). By confidence: 60-70% hit 0% of 1, under 60% hit 50% of 2.
+    - Spreads (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
+    - Totals (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
+    - Furthest off: Florida State at Pittsburgh (projected 54.3 total, scored 26, −28.3); Houston at Colorado (projected 53.9 total, scored 74, +20.1).
+    - Suggested college bets this season: 41-48 (46%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.6 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 13 points vs 12.9 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - Surest hit: Cameron Boozer under 19.5 points (60%), finished with 15.
+    - Miss: Julius Randle under 21.5 points at 61% (pick of the day). Finished with 22.
+    - Miss: Cam Spencer under 2.5 threes made at 61%. Finished with 3.
+    - Miss: Julius Randle under 20.5 points at 59%. Finished with 22.
+    - Miss: Kyrie Irving under 3.5 threes made at 59%. Finished with 7.
+    - Miss: Klay Thompson under 3.5 threes made at 59%. Finished with 6.
+    - Miss: Giannis Antetokounmpo under 12.5 rebounds at 57%. Finished with 14.
+  How the model did
+    - Every lean the model made on 5 games: 206-169 (55%). By confidence: 70%+ hit 82% of 45, 60-70% hit 60% of 52, under 60% hit 50% of 278.
+    - Unders 55% (260), overs 55% (115).
+    - Furthest off among confident leans: GG Jackson pra (projected 17.8, had 3, line 7.5); GG Jackson points (projected 10.9, had 3, line 3.5); GG Jackson rebounds (projected 4.8, had 0, line 2.5).
+  Where it was off and why
+    - Re-run with the minutes players really got, 2449 of 5003 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −1.0 per player vs the projection (typical miss 5.4).
+    - Team scoring: rotations scored −3.2 points per team vs projected (typical miss 12.7).
+  Model changes
+    - Refit this morning on every box score through 2026-11-14; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - BKN 110-129 MEM (sims BKN 108-116 MEM, winner ✓); biggest misses: Taylor Hendricks 22 points (sims 3.7), Javon Small 19 points (sims 7.5)
+    - DET 117-137 MIA (sims DET 115-111 MIA, winner ✗); biggest misses: Klay Thompson 26 points (sims 10.2), Kevin Huerter 20 points (sims 11)
+    - CHI 117-106 MIN (sims CHI 115-126 MIN, winner ✗); biggest misses: Buddy Hield 16 points (sims 7.3), Jaylen Clark 0 points (sims 7.5)
+    - DAL 117-127 CLE (sims DAL 113-124 CLE, winner ✓); biggest misses: Mario Hezonja 22 points (sims 5.8), Tyrese Proctor 24 points (sims 9.6)
+    - Last 30 days: 93 games, winner right in 54 (58%); each team's points missed by 10.3 on average (the book's line by 9.2), running +0.2 vs projected. Furthest-leaning stat: rebounds, -0.1 per player vs projected.
