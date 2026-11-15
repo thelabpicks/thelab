@@ -3,7 +3,7 @@ The Lab daily report, Sunday, Nov 15 (results from Saturday, Nov 14)
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
   NFL: 32-12 +12.44u / 8-4 +1.84u
-  CFB: 37-10 +0.68u / 7-0 +2.57u
+  CFB: 49-16 −1.35u / 7-1 +1.57u
   NBA: 70-54 +5.24u / 25-10 +3.50u
 
 NFL
@@ -21,20 +21,27 @@ NFL
 
 CFB
   Picks
-    - 19 picks are waiting on a final stat line: Wisconsin to win (ML -320); East Carolina to win (ML -430); Kennesaw State to win (ML -285); Rice to win (ML -135); Virginia to win (ML -450); Oregon to win (ML -390); BYU to win (ML -284); Indiana to win (ML -330); Texas State to win (ML -350); Kentucky to win (ML -145); Penn State to win (ML -420); South Alabama to win (ML -145); LSU to win (ML -194); South Carolina to win (ML -300); Oklahoma State to win (ML -160); Utah State to win (ML -147); Wyoming to win (ML -270); Washington State to win (ML -335); North Dakota State to win (ML -270). They are graded on the next refresh after the result posts.
+    - Surest hit: Penn State to win (ML -420) (81%), final 14–42.
+    - Miss: Wisconsin to win (ML -320) at 71%. Final 21–24.
+    - Miss: South Carolina to win (ML -300) at 67%. Final 6–34.
+    - Miss: LSU to win (ML -194) at 66%. Final 22–21.
+    - Miss: Oklahoma State to win (ML -160) at 61%. Final 52–27.
+    - Miss: Rice to win (ML -135) at 60% (pick of the day). Final 20–17.
+    - Miss: Kentucky to win (ML -145) at 58%. Final 21–14.
+    - Miss: Utah State to win (ML -147) at 58%. Final 13–30.
   How the model did
-    - Winners (3 games): 1-2 (33%). By confidence: 60-70% hit 0% of 1, under 60% hit 50% of 2.
-    - Spreads (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
-    - Totals (3 games): 1-2 (33%). By confidence: under 60% hit 33% of 3.
-    - Furthest off: Florida State at Pittsburgh (projected 54.3 total, scored 26, −28.3); Houston at Colorado (projected 53.9 total, scored 74, +20.1).
-    - Suggested college bets this season: 41-48 (46%).
+    - Winners (58 games): 30-28 (52%). By confidence: 70%+ hit 84% of 19, 60-70% hit 0% of 4, under 60% hit 40% of 35.
+    - Spreads (58 games): 28-28 (50%). By confidence: under 60% hit 50% of 56.
+    - Totals (58 games): 20-38 (34%). By confidence: under 60% hit 34% of 58.
+    - Furthest off: Southern Miss at Louisiana Tech (projected 56.9 total, scored 94, +37.1); Louisville at North Carolina (projected 58.8 total, scored 30, −28.8).
+    - Suggested college bets this season: 51-66 (44%).
   Where it was off and why
-    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.6 to 8.1 points (160 games), so most of the miss was the inputs, not chance.
-    - Pace (plays) ran +0.46 vs the pregame input (typical miss 6.9).
-    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
-    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8.1 points (226 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.25 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.13 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.06 vs the pregame input (typical miss 0.9).
   Model changes
-    - Totals: typical miss 13 points vs 12.9 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+    - Totals: typical miss 13 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
 
 NBA
   Picks
