@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-14",
-  "ran_at": "2026-11-14T15:26:03+00:00",
+  "date": "2026-11-15",
+  "ran_at": "2026-11-15T15:27:38+00:00",
   "files": [
     {
       "file": "cfb_schedules_2010.csv",
@@ -69,7 +69,7 @@
     {
       "file": "cfb_schedules_2026.csv",
       "status": "downloaded",
-      "bytes": 222509
+      "bytes": 225142
     },
     {
       "file": "team_box_2012.csv",
@@ -130,7 +130,7 @@
     {
       "file": "team_box_2026.csv",
       "status": "downloaded",
-      "bytes": 148261
+      "bytes": 159922
     },
     {
       "file": "player_box_2021.csv",
@@ -155,7 +155,7 @@
     {
       "file": "player_box_2026.csv",
       "status": "downloaded",
-      "bytes": 6606352
+      "bytes": 7118521
     },
     {
       "file": "cfb_line_odds.csv.gz",
@@ -213,41 +213,26 @@
     {
       "file": "play_by_play_2026.parquet",
       "status": "downloaded",
-      "bytes": 95228829
+      "bytes": 103732225
     }
   ],
   "espn": {
     "scoreboard": {
-      "saved": "2026-11-14.json",
-      "items": 126
+      "saved": "2026-11-15.json",
+      "items": 71
     },
     "rankings": {
-      "saved": "2026-11-14.json",
+      "saved": "2026-11-15.json",
       "items": 6
     },
     "finals": {
-      "games": 11,
-      "saved": "2026-11-14.json"
+      "games": 63,
+      "saved": "2026-11-15.json"
     }
   },
   "odds": {
-    "saved": "2026-11-14.json",
-    "game_lines": 2782,
-    "team_totals": 32,
-    "props": 68,
-    "budget": {
-      "plan": "free",
-      "allowance": 500.0,
-      "reserve": 200.0,
-      "game_lines": true,
-      "team_totals": 3,
-      "props": 1,
-      "alt": 0,
-      "cost": 10,
-      "reason": "ok"
-    },
-    "credits_remaining": 439.0,
-    "errors": []
+    "skipped": "not a line day (Tuesday and Saturday)",
+    "credits_remaining": 358.0
   },
   "license": "College football scores, schedules, closing lines and player stats: cfbfastR / CollegeFootballData.com, https://github.com/sportsdataverse/cfbfastR-data. Scoreboard: ESPN public site feed. Prices: The Odds API."
 }
