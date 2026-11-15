@@ -17,7 +17,7 @@ NFL
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0010), volume (+0.0002).
   Game sims vs the final
-    - Last 30 days: 17 games, winner right in 12 (71%); each team's points missed by 7.9 on average, running +0.1 vs projected. Furthest-leaning stat: rushing yards, +7 per player vs projected.
+    - Last 30 days: 24 games, winner right in 16 (67%); each team's points missed by 7.9 on average, running +0.1 vs projected. Furthest-leaning stat: rushing yards, +5.7 per player vs projected.
 
 CFB
   Picks
@@ -68,4 +68,4 @@ NBA
     - DET 117-137 MIA (sims DET 115-111 MIA, winner ✗); biggest misses: Klay Thompson 26 points (sims 10.2), Kevin Huerter 20 points (sims 11)
     - CHI 117-106 MIN (sims CHI 115-126 MIN, winner ✗); biggest misses: Buddy Hield 16 points (sims 7.3), Jaylen Clark 0 points (sims 7.5)
     - DAL 117-127 CLE (sims DAL 113-124 CLE, winner ✓); biggest misses: Mario Hezonja 22 points (sims 5.8), Tyrese Proctor 24 points (sims 9.6)
-    - Last 30 days: 93 games, winner right in 54 (58%); each team's points missed by 10.3 on average (the book's line by 9.2), running +0.2 vs projected. Furthest-leaning stat: rebounds, -0.1 per player vs projected.
+    - Last 30 days: 94 games, winner right in 55 (59%); each team's points missed by 10.3 on average (the book's line by 9.2), running +0.3 vs projected. Furthest-leaning stat: rebounds, -0.1 per player vs projected.
