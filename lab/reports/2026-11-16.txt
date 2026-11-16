@@ -2,17 +2,32 @@ The Lab daily report, Monday, Nov 16 (results from Sunday, Nov 15)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 32-12 +12.44u / 8-4 +1.84u
+  NFL: 38-17 +12.07u / 10-5 +0.84u
   CFB: 50-16 −0.59u / 7-1 +1.57u
   NBA: 77-64 +4.24u / 26-10 +3.50u
 
 NFL
   Picks
-    - 14 picks are waiting on a final stat line: Drake Maye under 27.5 rushing yards; Jahmyr Gibbs to score a touchdown; Gunnar Helm under 3.5 receptions; Tucker Kraft under 4.5 receptions; Rashee Rice under 5.5 receptions; DJ Moore under 46.5 receiving yards; James Cook to score a touchdown; Konata Mumpfield under 2.5 receptions; Jadarian Price under 42.5 rushing yards; George Kittle under 5.5 receptions; Ja'Marr Chase under 90.5 receiving yards; Mike Gesicki under 2.5 receptions; Dohnte Meyers under 2.5 receptions; Chase Brown under 45.5 rushing yards. They are graded on the next refresh after the result posts.
+    - Surest hit: Tucker Kraft under 4.5 receptions (65%), finished with 1.
+    - Miss: Gunnar Helm under 3.5 receptions at 69% (pick of the day). Finished with 4.
+    - Miss: Konata Mumpfield under 2.5 receptions at 67%. Finished with 3.
+    - Miss: DJ Moore under 46.5 receiving yards at 64%. Finished with 90.
+    - Miss: Ja'Marr Chase under 90.5 receiving yards at 63%. Finished with 231.
+    - Miss: George Kittle under 5.5 receptions at 63%. Finished with 6.
+    - 1 pick is waiting on a final stat line: Chase Brown under 45.5 rushing yards. It is graded on the next refresh after the result posts.
   How the model did
-    - Featured picks this season: 107 of 189 (57%).
-    - Off calibration: TD Lean: running hot (66 of 199 hit vs 26% expected).
-    - Off calibration: Props Strong: running cold (83 of 146 hit vs 70% expected).
+    - Every graded prop and TD lean on 12 games: 183-266 (41%). By confidence: 70%+ hit 60% of 15, 60-70% hit 47% of 83, under 60% hit 38% of 351.
+    - Featured picks this season: 135 of 243 (56%).
+    - Off calibration: TD Lean: running hot (82 of 260 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (104 of 190 hit vs 69% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.9 to 13.9, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.8 passes over 110). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.3 points over 55). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 110). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.4 pct pts over 353). Watching it; no automatic correction for this input.
+    - Yards per pass attempt keeps running above the pregame input (+0.4 yards over 96). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Biggest misses: Brock Purdy pass yards (sim 202.7, had 389; efficiency); Ja'Marr Chase rec yards (sim 64.1, had 231; efficiency); Christian McCaffrey rec yards (sim 18.9, had 161; efficiency).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0010), volume (+0.0002).
