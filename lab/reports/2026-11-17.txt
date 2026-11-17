@@ -2,20 +2,37 @@ The Lab daily report, Tuesday, Nov 17 (results from Monday, Nov 16)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 38-17 +12.07u / 10-5 +0.84u
+  NFL: 40-24 +6.62u / 10-6 −0.16u
   CFB: 50-16 −0.59u / 7-1 +1.57u
   NBA: 81-70 +3.87u / 26-11 +3.50u
 
 NFL
   Picks
-    - 9 picks are waiting on a final stat line: Justin Herbert under 21.5 rushing yards; Ja'Kobi Lane under 2.5 receptions; Keaton Mitchell under 2.5 receptions; Zay Flowers under 5.5 receptions; Justice Hill under 2.5 receptions; Rashod Bateman under 2.5 receptions; Kimani Vidal under 18.5 rushing yards; Mark Andrews under 2.5 receptions; Omarion Hampton under 32.5 rushing yards. They are graded on the next refresh after the result posts.
+    - Surest hit: Keaton Mitchell under 2.5 receptions (61%), finished with 0.
+    - Miss: Justin Herbert under 21.5 rushing yards at 62% (pick of the day). Finished with 51.
+    - Miss: Ja'Kobi Lane under 2.5 receptions at 61%. Finished with 3.
+    - Miss: Zay Flowers under 5.5 receptions at 60%. Finished with 6.
+    - Miss: Justice Hill under 2.5 receptions at 60%. Finished with 5.
+    - Miss: Rashod Bateman under 2.5 receptions at 58%. Finished with 3.
+    - Miss: Mark Andrews under 2.5 receptions at 57%. Finished with 8.
+    - Miss: Omarion Hampton under 32.5 rushing yards at 57%. Finished with 105.
   How the model did
-    - Featured picks this season: 135 of 243 (56%).
-    - Off calibration: TD Lean: running hot (82 of 260 hit vs 26% expected).
-    - Off calibration: Props Strong: running cold (104 of 190 hit vs 69% expected).
+    - Every graded prop and TD lean on 1 game: 11-27 (29%). By confidence: 70%+ hit 0% of 1, 60-70% hit 29% of 7, under 60% hit 30% of 30.
+    - Featured picks this season: 137 of 248 (55%).
+    - Off calibration: TD Lean: running hot (83 of 262 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (106 of 195 hit vs 69% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 23.1 to 13.9, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.6 passes over 112). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.1 points over 56). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 112). Watching it; no automatic correction for this input.
+    - Target share keeps running above the pregame input (+0.4 pct pts over 811). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.4 pct pts over 359). Watching it; no automatic correction for this input.
+    - Yards per pass attempt keeps running above the pregame input (+0.4 yards over 97). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Biggest misses: Brock Purdy pass yards (sim 202.7, had 389; efficiency); Ja'Marr Chase rec yards (sim 64.1, had 231; efficiency); Christian McCaffrey rec yards (sim 18.9, had 161; efficiency).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
-    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0010), volume (+0.0002).
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0005), yards per carry (+0.0013), volume (+0.0003).
   Game sims vs the final
     - LAC 23-20 BAL (sims LAC 17-22 BAL, winner ✗); biggest misses: Omarion Hampton 105 rushing yards (sims 40.4), Derrick Henry 10 rushing yards (sims 73.6)
     - Last 30 days: 29 games, winner right in 20 (69%); each team's points missed by 7.9 on average, running +0.8 vs projected. Furthest-leaning stat: rushing yards, +4.7 per player vs projected.
