@@ -44,9 +44,9 @@ CFB
     - Suggested college bets this season: 51-66 (44%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.1 to 8.1 points (226 games), so most of the miss was the inputs, not chance.
-    - Pace (plays) ran +0.25 vs the pregame input (typical miss 6.9).
-    - Yards per play ran −0.13 vs the pregame input (typical miss 1).
-    - Turnovers ran +0.06 vs the pregame input (typical miss 0.9).
+    - Pace (plays) ran +0.23 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.14 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.05 vs the pregame input (typical miss 0.9).
   Model changes
     - Totals: typical miss 13 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
 
