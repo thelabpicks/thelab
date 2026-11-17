@@ -1,4 +1,4 @@
-"""Chances at book lines are re-fitted on graded frozen leans only when that beats the raw chances day by day."""
+"""Chances at book lines are shown from the measured confidence table only when that beats the raw chances day by day."""
 import json
 
 import numpy as np
@@ -34,17 +34,19 @@ def _archive(tmp_path, monkeypatch, overconfident: bool, days: int = 6, per_day:
 def test_overconfident_chances_are_pulled_toward_even(tmp_path, monkeypatch):
     d = _archive(tmp_path, monkeypatch, overconfident=True)
     cal = pipeline.book_calibration(d, log=lambda *a: None)
-    assert cal is not None and cal["rows"] == 1500 and cal["log_loss_refit"] < cal["log_loss_raw"]
-    assert 0.2 < cal["a"] < 0.7
+    assert cal is not None and cal["rows"] == 1500 and cal["log_loss_table"] < cal["log_loss_raw"]
+    top = cal["bands"][-1]                      # leans rated 70%+: their real record is shown, not the model's chance
+    assert top["n"] > 100 and 0.55 < top["rate"] < 0.68
     p = pipeline.apply_book_cal(0.75, cal)
-    assert 0.55 < p < 0.68
-    assert pipeline.apply_book_cal(0.8, cal) > pipeline.apply_book_cal(0.7, cal) > 0.5   # ranks are kept
+    assert 0.55 < p < 0.7
+    assert pipeline.apply_book_cal(0.8, cal) > pipeline.apply_book_cal(0.75, cal) > 0.5   # order kept inside a band
+    assert pipeline.apply_book_cal(0.25, cal) == 1 - pipeline.apply_book_cal(0.75, cal)  # an under shows on its own side
 
 
 def test_well_calibrated_chances_need_no_refit_and_few_days_are_skipped(tmp_path, monkeypatch):
     d = _archive(tmp_path, monkeypatch, overconfident=False)
     cal = pipeline.book_calibration(d, log=lambda *a: None)
-    assert cal is None or abs(cal["a"] - 1) < 0.25
+    assert cal is None or abs(pipeline.apply_book_cal(0.75, cal) - 0.75) < 0.04
     (tmp_path / "archive").rename(tmp_path / "old")
     d = _archive(tmp_path, monkeypatch, overconfident=True, days=3, per_day=500)
     assert pipeline.book_calibration(d, log=lambda *a: None) is None

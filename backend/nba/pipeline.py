@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from engine import measured
 from engine.util import utcnow
 
 from . import collect, correlation, history, predict, props, report, sources, teamfit
@@ -317,21 +318,17 @@ def p_over_dist(dist: dict, line: float) -> float:
 # --------------------------------------------------------------------------- chances at real book lines
 # The model's chances are calibrated on each player's usual line (median of his last 10), where it has years of games.
 # Book lines are sharper: from 2026-10-26 to 11-04, leans it called 65%+ at a posted line hit about 58%, not 70%. So
-# chances at a book line are re-fitted (Platt: logit-linear, which keeps every pick's rank) on the frozen leans at book
-# lines already graded, and used only while that refit beats the raw chances on each later day it never saw.
+# a chance at a book line is shown as the measured record of leans that confident at book lines (engine/measured.py:
+# "picks rated 65-70% have hit 58% of 412"), used only while that table beats the raw chances on each later day it
+# never saw. It replaced a logistic re-fit curve on 2026-11-17 (simpler to read, same record in the replay).
 BOOK_CAL_MIN_ROWS = 1000
 BOOK_CAL_MIN_DAYS = 5
 BOOK_CAL_FIRST_FIT_DAYS = 3
 
 
-def _logit1(p: float) -> float:
-    p = min(1 - 1e-4, max(1e-4, p))
-    return math.log(p / (1 - p))
-
-
 def apply_book_cal(p: float, cal: dict) -> float:
-    z = cal["a"] * _logit1(p) + cal["b"]
-    return min(0.995, max(0.005, 1 / (1 + math.exp(-z))))
+    """The shown chance of the over at a book line: the measured confidence table (engine/measured.py)."""
+    return measured.apply(p, cal["bands"])
 
 
 def book_rows(d: pd.DataFrame) -> pd.DataFrame:
@@ -380,21 +377,9 @@ def book_sides(d: pd.DataFrame, log=print) -> dict | None:
     return {"proven": proven, "record": rec, "min_lean": SIDE_MIN_LEAN, "min_n": SIDE_MIN_N, "min_rate": SIDE_MIN_RATE}
 
 
-def _fit_platt_book(r: pd.DataFrame) -> tuple[float, float]:
-    from sklearn.linear_model import LogisticRegression  # noqa: PLC0415
-    x = r.raw.clip(1e-4, 1 - 1e-4)
-    lr = LogisticRegression(C=1e3).fit(np.log(x / (1 - x)).to_numpy()[:, None], r.over.to_numpy())
-    return float(lr.coef_[0][0]), float(lr.intercept_[0])
-
-
-def _logloss(y: np.ndarray, p: np.ndarray) -> float:
-    p = np.clip(p, 1e-4, 1 - 1e-4)
-    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
-
-
 def book_calibration(d: pd.DataFrame, log=print) -> dict | None:
-    """Platt refit of the chances at book lines, or None while there are too few graded days or it does not beat the
-    raw chances walk-forward (each day predicted from a fit on earlier days only)."""
+    """The measured confidence table at book lines (engine/measured.py), or None while there are too few graded days
+    or it does not beat the raw chances day by day (each day scored from a table of earlier days only)."""
     try:
         r = book_rows(d)
     except Exception as ex:  # noqa: BLE001 - the site still builds on the raw chances
@@ -404,24 +389,8 @@ def book_calibration(d: pd.DataFrame, log=print) -> dict | None:
     if len(r) < BOOK_CAL_MIN_ROWS or len(days) < BOOK_CAL_MIN_DAYS:
         log(f"nba book calibration: not used ({len(r)} graded book leans over {len(days)} days)")
         return None
-    raw_ll, cal_ll, n_test, better = 0.0, 0.0, 0, 0
-    for day in days[BOOK_CAL_FIRST_FIT_DAYS:]:
-        a, b = _fit_platt_book(r[r.date < day])
-        t = r[r.date == day]
-        y = t.over.to_numpy()
-        pc = np.array([apply_book_cal(p, {"a": a, "b": b}) for p in t.raw])
-        lr, lc = _logloss(y, t.raw.to_numpy()), _logloss(y, pc)
-        raw_ll += lr * len(t)
-        cal_ll += lc * len(t)
-        n_test += len(t)
-        better += int(lc < lr)
-    a, b = _fit_platt_book(r)
-    out = {"a": round(a, 4), "b": round(b, 4), "rows": int(len(r)), "days": len(days), "test_rows": n_test,
-           "test_days": len(days) - BOOK_CAL_FIRST_FIT_DAYS, "days_better": better,
-           "log_loss_raw": round(raw_ll / n_test, 4), "log_loss_refit": round(cal_ll / n_test, 4)}
-    use = cal_ll < raw_ll
-    log(f"nba book calibration: use={use} {out}")
-    return out if use else None
+    rows = [{"t": t, "p_over": float(p), "over": int(o)} for t, p, o in zip(r.date, r.raw, r.over)]
+    return measured.walk_forward(rows, BOOK_CAL_FIRST_FIT_DAYS, log=log, label="nba")
 
 
 # --------------------------------------------------------------------------- frozen leans and the live record

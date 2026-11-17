@@ -3,12 +3,19 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export type Tier = { tier: string; lo: number; hi: number; n: number; hits: number; rate: number | null; avg_chance: number | null; ci: [number | null, number | null] };
-export type BookCal = { a: number; b: number; rows: number; weeks: number; test_weeks: number; log_loss_raw: number; log_loss_refit: number };
-/** The chance of the over at a book line, after the live book-line refit. */
+/** One band of the measured confidence table (backend engine/measured.py): graded leans at book lines the model rated
+ *  lo to hi, and how many hit. */
+export type Band = { lo: number; hi: number; n: number; hits: number; rate: number | null };
+export type BookCal = { kind: "measured"; bands: Band[]; shrink: number; rows: number; periods: number; test_periods: number;
+  log_loss_raw: number; log_loss_table: number };
+/** The chance of the over at a book line, shown as the measured record of leans that confident at book lines: the
+ *  band's hit rate, nudged toward the model's own chance only as much as the band's sample is small, never below 50%. */
 export const bookCal = (pOver: number, c: BookCal | null | undefined) => {
-  if (!c) return pOver;
-  const x = Math.min(1 - 1e-4, Math.max(1e-4, pOver));
-  return Math.min(0.995, Math.max(0.005, 1 / (1 + Math.exp(-(c.a * Math.log(x / (1 - x)) + c.b)))));
+  if (!c?.bands?.length) return pOver;
+  const lean = Math.max(pOver, 1 - pOver);
+  const b = c.bands.find((x, i) => lean >= x.lo && (lean < x.hi || i === c.bands.length - 1)) ?? c.bands[c.bands.length - 1];
+  const shown = Math.max(0.5, (b.hits + c.shrink * lean) / (b.n + c.shrink));
+  return pOver >= 0.5 ? shown : 1 - shown;
 };
 
 export type Confidence = {
@@ -16,7 +23,7 @@ export type Confidence = {
   props: { weeks: number; first_season: number; tiers: Tier[]; note: string; by_side?: { over: Tier[]; under: Tier[] };
     line_history?: Record<string, { lo: number; hi: number; n: number; avg_line: number; avg_actual: number; over_rate: number; avg_p_over: number }[]>;
     unders_by_market?: { market: string; label: string; n: number; hits: number; rate: number; avg_chance: number; strong_n: number; strong_rate: number | null }[];
-    /** Chances at book lines re-fit to how leans at book lines have done live (engine/picklog.py); null until it beats the raw chances on unseen weeks. */
+    /** The measured confidence table at book lines (engine/picklog.py); null until it beats the raw chances on unseen weeks. */
     book_calibration?: BookCal | null } | null;
 };
 

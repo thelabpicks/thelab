@@ -163,15 +163,9 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     p = _asof(p, lg[["game_date", "pos"] + [f"lg_{m}" for m in MARKETS]], ["pos"])
     for m in MARKETS:
         p[f"opp_{m}"] = p[f"opp_{m}"] / p[f"lg_{m}"]
-    p = _asof(p, t[["game_date", "team", "pace", "pts_for", "net"]], ["team"])
-    p = _asof(p, t[["game_date", "team", "pace", "net"]].rename(columns={"team": "opp", "pace": "opp_pace", "net": "opp_net"}), ["opp"])
-    # How lopsided the matchup looks (each team's recent scoring margin): starters lose about a minute in mismatches
-    p["net_diff"] = p.net - p.opp_net
-    p["gap"] = p.net_diff.abs()
-    p = p.drop(columns=["net", "opp_net"])
+    p = _asof(p, t[["game_date", "team", "pace", "pts_for"]], ["team"])
+    p = _asof(p, t[["game_date", "team", "pace"]].rename(columns={"team": "opp", "pace": "opp_pace"}), ["opp"])
     p = p.drop(columns=[f"lg_{m}" for m in MARKETS])
-    for m in SIMILAR_MARKETS:
-        p = _similar_allowed(p, m)
     return _vacated(p, d)
 
 
@@ -209,53 +203,11 @@ def _vacated(p: pd.DataFrame, d: pd.DataFrame) -> pd.DataFrame:
     return p
 
 
-# "Players like him vs this team": how players at the position with a similar per-minute rate (thirds, cut points from
-# earlier seasons) did against this opponent relative to their own pregame rate, ewm over the opponent's games, shrunk
-# toward 1. Walk-forward 2024-25 to 2026-27 (2026-10-29): Poisson deviance better for points (0.14%, 90% CI 0.06-0.21),
-# threes (0.12%), PRA (0.13%) and assists (0.09%); rebounds unchanged, so left out.
-SIMILAR_MARKETS = ("points", "assists", "threes", "pra")
-SIMILAR_HALF_LIFE = 15
-SIMILAR_SHRINK_GAMES = 4
-
-
-def _rate_tier(p: pd.DataFrame, m: str) -> pd.Series:
-    rate = p[f"{m}_pm_l"]
-    tier = pd.Series(1, index=p.index)
-    for season in p.season.unique():
-        ref = p[p.played & (p.season < season) & rate.notna()]
-        if ref.empty:  # first season on file: everyone in the middle tier (no later games leak into the cut points)
-            continue
-        cut = ref.groupby("pos")[f"{m}_pm_l"].quantile([1 / 3, 2 / 3]).unstack()
-        cur = p.season == season
-        lo, hi = p.pos[cur].map(cut[1 / 3]), p.pos[cur].map(cut[2 / 3])
-        tier[cur] = np.where(rate[cur] >= hi, 2, np.where(rate[cur] >= lo, 1, 0))
-    return tier
-
-
-def _similar_allowed(p: pd.DataFrame, m: str) -> pd.DataFrame:
-    """sim_{m}: actual / expected (own per-minute rate x minutes played) for similar players against this opponent,
-    from games on earlier dates only. 1.0 = they did their usual."""
-    p = p.copy()
-    p["_tier"] = _rate_tier(p, m)
-    played = p[p.played].assign(_act=lambda x: x[m], _exp=lambda x: (x[f"{m}_pm_l"] * x.minutes).fillna(0))
-    keys = ["opp", "pos", "_tier"]
-    g = played[played._exp > 0].groupby(["game_id", "game_date"] + keys, as_index=False)[["_act", "_exp"]].sum()
-    g = g.sort_values("game_date")
-    gg = g.groupby(keys)
-    v = gg._act.transform(lambda s: s.ewm(halflife=SIMILAR_HALF_LIFE).mean()) / \
-        gg._exp.transform(lambda s: s.ewm(halflife=SIMILAR_HALF_LIFE).mean()).clip(lower=0.5)
-    n = gg.cumcount() + 1
-    g[f"sim_{m}"] = (v * n + SIMILAR_SHRINK_GAMES) / (n + SIMILAR_SHRINK_GAMES)
-    p = _asof(p, g[["game_date"] + keys + [f"sim_{m}"]], keys)
-    return p.drop(columns=["_tier"])
-
-
-# Matchup mismatch (net_diff: team minus opponent recent scoring margin, gap: its size). Starters played 1.0 minute under
-# their usual in the most lopsided quarter of games vs 0.25 in the closest (2024-25 to 2026-27). Walk-forward 2024-25
-# to 2026-27 (2026-11-01, 52,004 games each): points deviance -0.14% (90% CI 0.04-0.23%), 65%+ leans 70.3% -> 70.6%; PRA,
-# assists, rebounds and threes no better on deviance, so left out.
-MISMATCH = ["net_diff", "gap"]
-MISMATCH_MARKETS = ("points",)
+# Rolled back on 2026-11-17 (Andrew: keep only what proved itself since the good stretch of Oct 22 - Nov 2):
+# "players like him vs this team" (sim_*, 2026-10-29) and the matchup mismatch (net_diff/gap, 2026-11-01). Replayed
+# on every graded book line Oct 23 - Nov 16 (6,836) with monthly refits as live, neither moved the record: log loss
+# .7018 with both vs .7017 without the mismatch and .7025 without similar players; on all of 2025-26 at usual lines the
+# 60%+ hit rate moved by 0.2 points or less. Teammates out (above) stays: it helped every market on 2025-26.
 
 FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_games", "season_min", "rest", "home",
             "pace", "opp_pace", "pts_for"]
@@ -264,5 +216,4 @@ FEATURES = ["min_s", "min_l", "start_rate", "last_min", "games_prior", "season_g
 def features_for(market: str) -> list[str]:
     own = [f"{market}_pm_s", f"{market}_pm_l"]
     shots = ["fga_pm_l", "threes_att_pm_l", "fta_pm_l"] if market in ("points", "threes", "pra") else []
-    return FEATURES + own + shots + [f"opp_{market}"] + ([f"sim_{market}"] if market in SIMILAR_MARKETS else []) + \
-        (MISMATCH if market in MISMATCH_MARKETS else []) + (VACATED if market in VACATED_MARKETS else [])
+    return FEATURES + own + shots + [f"opp_{market}"] + (VACATED if market in VACATED_MARKETS else [])
