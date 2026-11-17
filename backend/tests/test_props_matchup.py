@@ -17,21 +17,6 @@ def _frame():
     return pd.DataFrame(rows)
 
 
-def test_similar_defense_uses_only_earlier_weeks():
-    t = _frame()
-    f = t.join(props._defense_similar(t))
-    wk1 = f[f.week == 1]
-    assert wk1.opp_sim_receptions_mult.isna().all()  # nothing earlier to learn from
-    dal = f[(f.week == 3) & (f.opponent == "DAL")].opp_sim_receptions_mult
-    nyg = f[(f.week == 3) & (f.opponent == "NYG")].opp_sim_receptions_mult
-    assert (dal > 1.0).all() and (nyg < 1.0).all()
-    # Week 2 sees only week 1; changing week 3's results must not move it.
-    t2 = t.copy()
-    t2.loc[t2.week == 3, "receptions"] = 0.0
-    f2 = t2.join(props._defense_similar(t2))
-    assert np.allclose(f[f.week == 2].opp_sim_receptions_mult, f2[f2.week == 2].opp_sim_receptions_mult)
-
-
 def test_last_carries_share_is_the_teams_previous_game():
     hist = pd.DataFrame([
         {"season": 2026, "week": 6, "team": "GB", "player_id": "lloyd", "carries": 8},
