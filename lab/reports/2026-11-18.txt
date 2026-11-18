@@ -1,10 +1,10 @@
 The Lab daily report, Wednesday, Nov 18 (results from Tuesday, Nov 17)
 
 Records (top 10 / picks of the day, season):
-Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.
-  NFL: 40-24 +6.62u / 10-6 −0.16u
-  CFB: 50-16 −0.59u / 7-1 +1.57u
-  NBA: 86-75 +4.37u / 26-12 +2.50u
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 35-14 +11.68u / 10-6 −0.16u
+  CFB: 47-13 +0.22u / 7-1 +1.57u
+  NBA: 51-36 +4.52u / 26-12 +2.50u
 
 NFL
   Picks
