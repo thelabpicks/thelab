@@ -364,7 +364,7 @@ const DAILY_KEEP_DAYS = 90;
 export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 /** Fills today's and tomorrow's open pick-of-the-day slots for each sport with its likeliest picks on that date (same
- *  ranking and one-per-game/player rule as the top 10; games not yet started; 60%+ and beating the book's price, see
+ *  ranking and one-per-game/player rule as the top 10; games not yet started; DAILY_MIN_CHANCE+ and beating the book's price, see
  *  beatsPrice). Slots already filled stay exactly as chosen. */
 export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): DailyPick[] {
   const today = playDate(now), tomorrow = playDate(new Date(now.getTime() + 864e5));
@@ -404,7 +404,7 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
     && c.market === d.market && c.id !== d.id && (c.player_id ?? null) === (d.player_id ?? null) && (c.team_side ?? null) === (d.team_side ?? null));
   const daily = chooseDaily((prev.daily ?? []).filter((d) => d.date >= cutoff), open, now)
     .map((d) => flipped(d) ? { ...d, result: "void" as const, actual: "Withdrawn before kickoff: the model now backs the other side", withdrawn: true } : d)
-    // and so is one locked before the 60% floor existed that sits under it
+    // and so is one locked under the current floor
     .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
     // and one locked before the edge rule whose sims don't beat its price
@@ -423,7 +423,7 @@ export const winUnits = (price: number) => (price > 0 ? price / 100 : 100 / -pri
 export const counts = (p: LabPick, floor = BET) => p.line_source === "book" && p.chance >= floor;
 
 /** A record of these picks. The top 10 counts from BET up (the default); picks of the day pass 0, since they were locked
- *  under their own bar (the 60% floor and the edge over the price) and every one counts. */
+ *  under their own bar (DAILY_MIN_CHANCE and the edge over the price) and every one counts. */
 export function tally(ps: LabPick[], floor = BET): LabRecord {
   const counted = ps.filter((p) => counts(p, floor));
   const c = (r: LabResult) => counted.filter((p) => p.result === r).length;
