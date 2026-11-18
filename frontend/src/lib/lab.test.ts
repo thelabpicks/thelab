@@ -273,6 +273,14 @@ describe("records", () => {
     expect(r.units).toBe(1);   // +0.5 - 1 + 1.5
     expect(r.roi).toBeCloseTo(1 / 3);
   });
+  it("counts top 10 picks only at 60%+ at lock, and every pick of the day", () => {
+    const ps = [pick({ id: "a", result: "won", chance: 0.62 }), pick({ id: "b", result: "lost", chance: 0.57 }),
+      pick({ id: "c", result: "lost", chance: 0.6 })];
+    const r = tally(ps);
+    expect([r.won, r.lost, r.unbooked]).toEqual([1, 1, 1]);
+    const d = tally(ps, 0);
+    expect([d.won, d.lost, d.unbooked]).toEqual([1, 2, 0]);
+  });
   it("keeps usual lines and prices shorter than -500 off the list", () => {
     const now = new Date("2026-10-24T17:00:00Z");
     const s = advance({ updated_at: null, board: [], frozen: [] }, [

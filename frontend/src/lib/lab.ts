@@ -415,15 +415,22 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
 /** What a 1-unit bet returns as profit at an American price. */
 export const winUnits = (price: number) => (price > 0 ? price / 100 : 100 / -price);
 
-export function tally(ps: LabPick[]): LabRecord {
-  const counted = ps.filter((p) => p.line_source === "book");
+/** A pick counts in a record only at a line a sportsbook posted and a 60%+ chance when it locked (Andrew, 2026-11-18).
+ *  Every list still shows 10 picks, but on the season through Nov 17 the ones under 60% went 43-52 while 60%+ went
+ *  133-63, so the leans are shown, tagged, graded and marked "not counted". */
+export const counts = (p: LabPick, floor = BET) => p.line_source === "book" && p.chance >= floor;
+
+/** A record of these picks. The top 10 counts from BET up (the default); picks of the day pass 0, since they were locked
+ *  under their own bar (the 60% floor and the edge over the price) and every one counts. */
+export function tally(ps: LabPick[], floor = BET): LabRecord {
+  const counted = ps.filter((p) => counts(p, floor));
   const c = (r: LabResult) => counted.filter((p) => p.result === r).length;
   const won = c("won"), lost = c("lost");
   const priced = counted.filter((p) => p.price != null && (p.result === "won" || p.result === "lost"));
   const units = priced.reduce((a, p) => a + (p.result === "won" ? winUnits(p.price!) : -1), 0);
   return { n: won + lost, won, lost, push: c("push"), void: c("void"), rate: won + lost ? won / (won + lost) : null,
     units: Math.round(units * 100) / 100, priced: priced.length, roi: priced.length ? units / priced.length : null,
-    unbooked: ps.filter((p) => p.line_source !== "book" && p.result && p.result !== "void").length };
+    unbooked: ps.filter((p) => !counts(p, floor) && p.result && p.result !== "void").length };
 }
 
 export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): LabBoard {
@@ -455,7 +462,7 @@ function dailyBoard(s: LabState) {
   return {
     today, picks: [...picks, ...fillDaily(s, picks, today)].sort((a, b) => a.date.localeCompare(b.date) || order(a, b)),
     recent: all.filter((d) => d.date < today).sort((a, b) => b.date.localeCompare(a.date) || order(a, b)).slice(0, 45),
-    record: { ...tally(settled), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp))])) as Record<Sport, LabRecord> },
+    record: { ...tally(settled, 0), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp), 0)])) as Record<Sport, LabRecord> },
   };
 }
 

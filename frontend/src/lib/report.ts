@@ -239,8 +239,8 @@ export function buildReport(i: ReportInputs, now: Date): DailyReport {
     if (late.length) findings.push(`Graded since the last report: ${late.map((p) => `${p.bet} ${p.result === "won" ? "✓" : p.result === "lost" ? "✗" : "(void)"}`).join("; ")}.`);
     return {
       sport,
-      record: { top10: tally(asLab(top(graded))), potd: tally(asLab(pot(graded))) },
-      day: { top10: tally(asLab(top(results))), potd: tally(asLab(pot(results))) },
+      record: { top10: tally(asLab(top(graded))), potd: tally(asLab(pot(graded)), 0) },
+      day: { top10: tally(asLab(top(results))), potd: tally(asLab(pot(results)), 0) },
       results, late, pending, today, findings, ...sec,
       ...(sport === "cfb" ? {} : { sims: simLines(i.sims, sport, results_date) }),
     };
@@ -265,7 +265,7 @@ export function reportText(r: DailyReport): string {
   const lines = [`The Lab daily report, ${longDay(r.date)} (results from ${longDay(r.results_date)})`, ""];
   lines.push("Records (top 10 / picks of the day, season):");
   const withUnits = (x: LabRecord) => [recText(x), unitsText(x)].filter(Boolean).join(" ");
-  lines.push("Records count only picks at a line a sportsbook posted; units risk 1 unit a pick at the price shown.");
+  lines.push("Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.");
   for (const s of r.sports) lines.push(`  ${SPORT_LABEL[s.sport]}: ${withUnits(s.record.top10)} / ${withUnits(s.record.potd)}`);
   for (const s of r.sports) {
     lines.push("", `${SPORT_LABEL[s.sport]}`);
