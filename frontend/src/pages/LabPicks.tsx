@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Star, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SURE, SPORT_LABEL, playDate, SPORTS, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -73,12 +73,83 @@ export default function LabPicks({ sport }: { sport: Sport }) {
             Only lines a sportsbook has posted count, priced {BOARD_MIN_PRICE} or longer (a heavier favorite risks too much to win too little).</p>
           <p><b className="text-ok">Top confidence</b> {n100(SURE)}%+ · <b className="text-accent">Bet</b> {n100(BET)}%+ · <b className="text-warn">Lean</b> {n100(LEAN)}–{n100(BET)}%, a small bet at most ·{" "}
             <b className="text-danger">Risky</b> under {n100(LEAN)}%, close to a coin flip.</p>
-          <p>Picks of the day (starred) are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
-            locked when chosen and tracked on their own record.</p>
+          <p>Picks of the day (starred) are our locks: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
+            locked when chosen and tracked on their own record. A day with no pick that strong gets none.</p>
           <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines; units assume 1 unit a pick at the locked price.
             Even a 90% pick loses 1 time in 10. Research, not betting advice.</p>
         </div>
       </details>
+    </div>
+  );
+}
+
+/** The Picks of the day tab, the site's front page: today's locks for every sport, their record, and the last results.
+ *  Only real picks of the day ({DAILY_MIN_CHANCE}+, beating the book's price); a day without one says so instead of
+ *  topping up with weaker picks (Andrew, 2026-11-18: "the picks of the day need to be locks"). */
+export function DailyPicks() {
+  const q = useQuery({ queryKey: ["lab-board"], queryFn: getBoard, staleTime: 5 * 60_000 });
+  const [open, setOpen] = React.useState<Set<string>>(new Set());
+  const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const b = q.data;
+  const real = (d: DailyPick) => !d.fill && !d.withdrawn;
+  const today = (b?.daily?.picks ?? []).filter((d) => d.date === b?.daily.today && real(d));
+  const r = b?.daily?.record;
+  // the latest day with graded picks of the day, every sport together
+  const graded = (b?.daily?.recent ?? []).filter((d) => real(d) && d.result);
+  const last = graded.reduce((m, d) => (d.date > m ? d.date : m), "");
+  const lastDay = graded.filter((d) => d.date === last);
+  return (
+    <div className="space-y-4">
+      <PageTitle kicker={b ? `Updated ${chicago(b.generated_at)}` : "The Lab"} title="Picks of the day" />
+      <p className="-mt-3 text-sm text-muted">Our strongest picks only: {n100(DAILY_MIN_CHANCE)}%+ to hit at a sportsbook line, and likelier than the book's price says. Locked when posted, graded after the final.</p>
+      {r?.n ? (
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+          <span><span className="text-muted">All sports</span> <b>{recText(r)}</b>{r.rate != null && <span className="text-muted"> ({pct(r.rate, 0)})</span>}
+            {r.priced > 0 && <b className={cn("ml-1", r.units >= 0 ? "text-ok" : "text-danger")}>{unitsText(r)}</b>}</span>
+          {SPORTS.map((sp) => r.by_sport[sp]?.n ? <span key={sp}><span className="text-muted">{SPORT_LABEL[sp]}</span> <b>{recText(r.by_sport[sp])}</b></span> : null)}
+        </div>
+      ) : null}
+      {b && stale(b.generated_at) && <Notice tone="warn" title="These picks haven't refreshed in over a day">
+        Last refresh {chicago(b.generated_at)}. Check injury news and your book's line before betting.</Notice>}
+      {q.isLoading && <Card><LoadingBlock rows={4} className="p-5" /></Card>}
+      {q.isError && <Notice title="Not published yet">{(q.error as Error).message}</Notice>}
+      {b && !today.length && (
+        <Notice tone="info" title="No locks today">Nothing reached {n100(DAILY_MIN_CHANCE)}% at a sportsbook line yet, so there is no pick of the day.
+          Locks post as lines come out. Each sport's top 10 still has today's best picks:{" "}
+          <Link to="/nfl" className="text-accent hover:underline">NFL</Link>, <Link to="/cfb" className="text-accent hover:underline">CFB</Link>,{" "}
+          <Link to="/nba" className="text-accent hover:underline">NBA</Link>.</Notice>
+      )}
+      {b && SPORTS.map((sp) => {
+        const ps = today.filter((d) => d.sport === sp);
+        if (!ps.length) return null;
+        return (
+          <Card key={sp} className="overflow-hidden">
+            <CardHeader title={SPORT_LABEL[sp]} subtitle={<Link to={sp === "nfl" ? "/nfl" : `/${sp}`} className="hover:underline">See the full {SPORT_LABEL[sp]} top 10 →</Link>}
+              action={<CopyPicks b={b} sport={sp} ps={ps} />} />
+            <ol className="divide-y divide-line/60">
+              {ps.map((d) => <PickRow key={d.id} p={{ ...d, rank: d.slot }} star={false} open={open.has(d.id)} onToggle={() => toggle(d.id)} />)}
+            </ol>
+          </Card>
+        );
+      })}
+      {!!lastDay.length && (
+        <Card>
+          <CardHeader title="Last results" icon={<Trophy className="h-4 w-4 text-accent" />} subtitle={day(last)}
+            action={<span className="text-xs font-semibold text-muted">{recText(tally(lastDay))}</span>} />
+          <ul className="divide-y divide-line/60 border-t border-line">
+            {lastDay.map((d) => (
+              <li key={`${d.id}|${d.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
+                <ResultMark p={d} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium leading-snug">{d.bet}</div>
+                  <div className="truncate text-xs text-muted">{SPORT_LABEL[d.sport]}{d.actual ? ` · ${d.actual}` : ""}</div>
+                </div>
+                <span className="shrink-0 text-xs text-muted">{pct(d.chance, 0)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }
@@ -160,7 +231,7 @@ const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("
 
 /** The text of one sport's picks of the day, ready to post. */
 function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
-  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our 60% bar)` : ""}`);
+  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit`);
   return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines,
     r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }

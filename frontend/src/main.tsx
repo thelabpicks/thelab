@@ -34,7 +34,7 @@ import CfbParlay from "./pages/cfb/CfbParlay";
 import CfbGames from "./pages/cfb/CfbGames";
 import HitRates from "./pages/HitRates";
 import NbaHitRates from "./pages/nba/NbaHitRates";
-import LabPicks from "./pages/LabPicks";
+import LabPicks, { DailyPicks } from "./pages/LabPicks";
 import Previous from "./pages/Previous";
 import NbaPrevious from "./pages/nba/NbaPrevious";
 import CfbPrevious from "./pages/cfb/CfbPrevious";
@@ -50,7 +50,7 @@ const Router = STATIC ? HashRouter : BrowserRouter;
 function TopRedirect() {
   const [sp] = useSearchParams();
   const s = sp.get("sport");
-  return <Navigate to={s === "nba" ? "/nba" : s === "cfb" ? "/cfb" : "/"} replace />;
+  return <Navigate to={s === "nba" ? "/nba" : s === "cfb" ? "/cfb" : "/nfl"} replace />;
 }
 
 const qc = new QueryClient({
@@ -64,7 +64,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <PinProvider>
           <Routes>
             <Route element={<Layout />}>
-              <Route index element={<LabPicks sport="nfl" />} />
+              <Route index element={<DailyPicks />} />
+              <Route path="nfl" element={<LabPicks sport="nfl" />} />
               <Route path="rankings" element={<Rankings />} />
               <Route path="parlay" element={<Parlay />} />
               <Route path="builder" element={<Builder />} />
