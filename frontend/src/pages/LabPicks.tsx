@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, counts, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -73,8 +73,8 @@ export default function LabPicks() {
             NFL picks come from confidence tiers that hit 50%+ on games the model never saw; NBA picks are players sure to play; college picks are mostly favorites to win outright,
             since college spreads and totals rarely get past 55%.</p>
           <p>Picks of the day are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says. On a thin day the
-            rest of the 3 are marked <b>Extra</b>: they're the next likeliest plays, can change until kickoff and count with the top 10, not the picks-of-the-day record.</p>
-          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines; units assume 1 unit a pick at the locked price.
+            rest of the 3 are marked <b>Extra</b>: they're the next likeliest plays, can change until kickoff and are graded with the top 10, not the picks-of-the-day record.</p>
+          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines with a {n100(BET)}%+ chance at lock; leans under that still show, marked NC (not counted). Units assume 1 unit a pick at the locked price.
             Even a 90% pick loses 1 time in 10. Research, not betting advice.</p>
         </div>
       </details>
@@ -140,7 +140,7 @@ const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("
 
 /** The text of one sport's picks of the day, ready to post. */
 function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
-  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our 60% bar)` : ""}`);
+  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our ${n100(DAILY_MIN_CHANCE)}% bar)` : ""}`);
   return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines,
     r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }
@@ -252,7 +252,7 @@ function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
                 return (
                   // a pick of the day can share its top 10 pick's id at another line (Ty Jerome 23.5 and 24.5, 10/29): key by bet
                   <li key={`${p.id}|${p.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
-                    <ResultMark p={daily?.result ? daily : p} />
+                    <ResultMark p={daily?.result ? daily : p} floor={daily?.result ? 0 : BET} />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent" title="Pick of the day">POTD</span>}</div>
                       {actual && <div className="truncate text-xs text-muted">{actual}</div>}
@@ -274,8 +274,9 @@ function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
 }
 
 /** A big hit / miss mark for the results list. */
-function ResultMark({ p }: { p: LabPick }) {
-  if (p.result && p.line_source !== "book") return <span title="Not counted: no sportsbook line" aria-label="Not counted: no sportsbook line"
+function ResultMark({ p, floor = BET }: { p: LabPick; floor?: number }) {
+  const why = p.line_source !== "book" ? "Not counted: no sportsbook line" : `Not counted: a lean under ${n100(BET)}% at lock`;
+  if (p.result && !counts(p, floor)) return <span title={why} aria-label={why}
     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-raised text-[10px] font-semibold text-muted">NC</span>;
   const r = p.result;
   const [txt, cls] = r === "won" ? ["✓", "bg-ok/15 text-ok"] : r === "lost" ? ["✗", "bg-danger/15 text-danger"]

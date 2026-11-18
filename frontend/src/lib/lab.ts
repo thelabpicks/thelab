@@ -355,14 +355,16 @@ export const impliedChance = (price: number) => (price > 0 ? 100 / (price + 100)
 /** True when the data backs the pick more strongly than the book's price does (or no price is posted yet). */
 export const beatsPrice = (p: Pick2) => p.price == null || p.chance - impliedChance(p.price) >= DAILY_MIN_EDGE;
 type Pick2 = { price: number | null; chance: number };
-/** A pick of the day must be at least this likely: a 51% favorite is too close to a coin flip to post. */
-export const DAILY_MIN_CHANCE = 0.6;
+/** A pick of the day must be at least this likely. Andrew (2026-11-18): picks of the day have to be locks, even if there
+ *  are fewer. Locked picks of the day through Nov 17 went 43-19 at 60%+ but 31-8 at 65%+ (NBA 17-4, NFL 7-4, CFB 7-0),
+ *  so the bar is 65%. A thin day fills its slots with Extra picks that are not counted. */
+export const DAILY_MIN_CHANCE = 0.65;
 const DAILY_KEEP_DAYS = 90;
 /** The Central-time date a game is played on: picks of the day follow the US sports day, not UTC. */
 export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 /** Fills today's and tomorrow's open pick-of-the-day slots for each sport with its likeliest picks on that date (same
- *  ranking and one-per-game/player rule as the top 10; games not yet started; 60%+ and beating the book's price, see
+ *  ranking and one-per-game/player rule as the top 10; games not yet started; DAILY_MIN_CHANCE+ and beating the book's price, see
  *  beatsPrice). Slots already filled stay exactly as chosen. */
 export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): DailyPick[] {
   const today = playDate(now), tomorrow = playDate(new Date(now.getTime() + 864e5));
@@ -402,7 +404,7 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
     && c.market === d.market && c.id !== d.id && (c.player_id ?? null) === (d.player_id ?? null) && (c.team_side ?? null) === (d.team_side ?? null));
   const daily = chooseDaily((prev.daily ?? []).filter((d) => d.date >= cutoff), open, now)
     .map((d) => flipped(d) ? { ...d, result: "void" as const, actual: "Withdrawn before kickoff: the model now backs the other side", withdrawn: true } : d)
-    // and so is one locked before the 60% floor existed that sits under it
+    // and so is one locked under the current floor
     .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
     // and one locked before the edge rule whose sims don't beat its price
@@ -415,15 +417,22 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
 /** What a 1-unit bet returns as profit at an American price. */
 export const winUnits = (price: number) => (price > 0 ? price / 100 : 100 / -price);
 
-export function tally(ps: LabPick[]): LabRecord {
-  const counted = ps.filter((p) => p.line_source === "book");
+/** A pick counts in a record only at a line a sportsbook posted and a 60%+ chance when it locked (Andrew, 2026-11-18).
+ *  Every list still shows 10 picks, but on the season through Nov 17 the ones under 60% went 43-52 while 60%+ went
+ *  133-63, so the leans are shown, tagged, graded and marked "not counted". */
+export const counts = (p: LabPick, floor = BET) => p.line_source === "book" && p.chance >= floor;
+
+/** A record of these picks. The top 10 counts from BET up (the default); picks of the day pass 0, since they were locked
+ *  under their own bar (DAILY_MIN_CHANCE and the edge over the price) and every one counts. */
+export function tally(ps: LabPick[], floor = BET): LabRecord {
+  const counted = ps.filter((p) => counts(p, floor));
   const c = (r: LabResult) => counted.filter((p) => p.result === r).length;
   const won = c("won"), lost = c("lost");
   const priced = counted.filter((p) => p.price != null && (p.result === "won" || p.result === "lost"));
   const units = priced.reduce((a, p) => a + (p.result === "won" ? winUnits(p.price!) : -1), 0);
   return { n: won + lost, won, lost, push: c("push"), void: c("void"), rate: won + lost ? won / (won + lost) : null,
     units: Math.round(units * 100) / 100, priced: priced.length, roi: priced.length ? units / priced.length : null,
-    unbooked: ps.filter((p) => p.line_source !== "book" && p.result && p.result !== "void").length };
+    unbooked: ps.filter((p) => !counts(p, floor) && p.result && p.result !== "void").length };
 }
 
 export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): LabBoard {
@@ -455,7 +464,7 @@ function dailyBoard(s: LabState) {
   return {
     today, picks: [...picks, ...fillDaily(s, picks, today)].sort((a, b) => a.date.localeCompare(b.date) || order(a, b)),
     recent: all.filter((d) => d.date < today).sort((a, b) => b.date.localeCompare(a.date) || order(a, b)).slice(0, 45),
-    record: { ...tally(settled), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp))])) as Record<Sport, LabRecord> },
+    record: { ...tally(settled, 0), by_sport: Object.fromEntries(SPORTS.map((sp) => [sp, tally(settled.filter((d) => d.sport === sp), 0)])) as Record<Sport, LabRecord> },
   };
 }
 

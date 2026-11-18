@@ -199,10 +199,10 @@ describe("picks of the day", () => {
     // a later refresh with a likelier pick keeps today's three as chosen
     expect(chooseDaily(d, [...cands, at(9, { chance: 0.98 })], now).filter((x) => x.date === "2026-10-24").map((x) => x.id)).toEqual(["p2", "p3", "p4"]);
   });
-  it("skips picks under 60% and withdraws a locked pick before kickoff once the model backs the other side", () => {
-    const d = chooseDaily([], [at(1, { chance: 0.59 }), at(2, { chance: 0.61 })], now);
+  it("skips picks under 65% and withdraws a locked pick before kickoff once the model backs the other side", () => {
+    const d = chooseDaily([], [at(1, { chance: 0.64 }), at(2, { chance: 0.66 })], now);
     expect(d.map((x) => x.id)).toEqual(["p2"]);
-    const del = at(3, { market: "moneyline", side: "away", chance: 0.62 });
+    const del = at(3, { market: "moneyline", side: "away", chance: 0.67 });
     const s = advance({ updated_at: null, board: [], frozen: [] }, [del], {}, now);
     const wku = at(4, { game_id: "3", player_id: "3", market: "moneyline", side: "home", chance: 0.58 });
     const s2 = advance(s, [wku], {}, new Date("2026-10-24T18:00:00Z"));
@@ -213,7 +213,7 @@ describe("picks of the day", () => {
       new Date("2026-10-25T15:00:00Z"));
     expect(s3.daily!.find((x) => x.id === "p3")!.result).toBe("void");
   });
-  it("withdraws a locked pick under the 60% floor before kickoff, but never one already played", () => {
+  it("withdraws a locked pick under the 65% floor before kickoff, but never one already played", () => {
     const old = { ...at(5, { chance: 0.51 }), date: "2026-10-24", slot: 1, chosen_at: "2026-10-23T12:00:00Z" };
     const done = { ...at(6, { chance: 0.52, kickoff: "2026-10-23T23:00:00Z" }), date: "2026-10-23", slot: 1, chosen_at: "2026-10-22T12:00:00Z" };
     const s = advance({ updated_at: null, board: [], frozen: [], daily: [old, done] }, [], {}, now);
@@ -225,7 +225,7 @@ describe("picks of the day", () => {
       at(1, { chance: 0.97, price: -5000 }),   // implies 98%: the book already knows
       at(2, { chance: 0.83, price: -490 }),    // implies 83%: no edge
       at(3, { chance: 0.81, price: -345 }),    // implies 78%: qualifies though shorter than -300
-      at(4, { chance: 0.62, price: 120 }),     // implies 45%: an underdog the sims like
+      at(4, { chance: 0.66, price: 120 }),     // implies 45%: an underdog the sims like
       at(5, { chance: 0.7, price: -155 }),     // implies 61%
     ], now);
     expect(d.map((x) => x.id)).toEqual(["p3", "p5", "p4"]);
@@ -246,8 +246,8 @@ describe("picks of the day", () => {
     expect(b.daily.today).toBe("2026-10-25");
   });
   it("fills a thin day with the next likeliest picks, labelled fill-ins that never count toward the record", () => {
-    // one real pick of the day (62%); the rest are under the 60% bar
-    const cands = [at(1, { chance: 0.62 }), at(2, { chance: 0.57 }), at(3, { chance: 0.53 }), at(4, { chance: 0.5 })];
+    // one real pick of the day (67%); the rest are under the 65% bar
+    const cands = [at(1, { chance: 0.67 }), at(2, { chance: 0.57 }), at(3, { chance: 0.53 }), at(4, { chance: 0.5 })];
     const s = advance({ updated_at: null, board: [], frozen: [] }, cands, {}, now);
     const b = publish(s, sports);
     const today = b.daily.picks.filter((x) => x.date === "2026-10-24");
@@ -272,6 +272,14 @@ describe("records", () => {
     expect([r.won, r.lost, r.void, r.unbooked, r.priced]).toEqual([3, 1, 1, 1, 3]);
     expect(r.units).toBe(1);   // +0.5 - 1 + 1.5
     expect(r.roi).toBeCloseTo(1 / 3);
+  });
+  it("counts top 10 picks only at 60%+ at lock, and every pick of the day", () => {
+    const ps = [pick({ id: "a", result: "won", chance: 0.62 }), pick({ id: "b", result: "lost", chance: 0.57 }),
+      pick({ id: "c", result: "lost", chance: 0.6 })];
+    const r = tally(ps);
+    expect([r.won, r.lost, r.unbooked]).toEqual([1, 1, 1]);
+    const d = tally(ps, 0);
+    expect([d.won, d.lost, d.unbooked]).toEqual([1, 2, 0]);
   });
   it("keeps usual lines and prices shorter than -500 off the list", () => {
     const now = new Date("2026-10-24T17:00:00Z");
