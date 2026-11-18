@@ -1,11 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import "./index.css";
 import { Layout } from "./components/Layout";
 import { PinProvider } from "./lib/state";
-import Overview from "./pages/Overview";
 import Rankings from "./pages/Rankings";
 import Parlay from "./pages/Parlay";
 import Defenses from "./pages/Defenses";
@@ -19,14 +18,12 @@ import Trends from "./pages/Trends";
 import Builder from "./pages/Builder";
 import Ask from "./pages/Ask";
 import How from "./pages/How";
-import NbaHome from "./pages/nba/NbaHome";
 import NbaProps from "./pages/nba/NbaProps";
 import NbaBuilder from "./pages/nba/NbaBuilder";
 import NbaAsk from "./pages/nba/NbaAsk";
 import NbaPlayer from "./pages/nba/NbaPlayer";
 import NbaRecord from "./pages/nba/NbaRecord";
 import NbaHow from "./pages/nba/NbaHow";
-import CfbHome from "./pages/cfb/CfbHome";
 import CfbGame from "./pages/cfb/CfbGame";
 import CfbAsk from "./pages/cfb/CfbAsk";
 import CfbTeams from "./pages/cfb/CfbTeams";
@@ -49,6 +46,13 @@ import { STATIC } from "./lib/api";
 // The hosted website uses #/ routes so any static host (GitHub Pages, Cloudflare Pages) can serve every page.
 const Router = STATIC ? HashRouter : BrowserRouter;
 
+/** Old /top10?sport= links (posts, bookmarks) open that sport's picks, which are now each sport's home page. */
+function TopRedirect() {
+  const [sp] = useSearchParams();
+  const s = sp.get("sport");
+  return <Navigate to={s === "nba" ? "/nba" : s === "cfb" ? "/cfb" : "/"} replace />;
+}
+
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false, placeholderData: (prev: unknown) => prev } },
 });
@@ -60,7 +64,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <PinProvider>
           <Routes>
             <Route element={<Layout />}>
-              <Route index element={<Overview />} />
+              <Route index element={<LabPicks sport="nfl" />} />
               <Route path="rankings" element={<Rankings />} />
               <Route path="parlay" element={<Parlay />} />
               <Route path="builder" element={<Builder />} />
@@ -75,11 +79,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="backtest" element={<Backtest />} />
               <Route path="data" element={<DataSync />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="top10" element={<LabPicks />} />
+              <Route path="top10" element={<TopRedirect />} />
               <Route path="previous" element={<Previous />} />
               <Route path="sims" element={<Sims sport="nfl" />} />
               <Route path="sims/:game" element={<Sims sport="nfl" />} />
-              <Route path="nba" element={<NbaHome />} />
+              <Route path="nba" element={<LabPicks sport="nba" />} />
               <Route path="nba/props" element={<NbaProps />} />
               <Route path="nba/hitrates" element={<NbaHitRates />} />
               <Route path="nba/builder" element={<NbaBuilder />} />
@@ -90,7 +94,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="nba/previous" element={<NbaPrevious />} />
               <Route path="nba/sims" element={<Sims sport="nba" />} />
               <Route path="nba/sims/:game" element={<Sims sport="nba" />} />
-              <Route path="cfb" element={<CfbHome />} />
+              <Route path="cfb" element={<LabPicks sport="cfb" />} />
               <Route path="cfb/game/:id" element={<CfbGame />} />
               <Route path="cfb/ask" element={<CfbAsk />} />
               <Route path="cfb/teams" element={<CfbTeams />} />

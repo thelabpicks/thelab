@@ -1,12 +1,12 @@
 import * as React from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Trophy } from "lucide-react";
+import { ChevronDown, Star, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
-import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice, Segmented } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
 
 const URL = STATIC ? `${import.meta.env.BASE_URL}data/lab/board.json` : "/api/lab/board.json";
@@ -24,41 +24,41 @@ const stale = (iso: string) => Date.now() - new Date(iso).getTime() > 30 * 3600_
 
 const n100 = (x: number) => Math.round(x * 100);
 
-/** Each sport's best plays, ranked 1 to 10 by chance to hit. Kept deliberately plain: one sport switch drives the whole
- *  page, each row shows only the bet, when, the price and the chance with its trust tag; the reasons open on tap. */
-export default function LabPicks() {
+/** A sport's picks page and home: its top 10 with picks of the day starred, then results. Kept deliberately plain
+ *  (Andrew, 2026-11-17: "people get the picks they will win, not too busy"): Bets first under their real record, Leans
+ *  after under theirs, each row only the bet, when, price and chance; reasons open on tap. */
+export default function LabPicks({ sport }: { sport: Sport }) {
   const q = useQuery({ queryKey: ["lab-board"], queryFn: getBoard, staleTime: 5 * 60_000 });
   const [open, setOpen] = React.useState<Set<string>>(new Set());
-  const [sp, setSp] = useSearchParams();
-  const sport: Sport = SPORTS.includes(sp.get("sport") as Sport) ? (sp.get("sport") as Sport) : "nfl";
   const b = q.data;
   const board = (b?.board ?? []).filter((p) => p.sport === sport);
   const note = b?.notes?.[sport];
   const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // only real picks of the day are starred and copied; fill-ins are just more top 10 picks and are not tracked
+  const today = (b?.daily?.picks ?? []).filter((d) => d.sport === sport && d.date === b?.daily.today && !d.withdrawn && !d.fill);
+  const starred = new Set(today.map((d) => `${d.game_id}|${d.bet}`));
+  const tags = b?.record.by_tag?.[sport];
+  const bets = board.filter((p) => p.chance >= BET), leans = board.filter((p) => p.chance < BET);
+  const row = (p: LabPick) => <PickRow key={p.id} p={p} star={starred.has(`${p.game_id}|${p.bet}`)} open={open.has(p.id)} onToggle={() => toggle(p.id)} />;
   return (
     <div className="space-y-4">
-      <PageTitle kicker={b ? `Updated ${chicago(b.generated_at)}` : "Every sport"} title={`Top 10 picks: ${SPORT_LABEL[sport]}`} />
-      <div className="-mt-3 space-y-3">
-        {/* one switch for the whole page; each label carries that sport's top 10 record */}
-        <Segmented label="Sport" value={sport} onChange={(v) => setSp({ sport: v }, { replace: true })}
-          options={SPORTS.map((s) => ({ value: s, label: <>{SPORT_LABEL[s]}{b && b.record.by_sport[s]?.n ? <span className="ml-1 text-xs font-normal opacity-75">{recText(b.record.by_sport[s])}</span> : null}</> }))} />
-        <Legend />
-      </div>
+      <PageTitle kicker={b ? `Updated ${chicago(b.generated_at)}` : SPORT_LABEL[sport]} title={`${SPORT_LABEL[sport]} picks`} />
+      {b && <RecordLine b={b} sport={sport} />}
       {b && stale(b.generated_at) && <Notice tone="warn" title="These picks haven't refreshed in over a day">
         Last refresh {chicago(b.generated_at)}. Check injury news and your book's line before betting.</Notice>}
       {q.isLoading && <Card><LoadingBlock rows={6} className="p-5" /></Card>}
       {q.isError && <Notice title="Not published yet">{(q.error as Error).message}</Notice>}
       {b && !b.sports[sport]?.loaded && <Notice tone="warn" title={`${SPORT_LABEL[sport]} numbers were not available on the last refresh`}>The list comes back with the next refresh.</Notice>}
-      {b && b.sports[sport]?.loaded && note && <Notice tone="info">{note}{!board.length ? " Picks appear as lines are posted and the sport refreshes." : ""}</Notice>}
-
-      {b?.daily && <DailyCard b={b} sport={sport} />}
+      {b && b.sports[sport]?.loaded && note && !board.length && <Notice tone="info">{note}</Notice>}
 
       {!!board.length && (
         <Card className="overflow-hidden">
-          <CardHeader title="Top 10" subtitle="#1 is the likeliest to hit. Tap a pick for why." />
-          <ol className="divide-y divide-line/60">
-            {board.map((p) => <PickRow key={p.id} p={p} open={open.has(p.id)} onToggle={() => toggle(p.id)} />)}
-          </ol>
+          <CardHeader title="Top 10" subtitle={<>Likeliest first. <Star className="inline h-3 w-3 -translate-y-px fill-accent text-accent" aria-hidden /> = pick of the day. Tap a pick for why.</>}
+            action={b && today.length ? <CopyPicks b={b} sport={sport} ps={today} /> : undefined} />
+          {!!bets.length && <GroupHead label="Bets" range={`${n100(BET)}%+`} r={tags?.bet} tone="text-accent" />}
+          <ol className="divide-y divide-line/60">{bets.map(row)}</ol>
+          {!!leans.length && <GroupHead label="Leans" range={`under ${n100(BET)}%: small bets at most`} r={tags?.lean} tone="text-warn" />}
+          <ol className="divide-y divide-line/60">{leans.map(row)}</ol>
         </Card>
       )}
 
@@ -68,12 +68,13 @@ export default function LabPicks() {
         <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-fg sm:px-5">
           How picks are chosen <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" aria-hidden /></summary>
         <div className="space-y-1.5 px-4 pb-4 sm:px-5">
-          <p>Every game is simulated 5,000 times. Each chance is then checked against how similar picks really did, and the 10 likeliest make the list,
-            spread one per game and player first. Only lines a sportsbook has posted count, priced {BOARD_MIN_PRICE} or longer (a heavier favorite risks too much to win too little).
-            NFL picks come from confidence tiers that hit 50%+ on games the model never saw; NBA picks are players sure to play; college picks are mostly favorites to win outright,
-            since college spreads and totals rarely get past 55%.</p>
-          <p>Picks of the day are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says. On a thin day the
-            rest of the 3 are marked <b>Extra</b>: they're the next likeliest plays, can change until kickoff and count with the top 10, not the picks-of-the-day record.</p>
+          <p>Every game is simulated 5,000 times. Each chance at a sportsbook line is then shown as what picks rated that high have really
+            hit at book lines, so a 60% pick is one that has won about 6 times in 10. The 10 likeliest make the list, spread one per game and player first.
+            Only lines a sportsbook has posted count, priced {BOARD_MIN_PRICE} or longer (a heavier favorite risks too much to win too little).</p>
+          <p><b className="text-ok">Top confidence</b> {n100(SURE)}%+ · <b className="text-accent">Bet</b> {n100(BET)}%+ · <b className="text-warn">Lean</b> {n100(LEAN)}–{n100(BET)}%, a small bet at most ·{" "}
+            <b className="text-danger">Risky</b> under {n100(LEAN)}%, close to a coin flip.</p>
+          <p>Picks of the day (starred) are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
+            locked when chosen and tracked on their own record.</p>
           <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines; units assume 1 unit a pick at the locked price.
             Even a 90% pick loses 1 time in 10. Research, not betting advice.</p>
         </div>
@@ -82,26 +83,45 @@ export default function LabPicks() {
   );
 }
 
-/** The four trust tags, once, in a single row. */
-function Legend() {
-  const tags = [[SURE, "Top confidence", `${n100(SURE)}%+`], [BET, "Bet", `${n100(BET)}%+`], [LEAN, "Lean", `${n100(LEAN)}–${n100(BET)}%`], [0, "Risky", `under ${n100(LEAN)}%`]] as const;
+/** One line under the title: the sport's top 10 and picks-of-the-day records. */
+function RecordLine({ b, sport }: { b: LabBoard; sport: Sport }) {
+  const r = b.record.by_sport[sport], d = b.daily?.record.by_sport[sport];
+  if (!r?.n && !d?.n) return null;
+  const part = (label: string, x?: LabRecord) => (x?.n ? (
+    <span><span className="text-muted">{label}</span> <b>{recText(x)}</b>{x.rate != null && <span className="text-muted"> ({pct(x.rate, 0)})</span>}
+      {x.priced > 0 && <b className={cn("ml-1", x.units >= 0 ? "text-ok" : "text-danger")}>{unitsText(x)}</b>}</span>) : null);
+  return <div className="-mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">{part("Top 10", r)}{part("Picks of the day", d)}</div>;
+}
+
+/** The heading over a group of picks, with how that kind of pick has really done. */
+function GroupHead({ label, range, r, tone }: { label: string; range: string; r?: LabRecord; tone: string }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-      {tags.map(([c, label, range]) => (
-        <span key={label} title={confidenceOf(c).advice}><b className={TONE_CLASS[confidenceOf(c).tone]}>{label}</b> {range}</span>
-      ))}
+    <div className="flex items-baseline justify-between gap-3 border-b border-line/60 bg-raised/40 px-4 py-1.5 text-xs sm:px-5">
+      <span><b className={tone}>{label}</b> <span className="text-muted">{range}</span></span>
+      {r?.n ? <span className="shrink-0 text-muted">have hit <b className="text-fg">{pct(r.rate!, 0)}</b> ({recText(r)})</span> : null}
     </div>
   );
 }
 
-function PickRow({ p, open, onToggle }: { p: LabPick; open: boolean; onToggle: () => void }) {
+/** Today's picks of the day as text, ready to post. */
+function CopyPicks({ b, sport, ps }: { b: LabBoard; sport: Sport; ps: DailyPick[] }) {
+  const [copied, setCopied] = React.useState(false);
+  const rec = b.daily.record.by_sport[sport];
+  return (
+    <button type="button" className="whitespace-nowrap text-xs font-semibold text-accent hover:underline"
+      onClick={() => navigator.clipboard?.writeText(postText(sport, b.daily.today, ps, rec)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }, () => {})}>
+      {copied ? "Copied" : "Copy picks of the day"}</button>
+  );
+}
+
+function PickRow({ p, star, open, onToggle }: { p: LabPick; star: boolean; open: boolean; onToggle: () => void }) {
   return (
     <li>
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-raised/50 sm:px-5">
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-base font-bold",
           p.rank === 1 ? "bg-accent text-accent-fg" : "bg-accent/10 text-accent")}>{p.rank}</div>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold leading-snug">{p.bet}</div>
+          <div className="font-semibold leading-snug">{star && <Star className="mr-1 inline h-3.5 w-3.5 -translate-y-px fill-accent text-accent" aria-label="Pick of the day" />}{p.bet}</div>
           <div className="mt-0.5 text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.price != null ? ` · ${price(p.price)}` : ""}{p.line_source === "usual" ? " · check your book's line" : ""}</div>
         </div>
         <div className="shrink-0 text-right">
@@ -145,75 +165,15 @@ function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): st
     r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }
 
-/** The sport's 3 picks of the day (today, and tomorrow once chosen), locked when chosen and tracked separately. */
-function DailyCard({ b, sport }: { b: LabBoard; sport: Sport }) {
-  const [copied, setCopied] = React.useState<string | null>(null);
-  const groups = new Map<string, DailyPick[]>();
-  for (const p of b.daily.picks.filter((d) => d.sport === sport)) groups.set(p.date, [...(groups.get(p.date) ?? []), p]);
-  const rec = b.daily.record.by_sport[sport];
-  const copy = (key: string, text: string) => {
-    navigator.clipboard?.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(null), 2000); }, () => {});
-  };
-  return (
-    <Card>
-      <CardHeader title="Picks of the day" icon={<Trophy className="h-4 w-4 text-accent" />}
-        subtitle={rec?.n ? `Record ${recText(rec)}${rec.rate != null ? ` (${pct(rec.rate, 0)})` : ""}${unitsText(rec) ? `, ${unitsText(rec)}` : ""}` : "Our 3 strongest picks each game day"} />
-      {!groups.size && <CardBody><p className="text-sm text-muted">Picks post once {SPORT_LABEL[sport]} games have lines, and stay put once chosen.</p></CardBody>}
-      {[...groups.entries()].map(([date, ps]) => (
-        <div key={date} className="border-t border-line/60 first:border-t-0">
-          <div className="flex items-center justify-between gap-3 px-4 pt-3 sm:px-5">
-            <span className="text-sm font-semibold">{date === b.daily.today ? "Today" : day(date)}</span>
-            <button type="button" className="text-xs text-accent hover:underline" onClick={() => copy(date, postText(sport, date, ps, rec))}>
-              {copied === date ? "Copied" : "Copy for posting"}</button>
-          </div>
-          <ol className="divide-y divide-line/40">
-            {ps.map((p) => {
-              const c = confidenceOf(p.chance);
-              return (
-                <li key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
-                  <span className="w-5 shrink-0 text-center font-display font-bold text-accent">{p.slot}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium leading-snug">{p.bet}</div>
-                    <div className="text-xs text-muted">{p.matchup} · {when(p.kickoff)}{p.price != null ? ` · ${price(p.price)}` : ""}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="font-semibold">{pct(p.chance, 0)}</div>
-                    {p.result ? <ResultBadge p={p} /> : p.fill
-                      ? <div className={cn("text-[11px] font-semibold", TONE_CLASS[c.tone])} title={`Under the ${n100(DAILY_MIN_CHANCE)}% bar: the next likeliest play, not in the picks-of-the-day record. ${c.advice}`}>Extra · {c.label}</div>
-                      : <ConfidenceTag chance={p.chance} />}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      ))}
-    </Card>
-  );
-}
-
 const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.push}` : ""}` : "–");
 const unitsText = (r: LabRecord) => (r.priced ? `${r.units >= 0 ? "+" : "−"}${Math.abs(r.units).toFixed(1)}u` : "");
 
-/** A record as the results card shows it: W-L and hit rate, units underneath. */
-function RecordStat({ label, r }: { label: string; r: LabRecord }) {
-  return (
-    <div>
-      <div className="label">{label}</div>
-      <div className="font-display text-xl font-bold">{recText(r)}{r.rate != null && <span className="ml-1.5 text-sm font-semibold text-muted">{pct(r.rate, 0)}</span>}</div>
-      {r.priced > 0 && <div className={cn("text-xs font-semibold", r.units >= 0 ? "text-ok" : "text-danger")}
-        title={`${r.roi! >= 0 ? "+" : "−"}${Math.abs(r.roi! * 100).toFixed(1)}% ROI${r.priced < r.n ? ` on ${r.priced} priced picks` : ""}, 1 unit a pick`}>{unitsText(r)}</div>}
-    </div>
-  );
-}
 
-const RECENT_DAYS = 3;
+const RECENT_DAYS = 1;
 
 /** Every pick that was on the list at kickoff (and every pick of the day) for the page's sport, graded after the final, by day. */
 function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
   const [all, setAll] = React.useState(false);
-  const r = b.record.by_sport[sport];
-  const dr = b.daily?.record.by_sport[sport];
   const recent = b.recent.filter((p) => p.sport === sport);
   const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => d.sport === sport && !d.fill).map((d) => [`${d.game_id}|${d.bet}`, d]));
   // picks of the day that never made the top 10 still belong in the results
@@ -230,13 +190,7 @@ function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
     <Card>
       <CardHeader title={`${SPORT_LABEL[sport]} results`} icon={<Trophy className="h-4 w-4 text-accent" />}
         subtitle="Graded after each final. Picks never change after kickoff." />
-      <CardBody className="space-y-2">
-        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-          <RecordStat label="Top 10" r={r} />
-          {dr && <RecordStat label="Picks of the day" r={dr} />}
-        </div>
-        {!rows.length && <p className="text-sm text-muted">Results show here once the first games on the list are played.</p>}
-      </CardBody>
+      {!rows.length && <CardBody><p className="text-sm text-muted">Results show here once the first games on the list are played.</p></CardBody>}
       {shown.map(([d, ps]) => {
         const t = tally(ps);
         return (

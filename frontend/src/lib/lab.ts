@@ -333,7 +333,9 @@ export type LabBoard = {
   /** Every sport's top 10 together; rank is within the pick's sport. notes: why a sport's list is short. */
   generated_at: string; board: LabPick[]; notes: Record<Sport, string | null>;
   sports: Record<Sport, { loaded: boolean; candidates: number }>;
-  record: LabRecord & { by_sport: Record<Sport, LabRecord>; since: string | null };
+  record: LabRecord & { by_sport: Record<Sport, LabRecord>; since: string | null;
+    /** Each sport's graded top 10 picks split by their tag when frozen: Bet (60%+, top confidence included) and Lean (under 60%). */
+    by_tag?: Record<Sport, { bet: LabRecord; lean: LabRecord }> };
   recent: LabPick[];
   /** Each sport's top 3 picks of the day (Central time): today's and tomorrow's once chosen, the recent ones, and their own record. */
   daily: { today: string; picks: DailyPick[]; recent: DailyPick[]; record: LabRecord & { by_sport: Record<Sport, LabRecord> } };
@@ -440,7 +442,11 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): 
   return {
     generated_at: s.updated_at ?? new Date().toISOString(), board: s.board, sports,
     notes: Object.fromEntries(SPORTS.map((sp) => [sp, note(sp)])) as Record<Sport, string | null>,
-    record: { ...tally(settled), by_sport: by, since: s.frozen.length ? s.frozen.map((p) => p.kickoff).sort()[0] : null },
+    record: { ...tally(settled), by_sport: by, since: s.frozen.length ? s.frozen.map((p) => p.kickoff).sort()[0] : null,
+      by_tag: Object.fromEntries(SPORTS.map((sp) => {
+        const xs = settled.filter((p) => p.sport === sp);
+        return [sp, { bet: tally(xs.filter((p) => p.chance >= BET)), lean: tally(xs.filter((p) => p.chance < BET)) }];
+      })) as Record<Sport, { bet: LabRecord; lean: LabRecord }> },
     recent: SPORTS.flatMap((sp) => s.frozen.filter((p) => p.sport === sp).sort((a, b) => b.kickoff.localeCompare(a.kickoff)).slice(0, recentN)),
     daily: dailyBoard(s),
   };

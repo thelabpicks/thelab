@@ -16,11 +16,11 @@ type NavItem = { to: string; label: string; short?: string; icon: typeof LayoutD
 type NavSection = { title: string; items: NavItem[] };
 
 /** Every sport gets the NFL tab's menu: the same sections, the same items in the same order, and the same mobile bar
- *  (Home, Sims, Ask, Parlay, More). Only the sport's own research pages differ. */
+ *  (Picks, Sims, Ask, Parlay, More). Only the sport's own research pages differ. */
 function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavSection[] {
   return [
     { title: "Picks", items: [
-      { to: base || "/", label: home, short: "Home", icon: LayoutDashboard, end: true },
+      { to: base || "/", label: home, short: "Picks", icon: LayoutDashboard, end: true },
       { to: `${base}/ask`, label: "Ask", icon: MessageCircleQuestion },
       { to: links.parlay, label: "Parlay builder", short: "Parlay", icon: Dices },
     ] },
@@ -34,16 +34,16 @@ function sportNav(base: string, home: string, research: NavItem[], links: { parl
   ];
 }
 const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
-  nfl: sportNav("", "This week", [
+  nfl: sportNav("", "Top 10 picks", [
     { to: "/rankings", label: "Anytime TD", short: "TDs", icon: ListOrdered },
     { to: "/hitrates", label: "Hit rates", icon: Percent },
     { to: "/defenses", label: "Defenses", icon: Shield },
   ], { parlay: "/builder", how: "/how", record: "/backtest" }),
-  cfb: sportNav("/cfb", "This week", [
+  cfb: sportNav("/cfb", "Top 10 picks", [
     { to: "/cfb/games", label: "All games", short: "Games", icon: ListOrdered },
     { to: "/cfb/teams", label: "Teams", icon: Trophy },
   ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
-  nba: sportNav("/nba", "Today", [{ to: "/nba/hitrates", label: "Hit rates", icon: Percent }], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
+  nba: sportNav("/nba", "Top 10 picks", [{ to: "/nba/hitrates", label: "Hit rates", icon: Percent }], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
 };
 // Mobile bar: Home, Game Simulations, Ask, Parlay builder (then More, which holds Player props), whatever the sport.
 const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];
@@ -51,16 +51,14 @@ const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1]
 type Sport = "nfl" | "nba" | "cfb";
 const sportOf = (path: string): Sport => (path === "/nba" || path.startsWith("/nba/") ? "nba" : path === "/cfb" || path.startsWith("/cfb/") ? "cfb" : "nfl");
 
-/** NFL / CFB / NBA switch, plus The Lab's top 10 across all three. Each sport keeps its own pages; the switch goes to that sport's home. */
-function SportSwitch({ sport, top }: { sport: Sport; top: boolean }) {
+/** NFL / CFB / NBA switch. Each sport's home is its picks (top 10 and picks of the day); the switch goes there. */
+function SportSwitch({ sport }: { sport: Sport }) {
   const base = "rounded-md px-2 py-1.5 text-sm font-bold tracking-wide transition-colors sm:px-3.5";
   const tab = (to: string, s: Sport, label: string) => (
-    <NavLink to={to} role="tab" aria-selected={!top && sport === s} className={cn(base, !top && sport === s ? "bg-accent text-accent-fg" : "text-muted hover:bg-raised hover:text-fg")}>{label}</NavLink>
+    <NavLink to={to} role="tab" aria-selected={sport === s} className={cn(base, sport === s ? "bg-accent text-accent-fg" : "text-muted hover:bg-raised hover:text-fg")}>{label}</NavLink>
   );
   return (
     <div className="flex rounded-lg border border-line bg-surface p-1" role="tablist" aria-label="Sport">
-      <NavLink to="/top10" role="tab" aria-selected={top} title="The Lab's top 10 picks across every sport"
-        className={cn(base, "whitespace-nowrap", top ? "bg-accent text-accent-fg" : "text-accent hover:bg-raised")}>Top 10</NavLink>
       {tab("/", "nfl", "NFL")}{tab("/cfb", "cfb", "CFB")}{tab("/nba", "nba", "NBA")}
     </div>
   );
@@ -244,8 +242,9 @@ export function Layout() {
   const sport = sportOf(loc.pathname);
   const nba = sport === "nba";
   const cfb = sport === "cfb";
-  const top = loc.pathname === "/top10";
-  const other = sport !== "nfl" || top;   // NBA, CFB and top-10 pages carry no NFL season/week query
+  // each sport's home is its picks page: no season/week or day picker there
+  const top = ["/", "/nba", "/cfb", "/top10"].includes(loc.pathname);
+  const other = sport !== "nfl" || top;   // NBA, CFB and picks pages carry no NFL season/week query
   const sections = NAV_BY_SPORT[sport];
   const mobile = mobileNav(sections);
   const link = (n: NavItem) => (
@@ -293,7 +292,7 @@ export function Layout() {
           <button className="lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></button>
           {/* On phones the sport switch stands in for the logo so the header fits. */}
           <div className="hidden sm:block lg:hidden"><Logo compact /></div>
-          <SportSwitch sport={sport} top={top} />
+          <SportSwitch sport={sport} />
           <div className="flex-1" />
           {!other && <SeasonWeekPicker />}
           {!other && <div className="hidden sm:block"><StatusChip /></div>}
