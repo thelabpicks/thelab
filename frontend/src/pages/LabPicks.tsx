@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Star, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SURE, SPORT_LABEL, playDate, SPORTS, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, counts, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -73,9 +73,9 @@ export default function LabPicks({ sport }: { sport: Sport }) {
             Only lines a sportsbook has posted count, priced {BOARD_MIN_PRICE} or longer (a heavier favorite risks too much to win too little).</p>
           <p><b className="text-ok">Top confidence</b> {n100(SURE)}%+ · <b className="text-accent">Bet</b> {n100(BET)}%+ · <b className="text-warn">Lean</b> {n100(LEAN)}–{n100(BET)}%, a small bet at most ·{" "}
             <b className="text-danger">Risky</b> under {n100(LEAN)}%, close to a coin flip.</p>
-          <p>Picks of the day (starred) are our locks: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
+          <p>Picks of the day (starred) are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
             locked when chosen and tracked on their own record. A day with no pick that strong gets none.</p>
-          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines; units assume 1 unit a pick at the locked price.
+          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines with a {n100(BET)}%+ chance at lock; leans under that still show, marked NC (not counted). Units assume 1 unit a pick at the locked price.
             Even a 90% pick loses 1 time in 10. Research, not betting advice.</p>
         </div>
       </details>
@@ -135,7 +135,7 @@ export function DailyPicks() {
       {!!lastDay.length && (
         <Card>
           <CardHeader title="Last results" icon={<Trophy className="h-4 w-4 text-accent" />} subtitle={day(last)}
-            action={<span className="text-xs font-semibold text-muted">{recText(tally(lastDay))}</span>} />
+            action={<span className="text-xs font-semibold text-muted">{recText(tally(lastDay, 0))}</span>} />
           <ul className="divide-y divide-line/60 border-t border-line">
             {lastDay.map((d) => (
               <li key={`${d.id}|${d.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
@@ -240,67 +240,77 @@ const recText = (r: LabRecord) => (r.n ? `${r.won}-${r.lost}${r.push ? `-${r.pus
 const unitsText = (r: LabRecord) => (r.priced ? `${r.units >= 0 ? "+" : "−"}${Math.abs(r.units).toFixed(1)}u` : "");
 
 
-const RECENT_DAYS = 1;
+const RECENT_PICKS = 5;
+type Shown = Sport | "all";
 
-/** Every pick that was on the list at kickoff (and every pick of the day) for the page's sport, graded after the final, by day. */
-function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
-  const [all, setAll] = React.useState(false);
-  const recent = b.recent.filter((p) => p.sport === sport);
-  const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => d.sport === sport && !d.fill).map((d) => [`${d.game_id}|${d.bet}`, d]));
-  // picks of the day that never made the top 10 still belong in the results
-  const rows: (LabPick & { day?: number })[] = [...recent];
-  const seen = new Set(recent.map((p) => `${p.game_id}|${p.bet}`));
+/** Graded picks, newest first: every pick that was on a top 10 at kickoff and every pick of the day (those that never made
+ *  the top 10 too), with each one's pick of the day when it was one. */
+function resultRows(b: LabBoard, sports: Sport[]) {
+  const potd = new Map((b.daily ? [...b.daily.recent, ...b.daily.picks] : []).filter((d) => sports.includes(d.sport) && !d.fill).map((d) => [`${d.sport}|${d.game_id}|${d.bet}`, d]));
+  const rows: LabPick[] = b.recent.filter((p) => sports.includes(p.sport));
+  const seen = new Set(rows.map((p) => `${p.sport}|${p.game_id}|${p.bet}`));
   potd.forEach((d, k) => { if (!seen.has(k) && new Date(d.kickoff) <= new Date(b.generated_at)) rows.push(d); });
+  return { potd, rows: rows.sort((x, y) => y.kickoff.localeCompare(x.kickoff)) };
+}
+
+/** Results: the 5 latest graded picks, any sport on a tap (Andrew, 2026-11-18: "show the other sports and only the most
+ *  recent 5 unless someone wants to click further"); more open 10 at a time. */
+function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
+  const [shownSport, setShownSport] = React.useState<Shown>(sport);
+  const [limit, setLimit] = React.useState(RECENT_PICKS);
+  React.useEffect(() => { setShownSport(sport); setLimit(RECENT_PICKS); }, [sport]);
+  const { potd, rows } = resultRows(b, shownSport === "all" ? SPORTS : [shownSport]);
+  const shown = rows.slice(0, limit);
   const byDay = new Map<string, LabPick[]>();
-  for (const p of rows.sort((x, y) => y.kickoff.localeCompare(x.kickoff))) {
-    const d = playDate(p.kickoff); byDay.set(d, [...(byDay.get(d) ?? []), p]);
-  }
-  const days = [...byDay.entries()];
-  const shown = all ? days : days.slice(0, RECENT_DAYS);
+  for (const p of shown) { const d = playDate(p.kickoff); byDay.set(d, [...(byDay.get(d) ?? []), p]); }
+  const pickSport = (v: Shown) => { setShownSport(v); setLimit(RECENT_PICKS); };
+  const chip = (v: Shown, label: string) => (
+    <button key={v} type="button" onClick={() => pickSport(v)} aria-pressed={shownSport === v}
+      className={cn("rounded-md px-2 py-1 text-xs font-semibold", shownSport === v ? "bg-accent text-accent-fg" : "text-muted hover:bg-raised hover:text-fg")}>{label}</button>
+  );
   return (
     <Card>
-      <CardHeader title={`${SPORT_LABEL[sport]} results`} icon={<Trophy className="h-4 w-4 text-accent" />}
-        subtitle="Graded after each final. Picks never change after kickoff." />
+      <CardHeader title="Results" icon={<Trophy className="h-4 w-4 text-accent" />} subtitle="Latest first. Graded after each final; picks never change after kickoff." />
+      <div className="flex flex-wrap gap-1 border-t border-line px-4 py-2 sm:px-5" role="group" aria-label="Results for">
+        {SPORTS.map((sp) => chip(sp, SPORT_LABEL[sp]))}{chip("all", "All")}
+      </div>
       {!rows.length && <CardBody><p className="text-sm text-muted">Results show here once the first games on the list are played.</p></CardBody>}
-      {shown.map(([d, ps]) => {
-        const t = tally(ps);
-        return (
-          // keyed by sport too, so switching sports builds a fresh list instead of reusing the last sport's rows
-          <div key={`${sport}|${d}`} className="border-t border-line">
-            <div className="flex items-center justify-between bg-raised/40 px-4 py-1.5 text-xs font-semibold sm:px-5">
-              <span>{day(d)}</span><span className="text-muted">{t.n ? recText(t) : ps.some((p) => !p.result) ? "Pending" : t.unbooked ? "Not counted" : "Void"}</span>
-            </div>
-            <ul className="divide-y divide-line/60">
-              {ps.map((p) => {
-                const daily = potd.get(`${p.game_id}|${p.bet}`);
-                const actual = daily?.actual ?? p.actual;
-                return (
-                  // a pick of the day can share its top 10 pick's id at another line (Ty Jerome 23.5 and 24.5, 10/29): key by bet
-                  <li key={`${p.id}|${p.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
-                    <ResultMark p={daily?.result ? daily : p} />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent" title="Pick of the day">POTD</span>}</div>
-                      {actual && <div className="truncate text-xs text-muted">{actual}</div>}
-                    </div>
-                    <div className="shrink-0 text-xs text-muted">{pct(p.chance, 0)}</div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
-      {days.length > RECENT_DAYS && (
-        <button type="button" onClick={() => setAll((v) => !v)} className="w-full border-t border-line px-4 py-2.5 text-xs font-semibold text-accent hover:bg-raised/50">
-          {all ? "Show fewer days" : `Show ${days.length - RECENT_DAYS} older ${days.length - RECENT_DAYS === 1 ? "day" : "days"}`}</button>
+      {[...byDay.entries()].map(([d, ps]) => (
+        <div key={`${shownSport}|${d}`} className="border-t border-line">
+          <div className="bg-raised/40 px-4 py-1.5 text-xs font-semibold sm:px-5">{day(d)}</div>
+          <ul className="divide-y divide-line/60">
+            {ps.map((p) => {
+              const daily = potd.get(`${p.sport}|${p.game_id}|${p.bet}`);
+              const actual = daily?.actual ?? p.actual;
+              return (
+                // a pick of the day can share its top 10 pick's id at another line (Ty Jerome 23.5 and 24.5, 10/29): key by bet
+                <li key={`${p.id}|${p.bet}`} className="flex items-center gap-3 px-4 py-2 text-sm sm:px-5">
+                  <ResultMark p={daily?.result ? daily : p} floor={daily?.result ? 0 : BET} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium leading-snug">{p.bet}{daily && <span className="ml-1.5 rounded bg-accent/10 px-1 py-px text-[10px] font-semibold text-accent" title="Pick of the day">POTD</span>}</div>
+                    <div className="truncate text-xs text-muted">{[shownSport === "all" && SPORT_LABEL[p.sport], actual].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <div className="shrink-0 text-xs text-muted">{pct(p.chance, 0)}</div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+      {(rows.length > limit || limit > RECENT_PICKS) && (
+        <div className="flex border-t border-line text-xs font-semibold text-accent">
+          {rows.length > limit && <button type="button" onClick={() => setLimit((n) => n + 10)} className="flex-1 px-4 py-2.5 hover:bg-raised/50">Show more results</button>}
+          {limit > RECENT_PICKS && <button type="button" onClick={() => setLimit(RECENT_PICKS)} className="flex-1 px-4 py-2.5 text-muted hover:bg-raised/50">Show fewer</button>}
+        </div>
       )}
     </Card>
   );
 }
 
 /** A big hit / miss mark for the results list. */
-function ResultMark({ p }: { p: LabPick }) {
-  if (p.result && p.line_source !== "book") return <span title="Not counted: no sportsbook line" aria-label="Not counted: no sportsbook line"
+function ResultMark({ p, floor = BET }: { p: LabPick; floor?: number }) {
+  const why = p.line_source !== "book" ? "Not counted: no sportsbook line" : `Not counted: a lean under ${n100(BET)}% at lock`;
+  if (p.result && !counts(p, floor)) return <span title={why} aria-label={why}
     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-raised text-[10px] font-semibold text-muted">NC</span>;
   const r = p.result;
   const [txt, cls] = r === "won" ? ["✓", "bg-ok/15 text-ok"] : r === "lost" ? ["✗", "bg-danger/15 text-danger"]
