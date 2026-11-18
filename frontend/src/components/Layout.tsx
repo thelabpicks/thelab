@@ -1,9 +1,7 @@
 import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity, BarChart3, BookOpen, Dices, MessageCircleQuestion, LayoutDashboard, ListOrdered, MonitorPlay, Moon, Settings, Shield, SlidersHorizontal, Sun, Percent, Menu, X, Trophy,
-} from "lucide-react";
+import { Moon, Settings, Star, Sun } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
 import { useLinkSuffix, useSeasonWeek, useTheme, type WeeksResponse } from "@/lib/state";
@@ -12,61 +10,50 @@ import { useLiveRecord } from "./LiveRecord";
 import { useCfb, type CfbPrevious, type CfbStatus, type Week as CfbWeek } from "@/lib/cfb";
 import { useNba, type NbaPrevious, type NbaStatus, type Slate } from "@/lib/nba";
 
-type NavItem = { to: string; label: string; short?: string; icon: typeof LayoutDashboard; end?: boolean };
-type NavSection = { title: string; items: NavItem[] };
+type NavItem = { to: string; label: string; end?: boolean };
 
-/** Every sport gets the NFL tab's menu: the same sections, the same items in the same order, and the same mobile bar
- *  (Home, Sims, Ask, Parlay, More). Only the sport's own research pages differ. */
-function sportNav(base: string, home: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavSection[] {
-  return [
-    { title: "Picks", items: [
-      { to: base || "/", label: home, short: "Home", icon: LayoutDashboard, end: true },
-      { to: `${base}/ask`, label: "Ask", icon: MessageCircleQuestion },
-      { to: links.parlay, label: "Parlay builder", short: "Parlay", icon: Dices },
-    ] },
-    { title: "Watch", items: [{ to: `${base}/sims`, label: "Game Simulations", short: "Sims", icon: MonitorPlay }] },
-    { title: "Research", items: [{ to: `${base}/props`, label: "Player props", short: "Props", icon: SlidersHorizontal }, ...research] },
-    { title: "Proof", items: [
-      { to: links.how, label: "How it works", icon: BookOpen },
-      { to: links.record, label: "Track record", icon: BarChart3 },
-    ] },
-    { title: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
-  ];
-}
-const NAV_BY_SPORT: Record<Sport, NavSection[]> = {
-  nfl: sportNav("", "This week", [
-    { to: "/rankings", label: "Anytime TD", short: "TDs", icon: ListOrdered },
-    { to: "/hitrates", label: "Hit rates", icon: Percent },
-    { to: "/defenses", label: "Defenses", icon: Shield },
+/** Inside a sport, one row of tabs toggles between its pages (Andrew, 2026-11-18: "picks of the day tab and the sports,
+ *  the top 10 found within each sport, and in each sport toggle through props, games, sims"). Every sport keeps the same
+ *  order: Top 10, its research, Parlay, Ask, then the proof pages. */
+const sportTabs = (base: string, research: NavItem[], links: { parlay: string; how: string; record: string }): NavItem[] => [
+  { to: base, label: "Top 10", end: true },
+  ...research,
+  { to: links.parlay, label: "Parlay" },
+  { to: `${base === "/nfl" ? "" : base}/ask`, label: "Ask" },
+  { to: links.record, label: "Track record" },
+  { to: links.how, label: "How it works" },
+];
+const TABS_BY_SPORT: Record<Sport, NavItem[]> = {
+  nfl: sportTabs("/nfl", [
+    { to: "/props", label: "Props" }, { to: "/sims", label: "Sims" }, { to: "/rankings", label: "Anytime TD" },
+    { to: "/hitrates", label: "Hit rates" }, { to: "/defenses", label: "Defenses" },
   ], { parlay: "/builder", how: "/how", record: "/backtest" }),
-  cfb: sportNav("/cfb", "This week", [
-    { to: "/cfb/games", label: "All games", short: "Games", icon: ListOrdered },
-    { to: "/cfb/teams", label: "Teams", icon: Trophy },
+  cfb: sportTabs("/cfb", [
+    { to: "/cfb/games", label: "Games" }, { to: "/cfb/props", label: "Props" }, { to: "/cfb/sims", label: "Sims" }, { to: "/cfb/teams", label: "Teams" },
   ], { parlay: "/cfb/parlay", how: "/cfb/how", record: "/cfb/record" }),
-  nba: sportNav("/nba", "Today", [{ to: "/nba/hitrates", label: "Hit rates", icon: Percent }], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
+  nba: sportTabs("/nba", [
+    { to: "/nba/props", label: "Props" }, { to: "/nba/sims", label: "Sims" }, { to: "/nba/hitrates", label: "Hit rates" },
+  ], { parlay: "/nba/builder", how: "/nba/how", record: "/nba/record" }),
 };
-// Mobile bar: Home, Game Simulations, Ask, Parlay builder (then More, which holds Player props), whatever the sport.
-const mobileNav = (sections: NavSection[]) => [sections[0].items[0], sections[1].items[0], sections[0].items[1], sections[0].items[2]];
 
 type Sport = "nfl" | "nba" | "cfb";
-const sportOf = (path: string): Sport => (path === "/nba" || path.startsWith("/nba/") ? "nba" : path === "/cfb" || path.startsWith("/cfb/") ? "cfb" : "nfl");
+/** null: the Picks of the day page (and Settings), which belong to no sport. */
+const sportOf = (path: string): Sport | null => (path === "/" || path === "/settings" ? null
+  : path === "/nba" || path.startsWith("/nba/") ? "nba" : path === "/cfb" || path.startsWith("/cfb/") ? "cfb" : "nfl");
 
-/** NFL / CFB / NBA switch, plus The Lab's top 10 across all three. Each sport keeps its own pages; the switch goes to that sport's home. */
-function SportSwitch({ sport, top }: { sport: Sport; top: boolean }) {
-  const base = "rounded-md px-2 py-1.5 text-sm font-bold tracking-wide transition-colors sm:px-3.5";
-  const tab = (to: string, s: Sport, label: string) => (
-    <NavLink to={to} role="tab" aria-selected={!top && sport === s} className={cn(base, !top && sport === s ? "bg-accent text-accent-fg" : "text-muted hover:bg-raised hover:text-fg")}>{label}</NavLink>
+/** The site's top level: Picks of the day, then one section per sport, each opening on its top 10. */
+function MainTabs({ sport, home }: { sport: Sport | null; home: boolean }) {
+  const base = "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-bold tracking-wide transition-colors sm:px-3";
+  const tab = (to: string, on: boolean, label: React.ReactNode, aria?: string) => (
+    <NavLink to={to} role="tab" aria-selected={on} aria-label={aria} className={cn(base, on ? "bg-accent text-accent-fg" : "text-muted hover:bg-raised hover:text-fg")}>{label}</NavLink>
   );
   return (
-    <div className="flex rounded-lg border border-line bg-surface p-1" role="tablist" aria-label="Sport">
-      <NavLink to="/top10" role="tab" aria-selected={top} title="The Lab's top 10 picks across every sport"
-        className={cn(base, "whitespace-nowrap", top ? "bg-accent text-accent-fg" : "text-accent hover:bg-raised")}>Top 10</NavLink>
-      {tab("/", "nfl", "NFL")}{tab("/cfb", "cfb", "CFB")}{tab("/nba", "nba", "NBA")}
+    <div className="flex rounded-lg border border-line bg-surface p-1" role="tablist" aria-label="Section">
+      {tab("/", home, <><Star className="h-3.5 w-3.5" aria-hidden /><span className="sm:hidden">Today</span><span className="hidden sm:inline">Picks of the day</span></>, "Picks of the day")}
+      {tab("/nfl", sport === "nfl", "NFL")}{tab("/cfb", sport === "cfb", "CFB")}{tab("/nba", sport === "nba", "NBA")}
     </div>
   );
 }
-
-type Health = { data_loaded: boolean; ready: boolean; calibrated: boolean };
 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
@@ -111,7 +98,7 @@ function SeasonWeekPicker() {
   const results = (live.data?.previous_weeks ?? []).filter((w) => w.season === season).map((w) => `${w.season}-${w.week}`);
   const onPrev = loc.pathname === "/previous";
   const value = onPrev ? `r:${params.get("p") ?? results[0] ?? ""}` : String(week);
-  const pick = (v: string) => (v.startsWith("r:") ? nav(`/previous?p=${encodeURIComponent(v.slice(2))}`) : onPrev ? nav(`/?season=${season}&week=${v}`) : set(season, Number(v)));
+  const pick = (v: string) => (v.startsWith("r:") ? nav(`/previous?p=${encodeURIComponent(v.slice(2))}`) : onPrev ? nav(`/props?season=${season}&week=${v}`) : set(season, Number(v)));
   return (
     <div className="flex items-center gap-1.5">
       <label className="sr-only" htmlFor="season-select">Season</label>
@@ -193,35 +180,6 @@ function SportPeriodPicker({ sport }: { sport: "cfb" | "nba" }) {
   );
 }
 
-/** College football and NBA: the same chip as the NFL's, green when the sport has markets proven in testing. */
-function SportStatusChip({ sport }: { sport: "cfb" | "nba" }) {
-  const cfb = sport === "cfb";
-  const c = useCfb<CfbStatus>("status.json", cfb);
-  const n = useNba<NbaStatus>("status.json", !cfb);
-  const ok = cfb ? (c.data ? Object.values(c.data.proven).some((t) => t.length) : null) : (n.data ? n.data.validated_markets.length > 0 : null);
-  const label = ok == null ? "Checking" : ok ? "Model validated" : "Research ranks only";
-  return (
-    <NavLink to={cfb ? "/cfb/record" : "/nba/record"} className="hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted hover:text-fg sm:flex">
-      <span className={cn("h-2 w-2 rounded-full", ok == null ? "bg-muted" : ok ? "bg-accent" : "bg-info")} aria-hidden />
-      {label}
-    </NavLink>
-  );
-}
-
-function StatusChip() {
-  const h = useQuery({ queryKey: ["health"], queryFn: () => api.get<Health>("/health"), refetchInterval: 30_000 });
-  const suffix = useLinkSuffix();
-  const state = h.isError ? "offline" : !h.data ? "…" : !h.data.data_loaded ? "no-data" : h.data.calibrated ? "validated" : "research";
-  const label = { offline: "API offline", "…": "Checking", "no-data": "Data not loaded", validated: "Model validated", research: "Research ranks only" }[state];
-  const tone = state === "validated" ? "bg-accent" : state === "research" ? "bg-info" : state === "…" ? "bg-muted" : "bg-warn";
-  return (
-    <NavLink to={`/data${suffix}`} className="hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted hover:text-fg sm:flex">
-      <span className={cn("h-2 w-2 rounded-full", tone)} aria-hidden />
-      {label}
-    </NavLink>
-  );
-}
-
 function ThemeToggle() {
   const [theme, setTheme] = useTheme();
   const dark = theme === "dark" || (theme === "system" && document.documentElement.classList.contains("dark"));
@@ -238,105 +196,45 @@ function ThemeToggle() {
 
 export function Layout() {
   const suffix = useLinkSuffix();
-  const [open, setOpen] = React.useState(false);
   const loc = useLocation();
-  React.useEffect(() => setOpen(false), [loc.pathname]);
   const sport = sportOf(loc.pathname);
-  const nba = sport === "nba";
-  const cfb = sport === "cfb";
-  const top = loc.pathname === "/top10";
-  const other = sport !== "nfl" || top;   // NBA, CFB and top-10 pages carry no NFL season/week query
-  const sections = NAV_BY_SPORT[sport];
-  const mobile = mobileNav(sections);
-  const link = (n: NavItem) => (
-    <NavLink
-      key={n.to}
-      to={n.to + (other ? "" : suffix)}
-      end={n.end}
-      className={({ isActive }) =>
-        cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-          isActive ? "bg-raised text-fg" : "text-muted hover:bg-raised/60 hover:text-fg")
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <n.icon className={cn("h-4 w-4", isActive && "text-accent")} aria-hidden />
-          {n.label}
-        </>
-      )}
-    </NavLink>
-  );
+  // each sport's top 10 (and Picks of the day) has no season/week or day picker
+  const top = ["/", "/nfl", "/nba", "/cfb", "/top10"].includes(loc.pathname);
+  const nfl = sport === "nfl" && !top;   // only the NFL research pages carry the season/week query
   return (
-    <div className="flex min-h-full">
+    <div className="flex min-h-full flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">Skip to content</a>
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface/40 px-3 py-4 lg:flex">
-        <div className="px-2 pb-6"><Logo /></div>
-        <nav aria-label="Primary" className="flex flex-1 flex-col gap-0.5"><Sections sections={sections} link={link} /></nav>
-        <div className="mt-4 rounded-lg border border-line p-3 text-[11px] leading-relaxed text-muted">
-          <Activity className="mb-1 h-3.5 w-3.5 text-accent" aria-hidden />
-          {nba ? "Basketball" : cfb ? "College football" : "Football"} research, not betting advice. No pick is guaranteed.
-        </div>
-      </aside>
-      {/* Mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <nav className="absolute left-0 top-0 flex h-full w-64 flex-col gap-0.5 bg-surface p-3">
-            <div className="mb-4 flex items-center justify-between px-2"><Logo /><button aria-label="Close menu" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button></div>
-            <Sections sections={sections} link={link} />
-          </nav>
-        </div>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-line bg-bg/85 px-3 backdrop-blur sm:px-6">
-          <button className="lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></button>
-          {/* On phones the sport switch stands in for the logo so the header fits. */}
-          <div className="hidden sm:block lg:hidden"><Logo compact /></div>
-          <SportSwitch sport={sport} top={top} />
+      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
+        <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center gap-2 px-3 sm:gap-3 sm:px-6">
+          <NavLink to="/" aria-label="The Lab home" className="shrink-0"><span className="hidden lg:block"><Logo /></span><span className="lg:hidden"><Logo compact /></span></NavLink>
+          <MainTabs sport={sport} home={loc.pathname === "/"} />
           <div className="flex-1" />
-          {!other && <SeasonWeekPicker />}
-          {!other && <div className="hidden sm:block"><StatusChip /></div>}
-          {!top && sport !== "nfl" && <SportPeriodPicker sport={sport} />}
-          {!top && sport !== "nfl" && <div className="hidden sm:block"><SportStatusChip sport={sport} /></div>}
+          <NavLink to="/settings" aria-label="Settings" className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-raised hover:text-fg"><Settings className="h-4 w-4" /></NavLink>
           <ThemeToggle />
-        </header>
-        <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-5 sm:px-6 lg:pb-10">
-          {!other && <NextWeekNote />}
-          <Outlet />
-          <footer className="mt-10 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
-            21+ only. The Lab is sports research, not betting or financial advice; no pick is guaranteed and past results don't promise future ones.
-            Bet only what you can afford to lose and where sports betting is legal. Gambling problem? Call or text 1-800-GAMBLER.
-          </footer>
-        </main>
-      </div>
-      {/* Mobile bottom nav */}
-      <nav aria-label="Primary mobile" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 backdrop-blur lg:hidden">
-        {mobile.map((n) => (
-          <NavLink key={n.to} to={n.to + (other ? "" : suffix)} end={n.end}
-            className={({ isActive }) => cn("flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium", isActive ? "text-accent" : "text-muted")}>
-            <n.icon className="h-5 w-5" aria-hidden />
-            {n.short ?? n.label}
-          </NavLink>
-        ))}
-        <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-muted">
-          <Menu className="h-5 w-5" aria-hidden />More
-        </button>
-      </nav>
-    </div>
-  );
-}
-
-function Sections({ sections, link }: { sections: NavSection[]; link: (n: NavItem) => React.ReactNode }) {
-  return (
-    <>
-      {sections.map((s, i) => (
-        <div key={s.title || i} className={cn(i > 0 && "mt-4", !s.title && "mt-auto border-t border-line pt-3")}>
-          {s.title && <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted/80">{s.title}</div>}
-          <div className="flex flex-col gap-0.5">{s.items.map(link)}</div>
         </div>
-      ))}
-    </>
+        {sport && (
+          <div className="mx-auto flex w-full max-w-[1400px] items-center gap-2 px-3 sm:px-6">
+            <nav aria-label={`${sport.toUpperCase()} pages`} className="-mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]">
+              {TABS_BY_SPORT[sport].map((n) => (
+                <NavLink key={n.to} to={n.to + (nfl && n.to !== "/nfl" ? suffix : "")} end={n.end}
+                  className={({ isActive }) => cn("shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-sm font-semibold transition-colors",
+                    isActive ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}>{n.label}</NavLink>
+              ))}
+            </nav>
+            {nfl && <div className="shrink-0 py-1.5"><SeasonWeekPicker /></div>}
+            {!top && sport !== "nfl" && <div className="shrink-0 py-1.5"><SportPeriodPicker sport={sport} /></div>}
+          </div>
+        )}
+      </header>
+      <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-10 pt-5 sm:px-6">
+        {nfl && <NextWeekNote />}
+        <Outlet />
+        <footer className="mt-10 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
+          21+ only. The Lab is sports research, not betting or financial advice; no pick is guaranteed and past results don't promise future ones.
+          Bet only what you can afford to lose and where sports betting is legal. Gambling problem? Call or text 1-800-GAMBLER.
+        </footer>
+      </main>
+    </div>
   );
 }
 
