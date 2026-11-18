@@ -140,7 +140,7 @@ const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("
 
 /** The text of one sport's picks of the day, ready to post. */
 function postText(sport: Sport, date: string, ps: DailyPick[], r: LabRecord): string {
-  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our 60% bar)` : ""}`);
+  const lines = ps.filter((p) => !p.withdrawn).map((p) => `${p.slot}. ${p.bet}${p.price != null ? ` ${price(p.price)}` : ""} (${p.matchup}): ${pct(p.chance, 0)} to hit${p.fill ? ` (${confidenceOf(p.chance).label.toLowerCase()}, below our ${n100(DAILY_MIN_CHANCE)}% bar)` : ""}`);
   return [`The Lab's ${SPORT_LABEL[sport]} picks of the day, ${day(date)}`, ...lines,
     r.n ? `Picks of the day: ${recText(r)}${unitsText(r) ? `, ${unitsText(r)}` : ""} (book lines only, 1 unit a pick)` : "", "21+. Not betting advice."].filter(Boolean).join("\n");
 }

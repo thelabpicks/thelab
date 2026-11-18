@@ -355,8 +355,10 @@ export const impliedChance = (price: number) => (price > 0 ? 100 / (price + 100)
 /** True when the data backs the pick more strongly than the book's price does (or no price is posted yet). */
 export const beatsPrice = (p: Pick2) => p.price == null || p.chance - impliedChance(p.price) >= DAILY_MIN_EDGE;
 type Pick2 = { price: number | null; chance: number };
-/** A pick of the day must be at least this likely: a 51% favorite is too close to a coin flip to post. */
-export const DAILY_MIN_CHANCE = 0.6;
+/** A pick of the day must be at least this likely. Andrew (2026-11-18): picks of the day have to be locks, even if there
+ *  are fewer. Locked picks of the day through Nov 17 went 43-19 at 60%+ but 31-8 at 65%+ (NBA 17-4, NFL 7-4, CFB 7-0),
+ *  so the bar is 65%. A thin day fills its slots with Extra picks that are not counted. */
+export const DAILY_MIN_CHANCE = 0.65;
 const DAILY_KEEP_DAYS = 90;
 /** The Central-time date a game is played on: picks of the day follow the US sports day, not UTC. */
 export const playDate = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
