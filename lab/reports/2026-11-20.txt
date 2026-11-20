@@ -24,9 +24,9 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
-    - Winners (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
-    - Spreads (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
-    - Totals (2 games): 2-0 (100%). By confidence: under 60% hit 100% of 2.
+    - Winners (3 games): 2-1 (67%). By confidence: under 60% hit 67% of 3.
+    - Spreads (3 games): 2-1 (67%). By confidence: under 60% hit 67% of 3.
+    - Totals (3 games): 3-0 (100%). By confidence: under 60% hit 100% of 3.
     - Furthest off: Akron at Massachusetts (projected 48.6 total, scored 67, +18.4); Central Michigan at Buffalo (projected 47.5 total, scored 61, +13.5).
     - Suggested college bets this season: 53-67 (44%).
   Where it was off and why
