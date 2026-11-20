@@ -1,0 +1,60 @@
+The Lab daily report, Friday, Nov 20 (results from Thursday, Nov 19)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 35-14 +11.68u / 10-6 −0.16u
+  CFB: 49-13 +0.77u / 7-1 +1.57u
+  NBA: 57-39 +3.52u / 26-12 +2.50u
+
+NFL
+  Picks
+    - 1 pick is waiting on a final stat line: Xavier Hutchinson under 3.5 receptions. It is graded on the next refresh after the result posts.
+  How the model did
+    - Featured picks this season: 137 of 248 (55%).
+    - Off calibration: TD Lean: running hot (83 of 262 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (106 of 195 hit vs 69% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
+  Game sims vs the final
+    - IND 3-26 HOU (sims IND 16-28 HOU, winner ✓); biggest misses: David Montgomery 107 rushing yards (sims 49.4), Anthony Gould 48 receiving yards (sims 6.1)
+    - Last 30 days: 30 games, winner right in 21 (70%); each team's points missed by 7.9 on average, running +0.5 vs projected. Furthest-leaning stat: rushing yards, +4.5 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+  How the model did
+    - Winners (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
+    - Spreads (2 games): 1-1 (50%). By confidence: under 60% hit 50% of 2.
+    - Totals (2 games): 2-0 (100%). By confidence: under 60% hit 100% of 2.
+    - Furthest off: Akron at Massachusetts (projected 48.6 total, scored 67, +18.4); Central Michigan at Buffalo (projected 47.5 total, scored 61, +13.5).
+    - Suggested college bets this season: 53-67 (44%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.1 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.23 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.14 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.05 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 13 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - Surest hit: Cam Spencer under 2.5 threes made (64%), finished with 1.
+    - Miss: Mikal Bridges under 1.5 threes made at 64%. Finished with 2.
+    - Miss: Brandin Podziemski over 25.5 pts + reb + ast at 56%. Finished with 20.
+    - Miss: Damian Lillard under 31.5 pts + reb + ast at 56%. Finished with 39.
+  How the model did
+    - Every lean the model made on 4 games: 162-143 (53%). By confidence: 70%+ hit 62% of 29, 60-70% hit 59% of 17, under 60% hit 52% of 259.
+    - Unders 57% (134), overs 50% (171).
+    - Furthest off among confident leans: Gary Payton II pra (projected 16.6, had 4, line 5.5); Jericho Sims pra (projected 11.1, had 1, line 2.5); Gary Payton II points (projected 11.1, had 2, line 3.5).
+  Where it was off and why
+    - Re-run with the minutes players really got, 3082 of 6331 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −0.9 per player vs the projection (typical miss 5.3).
+    - Team scoring: rotations scored −3.3 points per team vs projected (typical miss 12.8).
+  Model changes
+    - Refit this morning on every box score through 2026-11-19; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - NY 102-99 MIN (sims NY 107-115 MIN, winner ✗); biggest misses: Ayo Dosunmu 6 points (sims 19.9)
+    - LAC 112-124 SA (sims LAC 114-126 SA, winner ✓); biggest misses: Kobe Sanders 0 points (sims 9.3), Max Strus 18 points (sims 8.9)
+    - Last 30 days: 123 games, winner right in 67 (54%); each team's points missed by 10.4 on average (the book's line by 9.3), running -0.2 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
