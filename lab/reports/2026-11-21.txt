@@ -1,0 +1,65 @@
+The Lab daily report, Saturday, Nov 21 (results from Friday, Nov 20)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 35-14 +11.68u / 10-6 −0.16u
+  CFB: 49-13 +0.77u / 7-1 +1.57u
+  NBA: 59-40 +3.52u / 26-12 +2.50u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 137 of 248 (55%).
+    - Off calibration: TD Lean: running hot (83 of 262 hit vs 26% expected).
+    - Off calibration: Props Strong: running cold (106 of 195 hit vs 69% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
+  Game sims vs the final
+    - Last 30 days: 30 games, winner right in 21 (70%); each team's points missed by 7.9 on average, running +0.5 vs projected. Furthest-leaning stat: rushing yards, +4.5 per player vs projected.
+
+CFB
+  Picks
+    - 1 pick is waiting on a final stat line: New Mexico to win (ML -355). It is graded on the next refresh after the result posts.
+  How the model did
+    - Winners (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
+    - Spreads (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
+    - Totals (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
+    - Furthest off: Rice at Temple (projected 52.6 total, scored 58, +5.4).
+    - Suggested college bets this season: 53-67 (44%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.1 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.23 vs the pregame input (typical miss 6.9).
+    - Yards per play ran −0.14 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.05 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 13 points vs 12.7 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - Surest hit: Saddiq Bey over 1.5 assists (65%), finished with 3.
+    - Miss: Jamal Shead over 14.5 pts + reb + ast at 64%. Finished with 5.
+    - Miss: Julius Randle under 6.5 rebounds at 56%. Finished with 9.
+    - Miss: Darius Acuff Jr. over 2.5 threes made at 56%. Finished with 2.
+  How the model did
+    - Every lean the model made on 9 games: 412-307 (57%). By confidence: 70%+ hit 73% of 40, 60-70% hit 71% of 75, under 60% hit 55% of 604.
+    - Unders 62% (395), overs 52% (324).
+    - Furthest off among confident leans: Bilal Coulibaly pra (projected 17.8, had 7, line 11.5); Tre Johnson pra (projected 13, had 3, line 7.5); Will Riley pra (projected 11.5, had 2, line 3.5).
+  Where it was off and why
+    - Re-run with the minutes players really got, 3234 of 6638 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −0.8 per player vs the projection (typical miss 5.2).
+    - Team scoring: rotations scored −3.4 points per team vs projected (typical miss 12.7).
+  Model changes
+    - Refit this morning on every box score through 2026-11-20; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - HOU 124-133 DEN (sims HOU 103-113 DEN, winner ✓); biggest misses: Fred VanVleet 25 points (sims 12.2), Reed Sheppard 0 points (sims 10.4)
+    - SAC 104-106 LAL (sims SAC 114-117 LAL, winner ✓); biggest misses: Malik Monk 2 points (sims 12.5), Matisse Thybulle 14 points (sims 7.5)
+    - PHX 111-101 UTAH (sims PHX 115-114 UTAH, winner ✓); biggest misses: Mo Bamba 2 points (sims 10.3), Collin Gillespie 16 points (sims 8.4)
+    - WSH 98-94 CHI (sims WSH 125-123 CHI, winner ✓); biggest misses: Alex Sarr 3 points (sims 14.1), Josh Giddey 2 points (sims 13)
+    - NO 120-126 OKC (sims NO 119-120 OKC, winner ✓); biggest misses: Aday Mara 22 points (sims 12.4), Bennett Stirtz 18 points (sims 8.8)
+    - ORL 113-111 BKN (sims ORL 109-111 BKN, winner ✗); biggest misses: Danny Wolf 20 points (sims 8.7), Day'Ron Sharpe 17 points (sims 8.5)
+    - IND 119-128 CLE (sims IND 120-126 CLE, winner ✓); biggest misses: James Harden 51 points (sims 16.9), Aaron Nesmith 2 points (sims 13.7)
+    - TOR 105-102 DET (sims TOR 120-118 DET, winner ✓); biggest misses: Jamal Shead 0 points (sims 11.4), Allen Graves 20 points (sims 9)
+    - Last 30 days: 131 games, winner right in 74 (56%); each team's points missed by 10.4 on average (the book's line by 9.3), running -0.5 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
