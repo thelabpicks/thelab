@@ -3,16 +3,16 @@ The Lab daily report, Saturday, Nov 21 (results from Friday, Nov 20)
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
   NFL: 35-14 +11.68u / 10-6 −0.16u
-  CFB: 49-13 +0.77u / 7-1 +1.57u
+  CFB: 50-13 +1.05u / 7-1 +1.57u
   NBA: 59-40 +3.52u / 26-12 +2.50u
 
 NFL
   Picks
     - No NFL picks were played on this day.
+    - Graded since the last report: Xavier Hutchinson under 3.5 receptions ✓.
   How the model did
-    - Featured picks this season: 137 of 248 (55%).
-    - Off calibration: TD Lean: running hot (83 of 262 hit vs 26% expected).
-    - Off calibration: Props Strong: running cold (106 of 195 hit vs 69% expected).
+    - Featured picks this season: 139 of 252 (55%).
+    - Off calibration: Props Strong: running cold (108 of 199 hit vs 69% expected).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
@@ -21,15 +21,15 @@ NFL
 
 CFB
   Picks
-    - 1 pick is waiting on a final stat line: New Mexico to win (ML -355). It is graded on the next refresh after the result posts.
+    - Surest hit: New Mexico to win (ML -355) (73%), final 24–17.
   How the model did
-    - Winners (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Spreads (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Totals (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
-    - Furthest off: Rice at Temple (projected 52.6 total, scored 58, +5.4).
-    - Suggested college bets this season: 53-67 (44%).
+    - Winners (7 games): 4-3 (57%). By confidence: 70%+ hit 75% of 4, under 60% hit 33% of 3.
+    - Spreads (7 games): 5-2 (71%). By confidence: under 60% hit 71% of 7.
+    - Totals (7 games): 4-3 (57%). By confidence: under 60% hit 57% of 7.
+    - Furthest off: Bowling Green at Toledo (projected 46.4 total, scored 19, −27.4); Iowa State at UCF (projected 49.7 total, scored 65, +15.3).
+    - Suggested college bets this season: 54-67 (45%).
   Where it was off and why
-    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18.1 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.23 vs the pregame input (typical miss 6.9).
     - Yards per play ran −0.14 vs the pregame input (typical miss 1).
     - Turnovers ran +0.05 vs the pregame input (typical miss 0.9).
