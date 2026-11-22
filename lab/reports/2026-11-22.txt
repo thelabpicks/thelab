@@ -4,7 +4,7 @@ Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
   NFL: 35-14 +11.68u / 10-6 −0.16u
   CFB: 59-15 +1.77u / 7-1 +1.57u
-  NBA: 59-40 +3.52u / 26-12 +2.50u
+  NBA: 60-43 +3.52u / 26-12 +2.50u
 
 NFL
   Picks
@@ -39,13 +39,28 @@ CFB
 
 NBA
   Picks
-    - 19 picks are waiting on a final stat line: Jaime Jaquez Jr. over 2.5 assists; Landry Shamet under 2.5 threes made; Jaylen Wells over 15.5 pts + reb + ast; Kris Dunn over 2.5 assists; Ayo Dosunmu over 3.5 rebounds; Cam Spencer over 2.5 rebounds; Kyrie Irving under 3.5 threes made; Zion Williamson over 2.5 assists; Zach Edey over 7.5 rebounds; Payton Pritchard under 6.5 assists; Zach LaVine over 2.5 rebounds; Paul George under 5.5 rebounds; Neemias Queta under 2.5 assists; Sam Hauser under 11.5 points; Darius Acuff Jr. over 31.5 pts + reb + ast; De'Andre Hunter over 1.5 threes made; Precious Achiuwa over 5.5 points; Domantas Sabonis over 4.5 assists; Keegan Murray over 4.5 rebounds. They are graded on the next refresh after the result posts.
+    - Surest hit: Kris Dunn over 2.5 assists (64%), finished with 5.
+    - Miss: Payton Pritchard under 6.5 assists at 64%. Finished with 8.
+    - Miss: Jaylen Wells over 15.5 pts + reb + ast at 64%. Finished with 9.
+    - Miss: Jaime Jaquez Jr. over 2.5 assists at 63%. Finished with 1.
+    - Miss: Ayo Dosunmu over 3.5 rebounds at 56%. Finished with 2.
+    - Miss: Paul George under 5.5 rebounds at 56%. Finished with 8.
+    - Miss: Landry Shamet under 2.5 threes made at 56%. Finished with 6.
+    - Miss: Zach Edey over 7.5 rebounds at 56%. Finished with 2.
+    - Miss: Sam Hauser under 11.5 points at 56%. Finished with 14.
+    - Miss: Precious Achiuwa over 5.5 points at 54%. Finished with 5.
+    - Miss: Domantas Sabonis over 4.5 assists at 53%. Finished with 4.
+    - 1 pick is waiting on a final stat line: Zion Williamson over 2.5 assists. It is graded on the next refresh after the result posts.
+  How the model did
+    - Every lean the model made on 6 games: 239-214 (53%). By confidence: 70%+ hit 76% of 34, 60-70% hit 66% of 53, under 60% hit 49% of 366.
+    - Unders 58% (236), overs 47% (217).
+    - Furthest off among confident leans: Scoot Henderson pra (projected 20.1, had 5, line 12.5); Jahmai Mashack pra (projected 15.8, had 3, line 5.5); Jahmai Mashack points (projected 7.6, had 0, line 2.5).
   Where it was off and why
-    - Re-run with the minutes players really got, 3234 of 6638 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Re-run with the minutes players really got, 3325 of 6852 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
     - Minutes ran −0.8 per player vs the projection (typical miss 5.2).
-    - Team scoring: rotations scored −3.4 points per team vs projected (typical miss 12.7).
+    - Team scoring: rotations scored −3.5 points per team vs projected (typical miss 12.7).
   Model changes
-    - Refit this morning on every box score through 2026-11-20; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Refit this morning on every box score through 2026-11-21; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
   Game sims vs the final
     - LAC 100-110 DAL (sims LAC 118-113 DAL, winner ✗); biggest misses: Max Christie 13 points (sims 3.2), Naji Marshall 4 points (sims 12.8)
