@@ -10,6 +10,10 @@ def test_factor():
     assert abs(weather.factor("rec_yards", 45) - 0.5) < 1e-9          # capped at 20 mph over calm
     assert weather.factor("rush_yards", 30) == 1.0
     assert weather.factor("receptions", None) == 1.0
+    assert abs(weather.factor("pass_yards", None, 30) - 0.95) < 1e-9     # cold only
+    assert abs(weather.factor("rec_yards", 20, 25) - 0.695) < 1e-9       # wind and cold add
+    assert weather.factor("receptions", 5, 40) == 1.0                   # 40 F is not cold
+    assert weather.factor("rush_yards", 5, 10) == 1.0
 
 
 def test_kickoff_is_eastern():
@@ -29,14 +33,14 @@ def _db():
     return c
 
 
-def test_game_winds_only_open_unplayed_games():
+def test_game_weather_only_open_unplayed_games():
     calls = []
 
     def fetch(url):
         calls.append(url)
-        return {"hourly": {"time": ["2026-11-15T17:00", "2026-11-15T18:00"], "wind_speed_10m": [12.0, 21.5]}}
+        return {"hourly": {"time": ["2026-11-15T17:00", "2026-11-15T18:00"], "wind_speed_10m": [12.0, 21.5], "temperature_2m": [30.0, 28.5]}}
 
-    assert weather.game_winds(_db(), 2026, 10, fetch=fetch, log=lambda *_: None) == {"2026_10_MIN_GB": 21.5}
+    assert weather.game_weather(_db(), 2026, 10, fetch=fetch, log=lambda *_: None) == {"2026_10_MIN_GB": (21.5, 28.5)}
     assert len(calls) == 1 and "latitude=44.5013" in calls[0]
 
 
@@ -44,4 +48,4 @@ def test_failed_forecast_means_no_adjustment():
     def fetch(url):
         raise OSError("offline")
 
-    assert weather.game_winds(_db(), 2026, 10, fetch=fetch, log=lambda *_: None) == {}
+    assert weather.game_weather(_db(), 2026, 10, fetch=fetch, log=lambda *_: None) == {}

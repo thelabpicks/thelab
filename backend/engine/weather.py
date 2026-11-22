@@ -1,11 +1,18 @@
-"""Game-day wind for outdoor NFL games, and what it does to passing and receiving props.
+"""Game-day wind and cold for outdoor NFL games, and what they do to passing and receiving props.
 
 The prop models have no weather input, but sportsbook lines do. On the props walk-forward (2025-26 out-of-sample
 projections vs nflverse's game-day wind, 2026-11-13), outdoor games with 15+ mph wind came in under projection on
 passing yards by 20%, receiving yards by 25% and receptions by 21% (rushing ran 13% over). A multiplier of
 1 + rate x (wind - 10 mph, at most 20 mph) fit on 2025 Weeks 1-9 and tested on Weeks 10-18: passing yards log loss
 .6864 -> .6784 and 60%+ leans 62.1% -> 65.0% (140); receiving yards .6776 -> .6737; receptions .6496 -> .6465. On 2026
-Weeks 1-8 (few windy games) it was flat. Rushing was mixed, and cold had too few test games, so neither is used.
+Weeks 1-8 (few windy games) it was flat. Rushing was mixed, so it is not adjusted.
+
+Cold (2026-11-22): outdoor kickoffs under 40 F, on top of the wind term, measured against each player's previous-8-game
+average in nflverse 2021-26. Late-season (Week 12+) cold games ran 8-9% under that average vs other late-season games
+in every one of five seasons. A flat cold factor fit walk-forward on prior seasons cut the error on cold games in all
+nine season-market tests (2023-25): passing yards MAE 57.9 -> 56.7, 60.5 -> 59.6, 52.1 -> 50.0; receiving yards
+23.7 -> 22.9, 23.2 -> 22.7, 22.8 -> 22.2; receptions 1.59 -> 1.54, 1.52 -> 1.50, 1.44 -> 1.40. Fit through 2025:
+passing yards -5%, receiving yards -5.5%, receptions -4%.
 
 Live games use the Open-Meteo hourly forecast at the home stadium for kickoff (no key needed). Domes, closed or
 unknown roofs, early international kickoffs (before 10 am Eastern) and any failed lookup get no adjustment.
@@ -21,9 +28,11 @@ from zoneinfo import ZoneInfo
 CALM_MPH = 10.0
 MAX_EXCESS_MPH = 20.0
 RATE = {"pass_yards": -0.020, "rec_yards": -0.025, "receptions": -0.015}
+COLD_F = 40.0
+COLD = {"pass_yards": -0.050, "rec_yards": -0.055, "receptions": -0.040}
 OPEN_ROOFS = {"outdoors", "open"}
-FORECAST_URL = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=wind_speed_10m"
-                "&wind_speed_unit=mph&timezone=UTC&forecast_days=16")
+FORECAST_URL = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=wind_speed_10m,temperature_2m"
+                "&wind_speed_unit=mph&temperature_unit=fahrenheit&timezone=UTC&forecast_days=16")
 
 # home stadiums (latitude, longitude)
 STADIUMS = {
@@ -39,13 +48,17 @@ STADIUMS = {
 ET = ZoneInfo("America/New_York")
 
 
-def factor(market: str, wind_mph: float | None) -> float:
-    """Multiplier for a market's projection at this wind (1.0 = no change)."""
+def factor(market: str, wind_mph: float | None, temp_f: float | None = None) -> float:
+    """Multiplier for a market's projection at this wind and temperature (1.0 = no change)."""
     rate = RATE.get(market)
-    if rate is None or wind_mph is None:
+    if rate is None:
         return 1.0
-    excess = min(max(float(wind_mph) - CALM_MPH, 0.0), MAX_EXCESS_MPH)
-    return 1.0 + rate * excess
+    f = 1.0
+    if wind_mph is not None:
+        f += rate * min(max(float(wind_mph) - CALM_MPH, 0.0), MAX_EXCESS_MPH)
+    if temp_f is not None and float(temp_f) < COLD_F:
+        f += COLD[market]
+    return f
 
 
 def kickoff_utc(gameday: str, gametime: str | None) -> datetime | None:
@@ -60,22 +73,30 @@ def _fetch(url: str) -> dict:
         return json.loads(r.read())
 
 
-def forecast_wind(home: str, kickoff: datetime, fetch=_fetch) -> float | None:
-    """Forecast sustained wind (mph) at the home stadium in the kickoff hour."""
+def forecast(home: str, kickoff: datetime, fetch=_fetch) -> tuple[float | None, float | None] | None:
+    """Forecast sustained wind (mph) and temperature (F) at the home stadium in the kickoff hour."""
     loc = STADIUMS.get(home)
     if loc is None:
         return None
     data = fetch(FORECAST_URL.format(lat=loc[0], lon=loc[1]))
     hourly = data.get("hourly") or {}
     want = kickoff.strftime("%Y-%m-%dT%H:00")
-    for t, w in zip(hourly.get("time") or [], hourly.get("wind_speed_10m") or []):
-        if t == want and w is not None:
-            return float(w)
-    return None
+    times = hourly.get("time") or []
+    if want not in times:
+        return None
+    i = times.index(want)
+
+    def at(key):
+        vals = hourly.get(key) or []
+        return float(vals[i]) if i < len(vals) and vals[i] is not None else None
+
+    wind, temp = at("wind_speed_10m"), at("temperature_2m")
+    return None if wind is None and temp is None else (wind, temp)
 
 
-def game_winds(c, season: int, week: int, fetch=_fetch, log=print) -> dict[str, float]:
-    """Kickoff wind for this week's outdoor games that have not been played, by game_id. Never raises."""
+def game_weather(c, season: int, week: int, fetch=_fetch, log=print) -> dict[str, tuple[float | None, float | None]]:
+    """Kickoff (wind mph, temperature F) for this week's outdoor games that have not been played, by game_id.
+    Never raises."""
     if os.environ.get("FG_WEATHER", "1") == "0":
         return {}
     out = {}
@@ -88,12 +109,15 @@ def game_winds(c, season: int, week: int, fetch=_fetch, log=print) -> dict[str, 
         if k is None:
             continue
         try:
-            w = forecast_wind(home, k, fetch)
+            w = forecast(home, k, fetch)
         except Exception as ex:  # a missing forecast only means no adjustment
             log(f"weather: {gid} forecast failed ({ex})")
             continue
         if w is not None:
             out[gid] = w
     if out:
-        log("weather: kickoff wind " + ", ".join(f"{g} {w:.0f} mph" for g, w in sorted(out.items())))
+        def show(w):
+            wind, temp = w
+            return f"{'?' if wind is None else f'{wind:.0f}'} mph, {'?' if temp is None else f'{temp:.0f}'} F"
+        log("weather: kickoff " + ", ".join(f"{g} {show(w)}" for g, w in sorted(out.items())))
     return out
