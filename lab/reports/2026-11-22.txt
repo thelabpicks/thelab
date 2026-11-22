@@ -1,0 +1,53 @@
+The Lab daily report, Sunday, Nov 22 (results from Saturday, Nov 21)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 35-14 +11.68u / 10-6 −0.16u
+  CFB: 59-15 +1.77u / 7-1 +1.57u
+  NBA: 59-40 +3.52u / 26-12 +2.50u
+
+NFL
+  Picks
+    - No NFL picks were played on this day.
+  How the model did
+    - Featured picks this season: 139 of 252 (55%).
+    - Off calibration: Props Strong: running cold (108 of 199 hit vs 69% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
+  Game sims vs the final
+    - Last 30 days: 30 games, winner right in 21 (70%); each team's points missed by 7.9 on average, running +0.5 vs projected. Furthest-leaning stat: rushing yards, +4.5 per player vs projected.
+
+CFB
+  Picks
+    - Surest hit: Louisville to win (ML -470) (80%), final 10–42.
+    - Miss: Florida State to win (ML -395) at 78%. Final 28–10.
+    - Miss: Indiana to win (ML -340) at 72%. Final 24–27.
+  How the model did
+    - Winners (63 games): 31-29 (52%). By confidence: 70%+ hit 81% of 21, 60-70% hit 100% of 2, under 60% hit 32% of 37.
+    - Spreads (63 games): 34-29 (54%). By confidence: under 60% hit 54% of 63.
+    - Totals (63 games): 37-25 (60%). By confidence: under 60% hit 60% of 62.
+    - Furthest off: East Carolina at Army (projected 47.1 total, scored 16, −31.1); SMU at Notre Dame (projected 56.2 total, scored 27, −29.2).
+    - Suggested college bets this season: 68-80 (46%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.10 vs the pregame input (typical miss 7.1).
+    - Yards per play ran −0.06 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 12.6 points vs 12.4 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - 19 picks are waiting on a final stat line: Jaime Jaquez Jr. over 2.5 assists; Landry Shamet under 2.5 threes made; Jaylen Wells over 15.5 pts + reb + ast; Kris Dunn over 2.5 assists; Ayo Dosunmu over 3.5 rebounds; Cam Spencer over 2.5 rebounds; Kyrie Irving under 3.5 threes made; Zion Williamson over 2.5 assists; Zach Edey over 7.5 rebounds; Payton Pritchard under 6.5 assists; Zach LaVine over 2.5 rebounds; Paul George under 5.5 rebounds; Neemias Queta under 2.5 assists; Sam Hauser under 11.5 points; Darius Acuff Jr. over 31.5 pts + reb + ast; De'Andre Hunter over 1.5 threes made; Precious Achiuwa over 5.5 points; Domantas Sabonis over 4.5 assists; Keegan Murray over 4.5 rebounds. They are graded on the next refresh after the result posts.
+  Where it was off and why
+    - Re-run with the minutes players really got, 3234 of 6638 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −0.8 per player vs the projection (typical miss 5.2).
+    - Team scoring: rotations scored −3.4 points per team vs projected (typical miss 12.7).
+  Model changes
+    - Refit this morning on every box score through 2026-11-20; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - LAC 100-110 DAL (sims LAC 118-113 DAL, winner ✗); biggest misses: Max Christie 13 points (sims 3.2), Naji Marshall 4 points (sims 12.8)
+    - NO 91-114 SA (sims NO 117-132 SA, winner ✓); biggest misses: Victor Wembanyama 50 points (sims 29.7), Saddiq Bey 2 points (sims 18.1)
+    - Last 30 days: 133 games, winner right in 75 (56%); each team's points missed by 10.5 on average (the book's line by 9.3), running -0.7 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
