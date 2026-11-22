@@ -2,7 +2,7 @@ The Lab daily report, Sunday, Nov 22 (results from Saturday, Nov 21)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
-  NFL: 35-14 +11.68u / 10-6 −0.16u
+  NFL: 36-17 +9.48u / 10-7 −1.16u
   CFB: 59-15 +1.77u / 7-1 +1.57u
   NBA: 60-43 +3.52u / 26-12 +2.50u
 
@@ -10,13 +10,13 @@ NFL
   Picks
     - No NFL picks were played on this day.
   How the model did
-    - Featured picks this season: 139 of 252 (55%).
-    - Off calibration: Props Strong: running cold (108 of 199 hit vs 69% expected).
+    - Featured picks this season: 157 of 285 (55%).
+    - Off calibration: Props Strong: running cold (119 of 223 hit vs 70% expected).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
   Game sims vs the final
-    - Last 30 days: 30 games, winner right in 21 (70%); each team's points missed by 7.9 on average, running +0.5 vs projected. Furthest-leaning stat: rushing yards, +4.5 per player vs projected.
+    - Last 30 days: 36 games, winner right in 27 (75%); each team's points missed by 7.9 on average, running +0.8 vs projected. Furthest-leaning stat: rushing yards, +4.3 per player vs projected.
 
 CFB
   Picks
