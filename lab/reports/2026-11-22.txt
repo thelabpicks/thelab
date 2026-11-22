@@ -30,7 +30,7 @@ CFB
     - Furthest off: East Carolina at Army (projected 47.1 total, scored 16, −31.1); SMU at Notre Dame (projected 56.2 total, scored 27, −29.2).
     - Suggested college bets this season: 68-80 (46%).
   Where it was off and why
-    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8.1 points (227 games), so most of the miss was the inputs, not chance.
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8 points (276 games), so most of the miss was the inputs, not chance.
     - Pace (plays) ran +0.10 vs the pregame input (typical miss 7.1).
     - Yards per play ran −0.06 vs the pregame input (typical miss 1).
     - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
