@@ -2,29 +2,31 @@ The Lab daily report, Monday, Nov 23 (results from Sunday, Nov 22)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
-  NFL: 36-17 +9.48u / 10-7 −1.16u
+  NFL: 36-18 +8.48u / 11-8 −1.41u
   CFB: 59-15 +1.77u / 7-1 +1.57u
   NBA: 62-49 +2.52u / 26-12 +2.50u
 
 NFL
   Picks
-    - Surest hit: Brevyn Spann-Ford under 2.5 receptions (68%), finished with 2.
+    - Surest hit: Justin Jefferson under 7.5 receptions (70%), finished with 7.
     - Miss: Emmett Johnson under 3.5 receptions at 73% (pick of the day). Finished with 4.
+    - Miss: Jonah Coleman under 3.5 receptions at 72% (pick of the day). Finished with 4.
     - Miss: Kenny Gainwell under 2.5 receptions at 69%. Finished with 4.
     - Miss: Kevin Coleman Jr. over 0.5 receptions at 68%. Finished with 0.
-    - 7 picks are waiting on a final stat line: Braelon Allen over 1.5 receptions; Jonah Coleman under 3.5 receptions; T.J. Hockenson under 50.5 receiving yards; Brock Purdy under 15.5 rushing yards; Aaron Jones over 29.5 rushing yards; Christian McCaffrey under 33.5 receiving yards; Justin Jefferson under 7.5 receptions. They are graded on the next refresh after the result posts.
+    - Miss: Braelon Allen over 1.5 receptions at 59%. Finished with 1.
+    - Miss: T.J. Hockenson under 50.5 receiving yards at 58%. Finished with 55.
   How the model did
-    - Every graded prop and TD lean on 7 games: 123-155 (44%). By confidence: 70%+ hit 38% of 13, 60-70% hit 58% of 45, under 60% hit 42% of 220.
-    - Featured picks this season: 157 of 285 (55%).
-    - Off calibration: Props Strong: running cold (119 of 223 hit vs 70% expected).
+    - Every graded prop and TD lean on 11 games: 180-260 (41%). By confidence: 70%+ hit 50% of 20, 60-70% hit 52% of 69, under 60% hit 38% of 351.
+    - Featured picks this season: 165 of 300 (55%).
+    - Off calibration: Props Strong: running cold (126 of 236 hit vs 70% expected).
   Where it was off and why
-    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.7 to 13.7, mostly from his role.
-    - Team pass attempts keeps running below the pregame input (-1.5 passes over 128). A correction was tested on past weeks and did not help yet, so it is left alone.
-    - Favorite's margin vs spread keeps running above the pregame input (+3.2 points over 64). Watching it; no automatic correction for this input.
-    - Expected players who sat out keeps running above the pregame input (+0.9 players over 128). Watching it; no automatic correction for this input.
-    - Carry share keeps running above the pregame input (+1.2 pct pts over 409). Watching it; no automatic correction for this input.
-    - Snap share keeps running above the pregame input (+0.8 pct pts over 1330). Watching it; no automatic correction for this input.
-    - Biggest misses: Josh Allen pass yards (sim 199.4, had 304; his role); Patrick Mahomes pass yards (sim 223.2, had 324; team volume); Kyle McCord pass yards (sim 200.8, had 102; efficiency).
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.7 to 13.4, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.2 passes over 136). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.1 points over 68). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 136). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.1 pct pts over 436). Watching it; no automatic correction for this input.
+    - Snap share keeps running above the pregame input (+0.8 pct pts over 1578). Watching it; no automatic correction for this input.
+    - Biggest misses: Trevor Lawrence pass yards (sim 189.4, had 301; team volume); Josh Allen pass yards (sim 199.4, had 304; his role); Patrick Mahomes pass yards (sim 223.2, had 324; team volume).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
