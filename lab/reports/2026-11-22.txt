@@ -16,7 +16,7 @@ NFL
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
   Game sims vs the final
-    - Last 30 days: 36 games, winner right in 27 (75%); each team's points missed by 7.9 on average, running +0.8 vs projected. Furthest-leaning stat: rushing yards, +4.3 per player vs projected.
+    - Last 30 days: 40 games, winner right in 28 (70%); each team's points missed by 7.7 on average, running +1.1 vs projected. Furthest-leaning stat: rushing yards, +4.2 per player vs projected.
 
 CFB
   Picks
@@ -65,4 +65,4 @@ NBA
   Game sims vs the final
     - LAC 100-110 DAL (sims LAC 118-113 DAL, winner ✗); biggest misses: Max Christie 13 points (sims 3.2), Naji Marshall 4 points (sims 12.8)
     - NO 91-114 SA (sims NO 117-132 SA, winner ✓); biggest misses: Victor Wembanyama 50 points (sims 29.7), Saddiq Bey 2 points (sims 18.1)
-    - Last 30 days: 133 games, winner right in 75 (56%); each team's points missed by 10.5 on average (the book's line by 9.3), running -0.7 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
+    - Last 30 days: 134 games, winner right in 75 (56%); each team's points missed by 10.6 on average (the book's line by 9.3), running -0.8 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
