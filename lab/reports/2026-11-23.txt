@@ -1,0 +1,90 @@
+The Lab daily report, Monday, Nov 23 (results from Sunday, Nov 22)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 36-17 +9.48u / 10-7 −1.16u
+  CFB: 59-15 +1.77u / 7-1 +1.57u
+  NBA: 62-49 +2.52u / 26-12 +2.50u
+
+NFL
+  Picks
+    - Surest hit: Brevyn Spann-Ford under 2.5 receptions (68%), finished with 2.
+    - Miss: Emmett Johnson under 3.5 receptions at 73% (pick of the day). Finished with 4.
+    - Miss: Kenny Gainwell under 2.5 receptions at 69%. Finished with 4.
+    - Miss: Kevin Coleman Jr. over 0.5 receptions at 68%. Finished with 0.
+    - 7 picks are waiting on a final stat line: Braelon Allen over 1.5 receptions; Jonah Coleman under 3.5 receptions; T.J. Hockenson under 50.5 receiving yards; Brock Purdy under 15.5 rushing yards; Aaron Jones over 29.5 rushing yards; Christian McCaffrey under 33.5 receiving yards; Justin Jefferson under 7.5 receptions. They are graded on the next refresh after the result posts.
+  How the model did
+    - Every graded prop and TD lean on 7 games: 123-155 (44%). By confidence: 70%+ hit 38% of 13, 60-70% hit 58% of 45, under 60% hit 42% of 220.
+    - Featured picks this season: 157 of 285 (55%).
+    - Off calibration: Props Strong: running cold (119 of 223 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.7 to 13.7, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.5 passes over 128). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.2 points over 64). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 128). Watching it; no automatic correction for this input.
+    - Carry share keeps running above the pregame input (+1.2 pct pts over 409). Watching it; no automatic correction for this input.
+    - Snap share keeps running above the pregame input (+0.8 pct pts over 1330). Watching it; no automatic correction for this input.
+    - Biggest misses: Josh Allen pass yards (sim 199.4, had 304; his role); Patrick Mahomes pass yards (sim 223.2, had 324; team volume); Kyle McCord pass yards (sim 200.8, had 102; efficiency).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
+  Game sims vs the final
+    - MIN 10-35 SF (sims MIN 22-25 SF, winner ✓); biggest misses: Mike Evans 109 receiving yards (sims 36.8), Kaelon Black 8 rushing yards (sims 45.6)
+    - LV 24-38 DEN (sims LV 15-26 DEN, winner ✓); biggest misses: Jack Bech 88 receiving yards (sims 17.5), Evan Engram 74 receiving yards (sims 20.1)
+    - PIT 16-19 PHI (sims PIT 21-17 PHI, winner ✗); biggest misses: DK Metcalf 2 receiving yards (sims 65), Jaylen Warren 28 rushing yards (sims 73.3)
+    - NYJ 27-24 LAC (sims NYJ 19-22 LAC, winner ✗); biggest misses: Breece Hall 86 rushing yards (sims 46.8), Kimani Vidal 36 rushing yards (sims 20.2)
+    - ARI 7-34 KC (sims ARI 13-28 KC, winner ✓); biggest misses: Harrison Wallace III 57 receiving yards (sims 8.3), Travis Kelce 74 receiving yards (sims 43.1)
+    - BAL 33-35 CAR (sims BAL 21-24 CAR, winner ✓); biggest misses: Chuba Hubbard 120 rushing yards (sims 73.9), Rashod Bateman 67 receiving yards (sims 25.7)
+    - MIA 9-26 BUF (sims MIA 14-31 BUF, winner ✓); biggest misses: Khalil Shakir 101 receiving yards (sims 42.2), DJ Moore 91 receiving yards (sims 48.9)
+    - NO 13-21 CHI (sims NO 19-30 CHI, winner ✓); biggest misses: Chris Olave 102 receiving yards (sims 48.5), Jordyn Tyson 6 receiving yards (sims 59.5)
+    - TB 21-31 DET (sims TB 22-26 DET, winner ✓); biggest misses: Jameson Williams 93 receiving yards (sims 48.6), Ted Hurst III 56 receiving yards (sims 19.3)
+    - TEN 30-51 DAL (sims TEN 24-31 DAL, winner ✓); biggest misses: Calvin Ridley 68 receiving yards (sims 13.6), Chimere Dike 69 receiving yards (sims 15.3)
+    - JAX 18-23 NYG (sims JAX 26-20 NYG, winner ✗); biggest misses: Parker Washington 103 receiving yards (sims 54.4), Jakobi Meyers 85 receiving yards (sims 38.3)
+    - Last 30 days: 41 games, winner right in 29 (71%); each team's points missed by 7.8 on average, running +1 vs projected. Furthest-leaning stat: receptions, +0.3 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+  How the model did
+    - Winners (16 games): 6-10 (38%). By confidence: 70%+ hit 80% of 5, 60-70% hit 100% of 1, under 60% hit 10% of 10.
+    - Spreads (16 games): 7-9 (44%). By confidence: under 60% hit 44% of 16.
+    - Totals (16 games): 8-8 (50%). By confidence: under 60% hit 50% of 16.
+    - Furthest off: SMU at Notre Dame (projected 56.2 total, scored 27, −29.2); Colorado State at Fresno State (projected 65.6 total, scored 91, +25.4).
+    - Suggested college bets this season: 68-80 (46%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8 points (276 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.10 vs the pregame input (typical miss 7.1).
+    - Yards per play ran −0.06 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 12.6 points vs 12.4 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - Surest hit: Gui Santos over 3.5 rebounds (64%), finished with 5.
+    - Miss: Anthony Davis over 1.5 assists at 64%. Finished with 1.
+    - Miss: Klay Thompson under 2.5 rebounds at 64%. Finished with 6.
+    - Miss: Yaxel Lendeborg over 3.5 assists at 64%. Finished with 3.
+    - Miss: Pelle Larsson under 3.5 assists at 64%. Finished with 5.
+    - Miss: Josh Hart under 23.5 pts + reb + ast at 63%. Finished with 31.
+    - Miss: Jalen Suggs over 3.5 assists at 63%. Finished with 2.
+    - Miss: Cade Cunningham over 1.5 threes made at 56%. Finished with 1.
+    - Graded since the last report: Zion Williamson over 2.5 assists (void).
+  How the model did
+    - Every lean the model made on 7 games: 306-232 (57%). By confidence: 70%+ hit 91% of 43, 60-70% hit 68% of 82, under 60% hit 51% of 413.
+    - Unders 58% (305), overs 56% (233).
+    - Furthest off among confident leans: Bub Carrington pra (projected 9.7, had 0, line 5.5); Max Christie pra (projected 12.1, had 5, line 6.5).
+  Where it was off and why
+    - Re-run with the minutes players really got, 3453 of 7084 losing leans would have been right, so minutes caused 49% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −0.7 per player vs the projection (typical miss 5.2).
+    - Team scoring: rotations scored −3.5 points per team vs projected (typical miss 12.9).
+  Model changes
+    - Refit this morning on every box score through 2026-11-22; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - IND 106-113 NY (sims IND 107-108 NY, winner ✓); biggest misses: Quenton Jackson 2 points (sims 10.2), Josh Hart 10 assists (sims 4)
+    - DEN 151-145 CHI (sims DEN 120-117 CHI, winner ✓); biggest misses: Jamal Murray 45 points (sims 24.2), Buddy Hield 33 points (sims 12.6)
+    - DAL 116-114 UTAH (sims DAL 115-120 UTAH, winner ✗); biggest misses: Svi Mykhailiuk 39 points (sims 11.1), Darryn Peterson 6 points (sims 19.3)
+    - ORL 96-116 WSH (sims ORL 113-116 WSH, winner ✓)
+    - DET 97-107 ATL (sims DET 118-116 ATL, winner ✗); biggest misses: Cade Cunningham 5 points (sims 25.3), Onyeka Okongwu 6 points (sims 18.1)
+    - Last 30 days: 138 games, winner right in 78 (57%); each team's points missed by 10.6 on average (the book's line by 9.4), running -0.6 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
