@@ -54,12 +54,12 @@ CFB
     - Furthest off: SMU at Notre Dame (projected 56.2 total, scored 27, −29.2); Colorado State at Fresno State (projected 65.6 total, scored 91, +25.4).
     - Suggested college bets this season: 68-80 (46%).
   Where it was off and why
-    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 18 to 8 points (276 games), so most of the miss was the inputs, not chance.
-    - Pace (plays) ran +0.10 vs the pregame input (typical miss 7.1).
-    - Yards per play ran −0.06 vs the pregame input (typical miss 1).
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.9 to 8.1 points (296 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.01 vs the pregame input (typical miss 7.2).
+    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
     - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
   Model changes
-    - Totals: typical miss 12.6 points vs 12.4 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+    - Totals: typical miss 12.5 points vs 12.3 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
 
 NBA
   Picks
