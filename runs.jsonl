@@ -89,3 +89,4 @@
 {"date": "2026-11-23", "ran_at": "2026-11-23T20:50:11+00:00", "box_scores": {"season": 2027, "games": 248, "player_rows": 5546, "last_game_date": "2026-11-22"}, "odds": {"kept": "2026-11-23.json"}}
 {"date": "2026-11-23", "ran_at": "2026-11-24T02:41:45+00:00", "box_scores": {"season": 2027, "games": 248, "player_rows": 5546, "last_game_date": "2026-11-22"}, "odds": {"kept": "2026-11-23.json"}}
 {"date": "2026-11-24", "ran_at": "2026-11-24T06:14:51+00:00", "box_scores": {"season": 2027, "games": 248, "player_rows": 5546, "last_game_date": "2026-11-22"}, "odds": {"saved": "2026-11-24.json", "game_lines": 0, "props": 0, "credits_remaining": 242.0, "errors": []}}
+{"date": "2026-11-24", "ran_at": "2026-11-24T19:53:51+00:00", "box_scores": {"season": 2027, "games": 258, "player_rows": 5773, "last_game_date": "2026-11-23"}, "odds": {"kept": "2026-11-24.json"}}
