@@ -8,13 +8,27 @@ Records count only picks at a line a sportsbook posted with a 60%+ chance at loc
 
 NFL
   Picks
-    - 8 picks are waiting on a final stat line: Chig Okonkwo under 44.5 receiving yards; Joe Burrow over 2.5 passing TDs; Stefon Diggs under 4.5 receptions; Treylon Burks under 27.5 receiving yards; Mike Gesicki under 24.5 receiving yards; Chase Brown over 24.5 receiving yards; Samaje Perine over 20.5 rushing yards; Tee Higgins over 5.5 receptions. They are graded on the next refresh after the result posts.
+    - Surest hit: Stefon Diggs under 4.5 receptions (58%), finished with 4.
+    - Miss: Chig Okonkwo under 44.5 receiving yards at 58%. Finished with 66.
+    - Miss: Joe Burrow over 2.5 passing TDs at 58%. Finished with 2.
+    - Miss: Treylon Burks under 27.5 receiving yards at 58%. Finished with 30.
+    - Miss: Mike Gesicki under 24.5 receiving yards at 58%. Finished with 77.
+    - Miss: Tee Higgins over 5.5 receptions at 53%. Finished with 2.
+    - 2 picks are waiting on a final stat line: Chase Brown over 24.5 receiving yards; Samaje Perine over 20.5 rushing yards. They are graded on the next refresh after the result posts.
   How the model did
-    - Featured picks this season: 165 of 300 (55%).
-    - Off calibration: Props Strong: running cold (126 of 236 hit vs 70% expected).
+    - Every graded prop and TD lean on 1 game: 7-24 (23%). By confidence: 60-70% hit 50% of 6, under 60% hit 16% of 25.
+    - Featured picks this season: 165 of 303 (54%).
+    - Off calibration: Props Strong: running cold (126 of 238 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.7 to 13.3, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.2 passes over 138). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.0 points over 69). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 138). Watching it; no automatic correction for this input.
+    - Snap share keeps running above the pregame input (+0.8 pct pts over 1599). Watching it; no automatic correction for this input.
+    - Biggest misses: Trevor Lawrence pass yards (sim 189.4, had 301; team volume); Antonio Williams rec yards (sim 16.4, had 122; efficiency); Josh Allen pass yards (sim 199.4, had 304; his role).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
-    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0007), volume (+0.0002).
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0004), volume (−0.0001).
   Game sims vs the final
     - CIN 20-22 WAS (sims CIN 30-24 WAS, winner ✗); biggest misses: Antonio Williams 122 receiving yards (sims 29.9), Ja'Marr Chase 31 receiving yards (sims 105.3)
     - Last 30 days: 42 games, winner right in 29 (69%); each team's points missed by 7.7 on average, running +0.8 vs projected. Furthest-leaning stat: receptions, +0.3 per player vs projected.
@@ -56,9 +70,10 @@ NBA
     - Refit this morning on every box score through 2026-11-23; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
     - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
   Game sims vs the final
+    - UTAH 94-109 LAL (sims UTAH 118-118 LAL, winner ✓); biggest misses: Svi Mykhailiuk 4 points (sims 12.7), Sandro Mamukelashvili 2 points (sims 10.6)
     - LAC 104-116 HOU (sims LAC 111-111 HOU, winner ✓); biggest misses: Brook Lopez 3 points (sims 14.8), Keaton Wagler 2 points (sims 10.5)
     - CLE 108-122 CHI (sims CLE 120-120 CHI, winner ✗); biggest misses: Jordan Hawkins 19 points (sims 4.4), Josh Giddey 4 points (sims 14.6)
     - PHX 123-119 NO (sims PHX 117-119 NO, winner ✗); biggest misses: Jordan Poole 28 points (sims 13.8), Jeremiah Fears 7 points (sims 18.5)
     - MIL 116-111 TOR (sims MIL 100-116 TOR, winner ✗); biggest misses: Myles Turner 27 points (sims 8.5), Tyler Herro 32 points (sims 18.1)
     - POR 128-111 PHI (sims POR 120-106 PHI, winner ✓); biggest misses: Anfernee Simons 3 points (sims 11.7), Toumani Camara 5 points (sims 13.6)
-    - Last 30 days: 143 games, winner right in 80 (56%); each team's points missed by 10.4 on average (the book's line by 9.3), running -0.5 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
+    - Last 30 days: 144 games, winner right in 81 (56%); each team's points missed by 10.5 on average (the book's line by 9.3), running -0.6 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
