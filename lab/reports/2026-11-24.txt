@@ -76,4 +76,4 @@ NBA
     - PHX 123-119 NO (sims PHX 117-119 NO, winner ✗); biggest misses: Jordan Poole 28 points (sims 13.8), Jeremiah Fears 7 points (sims 18.5)
     - MIL 116-111 TOR (sims MIL 100-116 TOR, winner ✗); biggest misses: Myles Turner 27 points (sims 8.5), Tyler Herro 32 points (sims 18.1)
     - POR 128-111 PHI (sims POR 120-106 PHI, winner ✓); biggest misses: Anfernee Simons 3 points (sims 11.7), Toumani Camara 5 points (sims 13.6)
-    - Last 30 days: 144 games, winner right in 81 (56%); each team's points missed by 10.5 on average (the book's line by 9.3), running -0.6 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
+    - Last 30 days: 146 games, winner right in 82 (56%); each team's points missed by 10.5 on average (the book's line by 9.4), running -0.7 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
