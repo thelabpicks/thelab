@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-24",
-  "ran_at": "2026-11-24T23:41:28+00:00",
+  "date": "2026-11-25",
+  "ran_at": "2026-11-25T23:25:19+00:00",
   "files": [
     {
       "file": "cfb_schedules_2010.csv",
@@ -130,7 +130,7 @@
     {
       "file": "team_box_2026.csv",
       "status": "downloaded",
-      "bytes": 174990
+      "bytes": 175432
     },
     {
       "file": "player_box_2021.csv",
@@ -155,11 +155,12 @@
     {
       "file": "player_box_2026.csv",
       "status": "downloaded",
-      "bytes": 7767376
+      "bytes": 7785288
     },
     {
       "file": "cfb_line_odds.csv.gz",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 7047701
     },
     {
       "file": "pbp_stats_2014.csv",
@@ -211,41 +212,27 @@
     },
     {
       "file": "play_by_play_2026.parquet",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 112676867
     }
   ],
   "espn": {
     "scoreboard": {
-      "saved": "2026-11-24.json",
-      "items": 69
+      "saved": "2026-11-25.json",
+      "items": 67
     },
     "rankings": {
-      "saved": "2026-11-24.json",
-      "items": 3
+      "saved": "2026-11-25.json",
+      "items": 4
     },
     "finals": {
-      "games": 64,
-      "saved": "2026-11-24.json"
+      "games": 60,
+      "saved": "2026-11-25.json"
     }
   },
   "odds": {
-    "saved": "2026-11-24.json",
-    "game_lines": 3422,
-    "team_totals": 0,
-    "props": 0,
-    "budget": {
-      "plan": "free",
-      "allowance": 500.0,
-      "reserve": 200.0,
-      "game_lines": true,
-      "team_totals": 0,
-      "props": 0,
-      "alt": 0,
-      "cost": 3,
-      "reason": "ok"
-    },
-    "credits_remaining": 230.0,
-    "errors": []
+    "skipped": "not a line day (Tuesday and Saturday)",
+    "credits_remaining": 227.0
   },
   "license": "College football scores, schedules, closing lines and player stats: cfbfastR / CollegeFootballData.com, https://github.com/sportsdataverse/cfbfastR-data. Scoreboard: ESPN public site feed. Prices: The Odds API."
 }
