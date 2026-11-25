@@ -1,6 +1,6 @@
 {
   "date": "2026-11-24",
-  "ran_at": "2026-11-25T00:15:32+00:00",
+  "ran_at": "2026-11-25T04:58:36+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -36,11 +36,13 @@
     },
     {
       "file": "player_box_2027.csv",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 3482182
     },
     {
       "file": "nba_schedule_2027.csv",
-      "status": "kept"
+      "status": "downloaded",
+      "bytes": 3498176
     }
   ],
   "box_scores": {
@@ -75,8 +77,8 @@
   },
   "official_injuries": {
     "saved": "2026-11-24.json",
-    "players": 90,
-    "report": "Injury-Report_2026-11-24_07_15PM.pdf"
+    "players": 102,
+    "report": "Injury-Report_2026-11-24_11_45PM.pdf"
   },
   "rosters": {
     "teams": 30,
