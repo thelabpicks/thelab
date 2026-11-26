@@ -2,16 +2,25 @@ The Lab daily report, Thursday, Nov 26 (results from Wednesday, Nov 25)
 
 Records (top 10 / picks of the day, season):
 Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
-  NFL: 36-18 +8.48u / 11-8 −1.41u
+  NFL: 37-18 +9.41u / 11-9 −2.41u
   CFB: 59-15 +1.77u / 7-1 +1.57u
   NBA: 72-52 +3.32u / 26-12 +2.50u
 
 NFL
   Picks
-    - 2 picks are waiting on a final stat line: Christian Watson under 74.5 receiving yards; Konata Mumpfield under 3.5 receptions. They are graded on the next refresh after the result posts.
+    - Surest hit: Christian Watson under 74.5 receiving yards (64%), finished with 65.
+    - Miss: Konata Mumpfield under 3.5 receptions at 69% (pick of the day). Finished with 4.
   How the model did
-    - Featured picks this season: 165 of 303 (54%).
-    - Off calibration: Props Strong: running cold (126 of 238 hit vs 70% expected).
+    - Every graded prop and TD lean on 1 game: 20-20 (50%). By confidence: 70%+ hit 33% of 3, 60-70% hit 67% of 6, under 60% hit 48% of 31.
+    - Featured picks this season: 168 of 308 (55%).
+    - Off calibration: Props Strong: running cold (128 of 242 hit vs 70% expected).
+  Where it was off and why
+    - Rushing yards: knowing who played, the team's volume and each player's role would have cut the typical miss from 22.8 to 13.3, mostly from his role.
+    - Team pass attempts keeps running below the pregame input (-1.3 passes over 140). A correction was tested on past weeks and did not help yet, so it is left alone.
+    - Favorite's margin vs spread keeps running above the pregame input (+3.1 points over 70). Watching it; no automatic correction for this input.
+    - Expected players who sat out keeps running above the pregame input (+0.9 players over 140). Watching it; no automatic correction for this input.
+    - Snap share keeps running above the pregame input (+0.8 pct pts over 1624). Watching it; no automatic correction for this input.
+    - Biggest misses: Blake Corum rush yards (sim 40.3, had 184; his role); Matthew Stafford pass yards (sim 241.4, had 140; team volume); Konata Mumpfield rec yards (sim 18.6, had 69; his role).
   Model changes
     - Adopted: catch rate correction, which tested better on recent weeks.
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0004), volume (−0.0001).
