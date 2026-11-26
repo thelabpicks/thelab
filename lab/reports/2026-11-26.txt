@@ -26,7 +26,7 @@ NFL
     - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0004), volume (−0.0001).
   Game sims vs the final
     - GB 13-26 LA (sims GB 21-23 LA, winner ✓); biggest misses: Blake Corum 184 rushing yards (sims 46.8), Kyren Williams 19 receiving yards (sims 55.3)
-    - Last 30 days: 43 games, winner right in 30 (70%); each team's points missed by 7.7 on average, running +0.8 vs projected. Furthest-leaning stat: rushing yards, +4 per player vs projected.
+    - Last 30 days: 44 games, winner right in 31 (70%); each team's points missed by 7.7 on average, running +0.9 vs projected. Furthest-leaning stat: rushing yards, +4.4 per player vs projected.
 
 CFB
   Picks
