@@ -59,4 +59,4 @@ NBA
     - DAL 120-101 DEN (sims DAL 113-110 DEN, winner ✓); biggest misses: Aaron Gordon 1 points (sims 13), Caleb Martin 13 points (sims 6.9)
     - BOS 131-116 WSH (sims BOS 110-117 WSH, winner ✗); biggest misses: Jayson Tatum 41 points (sims 25.2), Neemias Queta 21 points (sims 10.7)
     - DET 104-86 ORL (sims DET 114-110 ORL, winner ✓); biggest misses: Anthony Black 5 points (sims 14.3), Isaiah Joe 21 points (sims 12.1)
-    - Last 30 days: 147 games, winner right in 83 (56%); each team's points missed by 10.5 on average (the book's line by 9.4), running -0.7 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
+    - Last 30 days: 149 games, winner right in 84 (56%); each team's points missed by 10.5 on average (the book's line by 9.4), running -0.8 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
