@@ -1,0 +1,48 @@
+The Lab daily report, Friday, Nov 27 (results from Thursday, Nov 26)
+
+Records (top 10 / picks of the day, season):
+Records count only picks at a line a sportsbook posted with a 60%+ chance at lock; units risk 1 unit a pick at the price shown.
+  NFL: 37-18 +9.41u / 11-9 −2.41u
+  CFB: 59-15 +1.77u / 7-1 +1.57u
+  NBA: 72-52 +3.32u / 26-12 +2.50u
+
+NFL
+  Picks
+    - 6 picks are waiting on a final stat line: Jahmyr Gibbs to score a touchdown; Zach Ertz over 0.5 receiving yards; Emmett Johnson under 30.5 receiving yards; Travis Kelce under 4.5 receptions; Rashee Rice under 45.5 receiving yards; Josh Allen under 38.5 rushing yards. They are graded on the next refresh after the result posts.
+  How the model did
+    - Featured picks this season: 168 of 308 (55%).
+    - Off calibration: Props Strong: running cold (128 of 242 hit vs 70% expected).
+  Model changes
+    - Adopted: catch rate correction, which tested better on recent weeks.
+    - Tested and rejected (no reliable gain on recent weeks): yards per target (−0.0004), yards per carry (+0.0004), volume (−0.0001).
+  Game sims vs the final
+    - KC 10-13 BUF (sims KC 21-24 BUF, winner ✓); biggest misses: Josh Allen 81 passing yards (sims 233.2), Xavier Worthy 0 receiving yards (sims 33.6)
+    - PHI 39-38 DAL (sims PHI 21-29 DAL, winner ✗); biggest misses: DeVonta Smith 200 receiving yards (sims 66.8), Saquon Barkley 7 rushing yards (sims 63)
+    - CHI 39-35 DET (sims CHI 29-28 DET, winner ✓); biggest misses: Jahmyr Gibbs 205 rushing yards (sims 93.1), D'Andre Swift 97 receiving yards (sims 16.5)
+    - Last 30 days: 46 games, winner right in 32 (70%); each team's points missed by 7.9 on average, running +1 vs projected. Furthest-leaning stat: rushing yards, +4.4 per player vs projected.
+
+CFB
+  Picks
+    - No CFB picks were played on this day.
+  How the model did
+    - Suggested college bets this season: 69-80 (46%).
+  Where it was off and why
+    - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.9 to 8.1 points (296 games), so most of the miss was the inputs, not chance.
+    - Pace (plays) ran +0.01 vs the pregame input (typical miss 7.2).
+    - Yards per play ran −0.07 vs the pregame input (typical miss 1).
+    - Turnovers ran +0.03 vs the pregame input (typical miss 0.9).
+  Model changes
+    - Totals: typical miss 12.5 points vs 12.3 for the closing line. Ratings refit every morning on the newest finals; new inputs ship only after testing better in the Monday review.
+
+NBA
+  Picks
+    - No NBA picks were played on this day.
+  Where it was off and why
+    - Re-run with the minutes players really got, 3806 of 7879 losing leans would have been right, so minutes caused 48% of the misses and production the rest (last 2 weeks).
+    - Minutes ran −0.7 per player vs the projection (typical miss 5.1).
+    - Team scoring: rotations scored −3.8 points per team vs projected (typical miss 12.8).
+  Model changes
+    - Refit this morning on every box score through 2026-11-25; 5 of 5 markets passed the test on unseen games (assists, points, pra, rebounds, threes).
+    - Team scoring correction kept: 65%+ leans hit 67% with it vs 66% without on unseen seasons.
+  Game sims vs the final
+    - Last 30 days: 153 games, winner right in 86 (56%); each team's points missed by 10.4 on average (the book's line by 9.2), running -0.9 vs projected. Furthest-leaning stat: rebounds, -0.2 per player vs projected.
