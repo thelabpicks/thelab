@@ -25,6 +25,10 @@ CFB
   Picks
     - No CFB picks were played on this day.
   How the model did
+    - Winners (1 game): 1-0 (100%). By confidence: 70%+ hit 100% of 1.
+    - Spreads (1 game): 0-1 (0%). By confidence: under 60% hit 0% of 1.
+    - Totals (1 game): 1-0 (100%). By confidence: under 60% hit 100% of 1.
+    - Furthest off: TCU at Texas Tech (projected 47.5 total, scored 75, +27.5).
     - Suggested college bets this season: 69-80 (46%).
   Where it was off and why
     - Re-run with the real plays, yards per play and turnovers, the total's typical miss falls from 17.9 to 8.1 points (296 games), so most of the miss was the inputs, not chance.
