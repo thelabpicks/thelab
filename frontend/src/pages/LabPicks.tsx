@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Star, Trophy } from "lucide-react";
 import { STATIC } from "@/lib/api";
 import { chicago, cn, pct } from "@/lib/format";
-import { BET, BOARD_MIN_PRICE, confidenceOf, counts, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
+import { BET, BOARD_MIN_PRICE, confidenceOf, counts, isBet, LEAN_ONLY_ADVICE, leanOnly, DAILY_MIN_CHANCE, DAILY_MIN_EDGE, LEAN, SPORTS, SURE, SPORT_LABEL, playDate, tally, type DailyPick, type LabBoard, type LabPick, type LabRecord, type Sport } from "@/lib/lab";
 import { PageTitle } from "@/components/Layout";
 import { Badge, Card, CardBody, CardHeader, LoadingBlock, Notice } from "@/components/ui";
 import { WriteUp } from "@/components/WriteUp";
@@ -38,7 +38,7 @@ export default function LabPicks({ sport }: { sport: Sport }) {
   const today = (b?.daily?.picks ?? []).filter((d) => d.sport === sport && d.date === b?.daily.today && !d.withdrawn && !d.fill);
   const starred = new Set(today.map((d) => `${d.game_id}|${d.bet}`));
   const tags = b?.record.by_tag?.[sport];
-  const bets = board.filter((p) => p.chance >= BET), leans = board.filter((p) => p.chance < BET);
+  const bets = board.filter(isBet), leans = board.filter((p) => !isBet(p));
   const row = (p: LabPick) => <PickRow key={p.id} p={p} star={starred.has(`${p.game_id}|${p.bet}`)} open={open.has(p.id)} onToggle={() => toggle(p.id)} />;
   return (
     <div className="space-y-4">
@@ -75,7 +75,8 @@ export default function LabPicks({ sport }: { sport: Sport }) {
             <b className="text-danger">Risky</b> under {n100(LEAN)}%, close to a coin flip.</p>
           <p>Picks of the day (starred) are stricter: {n100(DAILY_MIN_CHANCE)}%+ to hit and at least {n100(DAILY_MIN_EDGE)} points likelier than the book's price says,
             locked when chosen and tracked on their own record. A day with no pick that strong gets none.</p>
-          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines with a {n100(BET)}%+ chance at lock; leans under that still show, marked NC (not counted). Units assume 1 unit a pick at the locked price.
+          <p>A pick on the list at kickoff is frozen and graded after the final. Records count only book lines with a {n100(BET)}%+ chance at lock; leans under that still show, marked NC (not counted). NFL player props (not anytime touchdowns) are shown as leans and not counted
+            for now: since Week 8 the model has not beaten the books' own lines on them, so they return only once a new input does over 3+ weeks. Units assume 1 unit a pick at the locked price.
             Even a 90% pick loses 1 time in 10. Research, not betting advice.</p>
         </div>
       </details>
@@ -197,7 +198,7 @@ function PickRow({ p, star, open, onToggle }: { p: LabPick; star: boolean; open:
         </div>
         <div className="shrink-0 text-right">
           <div className="font-display text-lg font-bold leading-tight">{pct(p.chance, 0)}</div>
-          {p.result ? <ResultBadge p={p} /> : <ConfidenceTag chance={p.chance} />}
+          {p.result ? <ResultBadge p={p} /> : <ConfidenceTag p={p} />}
         </div>
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} aria-hidden />
       </button>
@@ -216,8 +217,9 @@ function PickRow({ p, star, open, onToggle }: { p: LabPick; star: boolean; open:
 }
 
 const TONE_CLASS = { ok: "text-ok", accent: "text-accent", warn: "text-warn", danger: "text-danger" } as const;
-function ConfidenceTag({ chance }: { chance: number }) {
-  const c = confidenceOf(chance);
+function ConfidenceTag({ p }: { p: LabPick }) {
+  // an NFL prop at 60%+ still reads as a Lean: those markets are leans only for now (lab.ts leanOnly)
+  const c = leanOnly(p) && p.chance >= BET ? { label: "Lean", tone: "warn" as const, advice: LEAN_ONLY_ADVICE } : confidenceOf(p.chance);
   return <div className={cn("text-[11px] font-semibold", TONE_CLASS[c.tone])} title={c.advice}>{c.label}</div>;
 }
 
@@ -309,7 +311,7 @@ function RecordCard({ b, sport }: { b: LabBoard; sport: Sport }) {
 
 /** A big hit / miss mark for the results list. */
 function ResultMark({ p, floor = BET }: { p: LabPick; floor?: number }) {
-  const why = p.line_source !== "book" ? "Not counted: no sportsbook line" : `Not counted: a lean under ${n100(BET)}% at lock`;
+  const why = p.line_source !== "book" ? "Not counted: no sportsbook line" : leanOnly(p) ? `Not counted: ${LEAN_ONLY_ADVICE}` : `Not counted: a lean under ${n100(BET)}% at lock`;
   if (p.result && !counts(p, floor)) return <span title={why} aria-label={why}
     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-raised text-[10px] font-semibold text-muted">NC</span>;
   const r = p.result;

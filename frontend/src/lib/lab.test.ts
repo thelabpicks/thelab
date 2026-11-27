@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, cfbCandidates, chooseDaily, confidenceOf, grade, nbaCandidates, publish, rankBoard, tally, type LabPick } from "./lab";
+import { advance, cfbCandidates, chooseDaily, confidenceOf, grade, isBet, leanOnly, nbaCandidates, publish, rankBoard, tally, type LabPick } from "./lab";
 import type { AltLine, CfbGame } from "./cfb";
 import type { NbaConfidence, NbaRow, Slate } from "./nba";
 
@@ -289,5 +289,26 @@ describe("records", () => {
       pick({ id: "c", game_id: "3", player_id: "3", kickoff: "2026-10-25T00:00:00Z", price: -450 }),
     ], {}, now);
     expect(s.board.map((p) => p.id)).toEqual(["c"]);
+  });
+});
+
+describe("NFL props are leans only from Nov 27, 2026", () => {
+  const nfl = (o: Partial<LabPick>) => pick({ sport: "nfl", market: "rec_yards", kickoff: "2026-11-30T18:00:00Z", chance: 0.68, ...o });
+  it("never counts an NFL yardage or receptions prop as a Bet, but keeps anytime TDs, earlier picks and other sports", () => {
+    expect([nfl({}), nfl({ market: "td" }), nfl({ kickoff: "2026-11-23T18:00:00Z" }), pick({ kickoff: "2026-11-30T00:00:00Z" })].map(isBet))
+      .toEqual([false, true, true, true]);
+    const r = tally([nfl({ id: "a", result: "won" }), nfl({ id: "b", market: "td", result: "won" }), nfl({ id: "c", kickoff: "2026-11-23T18:00:00Z", result: "lost" })]);
+    expect([r.won, r.lost, r.unbooked]).toEqual([1, 1, 1]);
+    const b = publish({ updated_at: "2026-12-01T00:00:00Z", board: [], frozen: [nfl({ id: "a", result: "won" })] }, sports);
+    expect([b.record.by_tag!.nfl.bet.n, b.record.by_tag!.nfl.lean.won]).toEqual([0, 1]);
+  });
+  it("never picks one as a pick of the day, and withdraws one locked before the change", () => {
+    const now = new Date("2026-11-29T15:00:00Z");
+    const c = nfl({ id: "x", game_id: "9", player_id: "9", kickoff: "2026-11-29T18:00:00Z", chance: 0.8 });
+    expect(chooseDaily([], [c], now)).toEqual([]);
+    expect(leanOnly(c)).toBe(true);
+    const locked = { ...c, date: "2026-11-29", slot: 1, chosen_at: "2026-11-26T15:00:00Z" };
+    const s = advance({ updated_at: null, board: [], frozen: [], daily: [locked] }, [c], {}, now);
+    expect([s.daily![0].result, s.daily![0].withdrawn]).toEqual(["void", true]);
   });
 });
