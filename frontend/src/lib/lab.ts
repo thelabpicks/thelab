@@ -48,6 +48,16 @@ export function confidenceOf(chance: number): Confidence {
   if (chance >= LEAN) return { label: "Lean", tone: "warn", advice: "Slight edge: a small bet, or leave it." };
   return { label: "Risky", tone: "danger", advice: "Close to a coin flip: only as a long shot, or lean away." };
 }
+/** NFL player props (yards, receptions, passing TDs; anytime TDs are not included) are shown as leans and never count as
+ *  Bets or picks of the day (Andrew, 2026-11-27). Replayed on every line books posted in Weeks 8-11, the model sorted overs
+ *  from unders no better than a coin flip (AUC 0.50, the books' own prices 0.55), and the Week 7 code gave the same chances.
+ *  They come back once a new input beats the books on 3+ weeks of posted lines. Picks before this date keep their record. */
+export const NFL_PROP_LEANS_FROM = "2026-11-27T00:00:00Z";
+export const leanOnly = (p: { sport: Sport; market: string; kickoff: string }) =>
+  p.sport === "nfl" && p.market !== "td" && new Date(p.kickoff) >= new Date(NFL_PROP_LEANS_FROM);
+/** A Bet: 60%+ at lock and not a lean-only market. */
+export const isBet = (p: { sport: Sport; market: string; kickoff: string; chance: number }) => p.chance >= BET && !leanOnly(p);
+export const LEAN_ONLY_ADVICE = "NFL props are leans for now: since Week 8 the model has not beaten the books' lines.";
 /** No pick shorter than this price: a -5000 favorite risks 50 to win 1, so one loss erases a month of wins and bettors
  *  read it as a padded record. At -500 a pick needs 83% to break even, which the calibrated favorites clear. */
 export const BOARD_MIN_PRICE = -500;
@@ -377,7 +387,7 @@ export function chooseDaily(prev: DailyPick[], open: LabPick[], now: Date): Dail
       if (have.length >= DAILY_SIZE) continue;
       const games = new Set(have.map((d) => d.game_id)), players = new Set(have.map((d) => d.player_id).filter(Boolean));
       const pool = open.filter((p) => p.sport === sp && playDate(p.kickoff) === date && new Date(p.kickoff) > now && listable(p)
-        && p.chance >= DAILY_MIN_CHANCE && (p.price == null || p.price >= DAILY_MIN_PRICE) && beatsPrice(p) && p.potd !== false && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
+        && p.chance >= DAILY_MIN_CHANCE && !leanOnly(p) && (p.price == null || p.price >= DAILY_MIN_PRICE) && beatsPrice(p) && p.potd !== false && !games.has(p.game_id) && !(p.player_id && players.has(p.player_id)));
       rankBoard(pool, DAILY_SIZE - have.length, false).forEach((p, i) => {
         const { frozen_at: _f, ...rest } = p;
         out.push({ ...rest, date, slot: have.length + i + 1, chosen_at: now.toISOString() });
@@ -409,6 +419,9 @@ export function advance(prev: LabState, cands: LabPick[], res: Results, now: Dat
     // and so is one locked under the current floor
     .map((d) => !d.result && !started(d) && d.chance < DAILY_MIN_CHANCE
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: under the ${DAILY_MIN_CHANCE * 100}% floor for a pick of the day`, withdrawn: true } : d)
+    // and an NFL prop locked before props became leans only (leanOnly)
+    .map((d) => !d.result && !started(d) && leanOnly(d)
+      ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: ${LEAN_ONLY_ADVICE}`, withdrawn: true } : d)
     // and one locked before the edge rule whose sims don't beat its price
     .map((d) => !d.result && !started(d) && !beatsPrice(d)
       ? { ...d, result: "void" as const, actual: `Withdrawn before kickoff: the sims (${Math.round(d.chance * 100)}%) don't beat what the price implies (${Math.round(impliedChance(d.price!) * 100)}%)`, withdrawn: true } : d)
@@ -422,7 +435,8 @@ export const winUnits = (price: number) => (price > 0 ? price / 100 : 100 / -pri
 /** A pick counts in a record only at a line a sportsbook posted and a 60%+ chance when it locked (Andrew, 2026-11-18).
  *  Every list still shows 10 picks, but on the season through Nov 17 the ones under 60% went 43-52 while 60%+ went
  *  133-63, so the leans are shown, tagged, graded and marked "not counted". */
-export const counts = (p: LabPick, floor = BET) => p.line_source === "book" && p.chance >= floor;
+/** floor 0 (picks of the day, the Leans group's own record) counts every booked pick; a Bet floor never counts a leanOnly pick. */
+export const counts = (p: LabPick, floor = BET) => p.line_source === "book" && p.chance >= floor && (floor === 0 || !leanOnly(p));
 
 /** A record of these picks. The top 10 counts from BET up (the default); picks of the day pass 0, since they were locked
  *  under their own bar (DAILY_MIN_CHANCE and the edge over the price) and every one counts. */
@@ -454,7 +468,7 @@ export function publish(s: LabState, sports: LabBoard["sports"], recentN = 60): 
     record: { ...tally(settled), by_sport: by, since: s.frozen.length ? s.frozen.map((p) => p.kickoff).sort()[0] : null,
       by_tag: Object.fromEntries(SPORTS.map((sp) => {
         const xs = settled.filter((p) => p.sport === sp);
-        return [sp, { bet: tally(xs.filter((p) => p.chance >= BET)), lean: tally(xs.filter((p) => p.chance < BET), 0) }];
+        return [sp, { bet: tally(xs.filter(isBet)), lean: tally(xs.filter((p) => !isBet(p)), 0) }];
       })) as Record<Sport, { bet: LabRecord; lean: LabRecord }> },
     recent: SPORTS.flatMap((sp) => s.frozen.filter((p) => p.sport === sp).sort((a, b) => b.kickoff.localeCompare(a.kickoff)).slice(0, recentN)),
     daily: dailyBoard(s),
