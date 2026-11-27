@@ -1,6 +1,6 @@
 {
   "date": "2026-11-27",
-  "ran_at": "2026-11-27T10:24:41+00:00",
+  "ran_at": "2026-11-27T18:40:24+00:00",
   "files": [
     {
       "file": "player_box_2019.csv",
@@ -54,7 +54,7 @@
   "espn": {
     "injuries": {
       "saved": "2026-11-27.json",
-      "items": 27
+      "items": 28
     },
     "scoreboard": {
       "saved": "2026-11-27.json",
@@ -77,8 +77,8 @@
   },
   "official_injuries": {
     "saved": "2026-11-27.json",
-    "players": 103,
-    "report": "Injury-Report_2026-11-27_05_15AM.pdf"
+    "players": 115,
+    "report": "Injury-Report_2026-11-27_01_30PM.pdf"
   },
   "rosters": {
     "teams": 30,
@@ -86,26 +86,11 @@
   },
   "espn_props": {
     "saved": "2026-11-27.json",
-    "lines": 638,
+    "lines": 649,
     "errors": {}
   },
   "odds": {
-    "saved": "2026-11-27.json",
-    "game_lines": 0,
-    "props": 0,
-    "budget": {
-      "plan": "free",
-      "allowance": 500.0,
-      "reserve": 200.0,
-      "remaining": 203.0,
-      "game_lines": false,
-      "espn_lines": true,
-      "props": false,
-      "cost": 0,
-      "reason": "free plan: player props need a paid plan"
-    },
-    "credits_remaining": 203.0,
-    "errors": []
+    "kept": "2026-11-27.json"
   },
   "license": "NBA box scores and schedules: sportsdataverse / hoopR (ESPN data), https://github.com/sportsdataverse/sportsdataverse-data. Injuries and scoreboard: ESPN public site feed."
 }
