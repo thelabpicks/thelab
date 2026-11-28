@@ -19,7 +19,7 @@ NFL
     - KC 10-13 BUF (sims KC 21-24 BUF, winner ✓); biggest misses: Josh Allen 81 passing yards (sims 233.2), Xavier Worthy 0 receiving yards (sims 33.6)
     - PHI 39-38 DAL (sims PHI 21-29 DAL, winner ✗); biggest misses: DeVonta Smith 200 receiving yards (sims 66.8), Saquon Barkley 7 rushing yards (sims 63)
     - CHI 39-35 DET (sims CHI 29-28 DET, winner ✓); biggest misses: Jahmyr Gibbs 205 rushing yards (sims 93.1), D'Andre Swift 97 receiving yards (sims 16.5)
-    - Last 30 days: 46 games, winner right in 32 (70%); each team's points missed by 7.9 on average, running +1 vs projected. Furthest-leaning stat: rushing yards, +4.4 per player vs projected.
+    - Last 30 days: 47 games, winner right in 32 (68%); each team's points missed by 8 on average, running +0.9 vs projected. Furthest-leaning stat: rushing yards, +4.2 per player vs projected.
 
 CFB
   Picks
